@@ -158,6 +158,35 @@ export default function PostExamPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sunucu otoritesiyle periyodik yeniden senkron — yerel sayaç sekme arka planı / uyku
+  // sonrası bayatlayabilir; mutlak süre sunucuda. 30 sn'de bir düzelt. GET /timer süresi
+  // dolmuşsa expired döner ve attempt'i kapatır → 0'a çek, otomatik submit tetiklensin.
+  useEffect(() => {
+    if (!attemptId || timeLeft === null) return;
+    const syncId = setInterval(() => {
+      fetch(`/api/exam/${attemptId}/timer`, { method: 'GET' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.expired) { setTimeLeft(0); return; }
+          if (typeof data.remainingSeconds === 'number') {
+            // Sadece anlamlı sapmada (>2 sn) düzelt — gereksiz re-render'ı önle.
+            setTimeLeft(prev => (prev !== null && Math.abs(prev - data.remainingSeconds) > 2 ? data.remainingSeconds : prev));
+          }
+        })
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(syncId);
+  }, [attemptId, timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Otomatik gönderim öncesi tek seferlik uyarı — son 60 sn'de personeli bilgilendir.
+  const timeoutWarnedRef = useRef(false);
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || timeLeft > 60) return;
+    if (timeoutWarnedRef.current) return;
+    timeoutWarnedRef.current = true;
+    toast('Sınav süresi dolmak üzere — süre bitince sınav otomatik gönderilecektir.', 'warning');
+  }, [timeLeft, toast]);
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) setTabSwitchCount((prev) => prev + 1);

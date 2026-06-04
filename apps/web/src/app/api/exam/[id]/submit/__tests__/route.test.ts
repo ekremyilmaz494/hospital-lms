@@ -198,6 +198,25 @@ describe('POST /api/exam/[id]/submit', () => {
     expect(prismaMock.trainingAssignment.update).not.toHaveBeenCalled()
   })
 
+  it('post-exam + postExamStartedAt null → reddetmez, stamp edip devam eder (güvenlik ağı)', async () => {
+    prismaMock.examAttempt.findFirst.mockResolvedValue(baseAttempt({ postExamStartedAt: null }))
+    prismaMock.examAnswer.findMany.mockResolvedValue([
+      { questionId: 'q1', selectedOptionId: 'q1a' },
+      { questionId: 'q2', selectedOptionId: 'q2a' },
+    ])
+
+    const res = await POST(submitRequest({ phase: 'post' }), ctx)
+    expect(res.status).toBe(200) // 400 "başlatılmamış" DEĞİL
+    const body = await res.json()
+    expect(body.score).toBe(100)
+
+    const stampCall = prismaMock.examAttempt.updateMany.mock.calls.find((c) => {
+      const data = (c[0] as { data: Record<string, unknown> }).data
+      return data?.postExamStartedAt instanceof Date && data?.postExamScore === undefined
+    })
+    expect(stampCall).toBeTruthy()
+  })
+
   it('pre-exam submit — skor yazılır, nextStep videos', async () => {
     prismaMock.examAttempt.findFirst.mockResolvedValue(
       baseAttempt({ status: 'pre_exam', preExamStartedAt: new Date(), postExamStartedAt: null, preExamScore: null }),

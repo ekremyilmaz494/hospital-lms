@@ -94,6 +94,33 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
     return errorResponse('Yetkisiz erişim', 403)
   }
 
+  const phase = attemptStatusToExamPhase(attempt.status as AttemptStatus)
+
+  // Son sınav saatinin LAZY başlangıcı — KRİTİK (İZEM CAN incident, 2026-06-03):
+  // postExamStartedAt artık video bitiminde DEĞİL, personel son sınava fiilen girdiğinde
+  // (bu POST mount'ta çağrılınca) damgalanır. Aksi halde video↔sınav arası gecikme
+  // (ara verme, sekme kapatıp dönme) sınav süresini sessizce eritir ve kullanıcı süresi
+  // varken otomatik submit'e takılır. Atomik guard (status + postExamStartedAt: null)
+  // çift mount / iki sekme race'inde ikinci yazımı eler — ilk POST kazanır, saat bir kez sabitlenir.
+  if (phase === 'post' && attempt.postExamStartedAt === null) {
+    const now = new Date()
+    const stamped = await prisma.examAttempt.updateMany({ // perf-check-disable-line
+      where: { id: attempt.id, status: 'post_exam' satisfies AttemptStatus, postExamStartedAt: null },
+      data: { postExamStartedAt: now },
+    })
+    // Yalnız bu istek stamp'i kazandıysa lokal kopyayı güncelle ki aşağıdaki recovery
+    // doğru phaseStartedAt ile timer'ı dolaştırsın. Yarışı kaybettiysek DB'den taze oku.
+    if (stamped.count > 0) {
+      attempt.postExamStartedAt = now
+    } else {
+      const fresh = await prisma.examAttempt.findUnique({ // perf-check-disable-line
+        where: { id: attempt.id },
+        select: { postExamStartedAt: true },
+      })
+      attempt.postExamStartedAt = fresh?.postExamStartedAt ?? now
+    }
+  }
+
   // Fast-path: Redis'te canlı sayaç var → olduğu gibi dön
   const remaining = await getExamTimeRemaining(attempt.id)
   if (remaining !== null) {
@@ -103,7 +130,6 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
   // Redis TTL geçmiş veya Redis flush. DB'deki phaseStartedAt'tan recovery.
   // Eskiden burası her zaman tam süreli taze timer başlatıyordu → kullanıcı süre
   // dolmuş bile olsa sanki yeni sınava girmiş gibi görüyordu; submit ise 5 dk grace'le reddediyordu.
-  const phase = attemptStatusToExamPhase(attempt.status as AttemptStatus)
   const phaseStartedAt = phase === 'pre' ? attempt.preExamStartedAt : phase === 'post' ? attempt.postExamStartedAt : null
 
   if (phaseStartedAt && attempt.training.examDurationMinutes) {

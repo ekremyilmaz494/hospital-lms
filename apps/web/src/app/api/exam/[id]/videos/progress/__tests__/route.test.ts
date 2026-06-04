@@ -367,6 +367,13 @@ describe('POST /api/exam/[id]/videos/progress — K2 sertleştirme regresyon gua
           where: { id: ATTEMPT_ID, status: 'watching_videos' },
         }),
       )
+      // KRİTİK (İZEM CAN incident): video bitiminde postExamStartedAt SET EDİLMEZ.
+      const transitionArgs = prismaMock.examAttempt.updateMany.mock.calls.at(-1)![0] as {
+        data: Record<string, unknown>
+      }
+      expect(transitionArgs.data).toHaveProperty('videosCompletedAt')
+      expect(transitionArgs.data).toHaveProperty('status')
+      expect(transitionArgs.data).not.toHaveProperty('postExamStartedAt')
     })
   })
 

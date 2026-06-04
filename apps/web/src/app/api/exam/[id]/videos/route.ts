@@ -477,12 +477,14 @@ export const POST = withStaffRoute<{ id: string }>(
         // Atomik guard: yalnız hâlâ watching_videos iken güncelle. Doğrudan update
         // yerine status-filtreli updateMany — cron expire ya da başka bir POST
         // attempt'i terminal/post_exam yaptıysa geri açma (/videos/progress deseni).
+        // NOT: postExamStartedAt'ı burada SET ETME — son sınav saati personel sınava
+        // fiilen girince (timer POST mount'ta) başlar. videos/progress/route.ts ile
+        // tutarlı (İZEM CAN incident, 2026-06-03).
         const advanced = await prisma.examAttempt.updateMany({
           where: { id: activeAttempt.id, status: 'watching_videos' satisfies AttemptStatus },
           data: {
             videosCompletedAt: new Date(),
             status: transition.next,
-            postExamStartedAt: new Date(),
           },
         });
         return jsonResponse({ progress: true, allVideosCompleted: advanced.count > 0 });

@@ -100,11 +100,33 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Bu aşamada sınav gönderimi yapılamaz', 400)
   }
 
-  // B7.1/G7.1 — phaseStartedAt null ise sınav başlatılmamış demek; gönderimi reddet
-  const phaseStartedAt = phase === 'pre' ? attempt.preExamStartedAt : attempt.postExamStartedAt
+  // B7.1/G7.1 — phaseStartedAt null ise sınav başlatılmamış demek.
+  let phaseStartedAt = phase === 'pre' ? attempt.preExamStartedAt : attempt.postExamStartedAt
   if (!phaseStartedAt) {
-    logger.warn('Exam Submit', 'phaseStartedAt null — sınav başlatılmamış, gönderim reddedildi', { attemptId: attempt.id })
-    return errorResponse('Sınav henüz başlatılmamış. Lütfen sınavı yeniden başlatın.', 400)
+    // Post-exam güvenlik ağı (İZEM CAN incident sonrası lazy-start tasarımı): postExamStartedAt
+    // normalde timer POST'unda mount'ta damgalanır. Kullanıcı bunu hiç tetiklemeden (JS hatası
+    // / çok hızlı otomatik submit) post submit ederse reddetmek cevapları kaybettirir. Bu durumda
+    // şimdi stamp edip devam et — grace kontrolü elapsed≈0 verir, doğru geçer. Pre-exam null ise
+    // gerçekten anormal (pre saat attempt yaratımında set edilir) → reddi koru.
+    if (phase === 'post') {
+      const now = new Date()
+      const stamped = await prisma.examAttempt.updateMany({
+        where: { id: attempt.id, status: 'post_exam' satisfies AttemptStatus, postExamStartedAt: null },
+        data: { postExamStartedAt: now },
+      })
+      if (stamped.count > 0) {
+        phaseStartedAt = now
+      } else {
+        const fresh = await prisma.examAttempt.findUnique({
+          where: { id: attempt.id },
+          select: { postExamStartedAt: true },
+        })
+        phaseStartedAt = fresh?.postExamStartedAt ?? now
+      }
+    } else {
+      logger.warn('Exam Submit', 'phaseStartedAt null — sınav başlatılmamış, gönderim reddedildi', { attemptId: attempt.id })
+      return errorResponse('Sınav henüz başlatılmamış. Lütfen sınavı yeniden başlatın.', 400)
+    }
   }
 
   // Server-side timer check — reject submissions more than 5 minutes past exam duration

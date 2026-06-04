@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
-    examAttempt: { findFirst: vi.fn(), updateMany: vi.fn() },
+    examAttempt: { findFirst: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
     trainingAssignment: { update: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -50,12 +50,13 @@ vi.mock('@/lib/api-handler', () => ({
   },
 }))
 
-import { GET } from '../route'
+import { GET, POST } from '../route'
 import { logger } from '@/lib/logger'
-import { getExamTimeRemaining, isExamExpired } from '@/lib/redis'
+import { getExamTimeRemaining, isExamExpired, resumeExamTimer } from '@/lib/redis'
 import { assignmentNextStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
 
 const loggerWarn = vi.mocked(logger.warn)
+const redisResume = vi.mocked(resumeExamTimer)
 const redisRemaining = vi.mocked(getExamTimeRemaining)
 const redisExpired = vi.mocked(isExamExpired)
 
@@ -216,5 +217,73 @@ describe('autoCompleteExpiredAttempt — atomiklik + state machine tutarlılığ
       const r = assignmentNextStatus(s, { type: 'POST_EXAM_FAILED', attemptsRemaining: 1 })
       expect(r.ok).toBe(false)
     }
+  })
+})
+
+/**
+ * POST handler — son sınav saatinin LAZY başlangıcı (İZEM CAN incident, 2026-06-03).
+ * postExamStartedAt artık video bitiminde değil, personel son sınava fiilen girince
+ * (bu POST mount'ta çağrılınca) damgalanır.
+ */
+function postAttempt(overrides: { status?: string; postExamStartedAt?: Date | null; preExamStartedAt?: Date | null } = {}) {
+  return {
+    id: 'att-1',
+    userId: 'staff-1',
+    status: overrides.status ?? 'post_exam',
+    assignmentId: 'asg-1',
+    preExamStartedAt: overrides.preExamStartedAt ?? null,
+    postExamStartedAt: overrides.postExamStartedAt ?? null,
+    training: { organizationId: 'org-1', examDurationMinutes: 30 },
+  }
+}
+
+const postReq = new Request('http://localhost/api/exam/att-1/timer', { method: 'POST' })
+
+describe('POST timer — postExamStartedAt lazy stamp', () => {
+  it('post_exam + postExamStartedAt null → atomik guard ile stamp + taze süre', async () => {
+    prismaMock.examAttempt.findFirst.mockResolvedValue(postAttempt({ postExamStartedAt: null }))
+    prismaMock.examAttempt.updateMany.mockResolvedValue({ count: 1 })
+
+    const res = await POST(postReq, ctx)
+    expect(res.status).toBe(200)
+
+    expect(prismaMock.examAttempt.updateMany).toHaveBeenCalledOnce()
+    const args = prismaMock.examAttempt.updateMany.mock.calls[0][0] as {
+      where: { id: string; status: string; postExamStartedAt: null }
+      data: { postExamStartedAt: Date }
+    }
+    expect(args.where.id).toBe('att-1')
+    expect(args.where.status).toBe('post_exam')
+    expect(args.where.postExamStartedAt).toBeNull()
+    expect(args.data.postExamStartedAt).toBeInstanceOf(Date)
+
+    expect(redisResume).toHaveBeenCalledOnce()
+    const body = (await res.json()) as { remainingSeconds: number; expired: boolean }
+    expect(body.expired).toBe(false)
+    expect(body.remainingSeconds).toBeGreaterThan(1790)
+  })
+
+  it('postExamStartedAt zaten dolu → ikinci stamp YOK (idempotent)', async () => {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000)
+    prismaMock.examAttempt.findFirst.mockResolvedValue(postAttempt({ postExamStartedAt: fiveMinAgo }))
+
+    const res = await POST(postReq, ctx)
+    expect(res.status).toBe(200)
+
+    expect(prismaMock.examAttempt.updateMany).not.toHaveBeenCalled()
+    expect(redisResume).toHaveBeenCalledOnce()
+    const body = (await res.json()) as { expired: boolean }
+    expect(body.expired).toBe(false)
+  })
+
+  it('pre_exam fazı → postExamStartedAt stamp EDİLMEZ', async () => {
+    const oneMinAgo = new Date(Date.now() - 60 * 1000)
+    prismaMock.examAttempt.findFirst.mockResolvedValue(
+      postAttempt({ status: 'pre_exam', preExamStartedAt: oneMinAgo, postExamStartedAt: null }),
+    )
+
+    const res = await POST(postReq, ctx)
+    expect(res.status).toBe(200)
+    expect(prismaMock.examAttempt.updateMany).not.toHaveBeenCalled()
   })
 })
