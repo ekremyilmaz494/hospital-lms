@@ -2,6 +2,7 @@ import { addMonths } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
+import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
 /** GET /api/exam/[id]/scorm/tracking — Get latest SCORM attempt */
@@ -33,6 +34,10 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
 /** POST /api/exam/[id]/scorm/tracking — Create new SCORM attempt */
 export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: trainingId } = params
+
+  // Oturum oluşturma seyrek olmalı — abuse/yanlışlıkla tekrar mount koruması.
+  const allowed = await checkRateLimit(`scorm-attempt-create:${dbUser.id}`, 5, 60)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
 
   try {
     // Verify user has assignment for this training (any period — SCORM legacy)
@@ -69,6 +74,10 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 /** PATCH /api/exam/[id]/scorm/tracking — Update SCORM attempt data */
 export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
   const { id: trainingId } = params
+
+  // SCORM commit'leri sık gelir (istemci ~2sn debounce → ~30/dk); burst için tavan 40/dk.
+  const allowed = await checkRateLimit(`scorm-attempt-update:${dbUser.id}`, 40, 60)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
 
   const body = await parseBody<{
     suspendData?: string

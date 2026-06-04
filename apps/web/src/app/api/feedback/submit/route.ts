@@ -48,14 +48,13 @@ export const POST = withStaffRoute(async ({ request, dbUser, organizationId, aud
       attemptNumber: true,
       trainingId: true,
       training: {
+        // Yalnız erişilebilirlik kontrolü için gereken alanlar (isTrainingAccessible)
+        // + org doğrulaması. Sertifika BU route'ta üretilmez — exam/submit pass'te üretir;
+        // bu yüzden title/renewalPeriodMonths/feedbackMandatory burada gereksizdi.
         select: {
           organizationId: true,
           isActive: true,
           publishStatus: true,
-          // Sertifika ertelemesi: feedbackMandatory=true ise bu route sertifikayı üretir.
-          title: true,
-          renewalPeriodMonths: true,
-          feedbackMandatory: true,
         },
       },
       assignment: { select: { originalMaxAttempts: true, periodId: true } },

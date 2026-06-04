@@ -163,10 +163,12 @@ export default function PostExamPage() {
   // dolmuşsa expired döner ve attempt'i kapatır → 0'a çek, otomatik submit tetiklensin.
   useEffect(() => {
     if (!attemptId || timeLeft === null) return;
-    const syncId = setInterval(() => {
+    let cancelled = false;
+    const syncNow = () => {
       fetch(`/api/exam/${attemptId}/timer`, { method: 'GET' })
         .then(res => res.json())
         .then(data => {
+          if (cancelled) return;
           if (data.expired) { setTimeLeft(0); return; }
           if (typeof data.remainingSeconds === 'number') {
             // Sadece anlamlı sapmada (>2 sn) düzelt — gereksiz re-render'ı önle.
@@ -174,8 +176,13 @@ export default function PostExamPage() {
           }
         })
         .catch(() => {});
-    }, 30000);
-    return () => clearInterval(syncId);
+    };
+    const syncId = setInterval(syncNow, 30000);
+    // Sekme tekrar görünür olunca anında senkron — arka planda 30 sn poll de throttle olur,
+    // dönüşte bir poll periyodu boyunca bayat kalmasın.
+    const onVisible = () => { if (!document.hidden) syncNow(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { cancelled = true; clearInterval(syncId); document.removeEventListener('visibilitychange', onVisible); };
   }, [attemptId, timeLeft !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Otomatik gönderim öncesi tek seferlik uyarı — son 60 sn'de personeli bilgilendir.
