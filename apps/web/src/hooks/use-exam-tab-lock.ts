@@ -13,6 +13,13 @@ import { useEffect, useState } from 'react'
  *
  * Mekanizma: `localStorage` (kalıcı kilit kaydı + staleness) + `BroadcastChannel`
  * (anlık mesaj) + `storage` event (BroadcastChannel yoksa yedek bildirim).
+ *
+ * Kapsam sınırı (D3 — WONTFIX, bilinçli): Bu bir UX guard'ı, GÜVENLİK SINIRI DEĞİL.
+ * DevTools'tan `localStorage` anahtarı silinerek baypas edilebilir; kabul edilmiştir.
+ * Gerçek sınav bütünlüğü SUNUCUDA: save-answer last-write-wins + 30sn cevap kilidi +
+ * skorun DB'den hesaplanması. Önerilen sequence-counter sertleştirmesi, aşağıdaki
+ * heartbeat'in meşru crash-recovery'sini (sahip sekme çökünce kilidi devralma) bozma
+ * riski taşıdığından EKLENMEDİ — net güvenlik faydası yok, regresyon riski var.
  */
 
 /** Stale kilit eşiği — bu süreden eski heartbeat'li kilit terk edilmiş sayılır. */
