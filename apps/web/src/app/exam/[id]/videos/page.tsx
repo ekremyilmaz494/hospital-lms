@@ -78,6 +78,11 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// Sonraki içeriğe otomatik geçişten önce kullanıcıya gösterilen görünür geri sayım
+// (saniye). transition/page.tsx'teki COUNTDOWN_SECONDS ile aynı konvansiyon
+// (proje genelinde src/lib/constants.ts yok; sabitler dosya-içi module-level const).
+const AUTO_ADVANCE_SECONDS = 8;
+
 export default function VideoPlayerPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
@@ -165,6 +170,9 @@ export default function VideoPlayerPage() {
   const [videoError, setVideoError] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const lastAllowedTime = useRef(0);
+  // null = geri sayım kapalı; sayı = sonraki içeriğe kalan saniye. Yalnız içerik doğal
+  // bitince + completed POST 'ok' döndükten SONRA set edilir (kayıt onaylanmadan geçiş yok).
+  const [autoAdvanceLeft, setAutoAdvanceLeft] = useState<number | null>(null);
   const [orientationHintDismissed, setOrientationHintDismissed] = useState(true);
 
   useEffect(() => {
@@ -181,6 +189,7 @@ export default function VideoPlayerPage() {
   }, []);
 
   const changeVideo = useCallback((idx: number) => {
+    setAutoAdvanceLeft(null);
     setCurrentVideoIdx(idx);
     lastAllowedTime.current = 0;
     setCurrentTime(0);
@@ -221,6 +230,8 @@ export default function VideoPlayerPage() {
   const activeMedia = mediaItems[currentMediaIdx >= 0 ? currentMediaIdx : 0];
   const activePdf = pdfItems[currentPdfIdx >= 0 ? currentPdfIdx : 0];
   const currentVideo = isMixed ? activeMedia : singleCurrent;
+  // Geri sayım overlay'inde başlığını göstereceğimiz sonraki içerik (yoksa undefined).
+  const nextItem = isMixed ? mediaItems[currentMediaIdx + 1] : videosData[currentVideoIdx + 1];
   // O5: PDF içerikleri son sınava geçiş için OPSİYONEL — sunucu da öyle sayıyor.
   // "Son Sınava Git" gating'i yalnız video/ses içeriğine (mediaItems) bağlı.
   // Boş mediaItems → every() true döner (yalnızca PDF olan eğitimde sınav açık).
@@ -336,6 +347,7 @@ export default function VideoPlayerPage() {
   }, [isReview]);
 
   const goToNextVideo = useCallback(() => {
+    setAutoAdvanceLeft(null);
     if (isMixed) {
       if (currentMediaIdx < mediaItems.length - 1) {
         setCurrentMediaIdx(currentMediaIdx + 1);
@@ -356,6 +368,14 @@ export default function VideoPlayerPage() {
     videosData.length,
     changeVideo,
   ]);
+
+  // "Şimdi Geç" butonu + geri sayım 0'a inince çağrılır. goToNextVideo index'i
+  // closure'dan idx+1 olarak set ettiği için (functional update değil) çift çağrı
+  // idempotenttir — iki içerik birden atlanmaz.
+  const advanceNow = useCallback(() => {
+    setAutoAdvanceLeft(null);
+    goToNextVideo();
+  }, [goToNextVideo]);
 
   // Kayıt durumu: 'idle' = sorun yok, 'error' = retry'lar tükendi (ilerleme kaydedilemiyor).
   const [saveStatus, setSaveStatus] = useState<'idle' | 'error'>('idle');
@@ -496,7 +516,9 @@ export default function VideoPlayerPage() {
         ) {
           setTimeout(() => router.replace(`/exam/${id}/transition?from=videos`), 800);
         } else if (!isLastVideo) {
-          setTimeout(() => goToNextVideo(), 1500);
+          // Sessiz 1.5s geçiş yerine: kullanıcıya görünür geri sayım göster (POST 'ok'
+          // sonrası başlar). 0'a inince veya "Şimdi Geç" ile goToNextVideo tetiklenir.
+          setAutoAdvanceLeft(AUTO_ADVANCE_SECONDS);
         }
       } else if (result.kind === 'transient') {
         // Geçici hata — iyimser tamamlamayı geri al, kullanıcı tekrar deneyebilsin.
@@ -550,6 +572,25 @@ export default function VideoPlayerPage() {
     // hiç ateşlenmez. postVideoProgress useCallback ile stabil, churn yaratmaz.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, currentVideo?.id, id, isReview, postVideoProgress]);
+
+  // Geri sayım tik'i — yalnız aktifken çalışır. Stabil boolean dep + functional
+  // updater kullanır, böylece her saniye effect yeniden kurulmaz (transition/page.tsx
+  // ve heartbeat effect'iyle aynı dep-churn önleme deseni).
+  const countdownActive = autoAdvanceLeft !== null;
+  useEffect(() => {
+    if (!countdownActive) return;
+    const t = setInterval(() => {
+      setAutoAdvanceLeft((prev) => (prev === null ? null : prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(t); // unmount + skip + 0'a ulaşma → temizlik
+  }, [countdownActive]);
+
+  // Geri sayım 0'a inince sonraki içeriğe geç. advanceNow setAutoAdvanceLeft(null)
+  // yapar → countdownActive false → yukarıdaki interval cleanup'ı tetiklenir (leak yok).
+  useEffect(() => {
+    if (autoAdvanceLeft === 0) advanceNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAdvanceLeft]);
 
   useEffect(() => {
     const flushPosition = () => {
@@ -874,7 +915,7 @@ export default function VideoPlayerPage() {
             </div>
           )}
 
-          <div className={isMixed ? 'vd-media-col' : ''}>
+          <div className={`vd-media-stage ${isMixed ? 'vd-media-col' : ''}`}>
             {currentVideo.contentType === 'audio' ? (
               <div className="vd-audio-wrap">
                 <AudioPlayer
@@ -907,6 +948,13 @@ export default function VideoPlayerPage() {
                             () => router.replace(`/exam/${id}/transition?from=videos`),
                             800
                           );
+                        } else {
+                          // Ses bitti ama hâlâ tamamlanmamış içerik var → sonraki içeriğe
+                          // görünür geri sayımla geç (video yoluyla aynı davranış).
+                          const isLastMedia = isMixed
+                            ? currentMediaIdx >= mediaItems.length - 1
+                            : currentVideoIdx >= videosData.length - 1;
+                          if (!isLastMedia) setAutoAdvanceLeft(AUTO_ADVANCE_SECONDS);
                         }
                       } else if (result.kind === 'transient') {
                         setLocalCompleted((prev) => {
@@ -1100,7 +1148,8 @@ export default function VideoPlayerPage() {
                       </span>
                     </div>
                     <div className="vd-controls-right">
-                      {currentVideo.completed &&
+                      {autoAdvanceLeft === null &&
+                        currentVideo.completed &&
                         (isMixed
                           ? currentMediaIdx < mediaItems.length - 1
                           : currentVideoIdx < videosData.length - 1) && (
@@ -1135,6 +1184,45 @@ export default function VideoPlayerPage() {
                 </div>
               </div>
             )}
+            {autoAdvanceLeft !== null && (
+              <div className="vd-aa-overlay" role="status" aria-live="polite">
+                <span className="vd-aa-eyebrow">Sıradaki içerik</span>
+                {nextItem?.title && <span className="vd-aa-title">{nextItem.title}</span>}
+                <div className="vd-aa-ring-wrap">
+                  <svg viewBox="0 0 64 64" className="vd-aa-ring" aria-hidden="true">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="26"
+                      fill="none"
+                      strokeWidth="4"
+                      stroke="rgba(255,255,255,0.2)"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="26"
+                      fill="none"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      stroke="#fff"
+                      transform="rotate(-90 32 32)"
+                      className="vd-aa-arc"
+                      strokeDasharray={2 * Math.PI * 26}
+                      strokeDashoffset={2 * Math.PI * 26 * (1 - autoAdvanceLeft / AUTO_ADVANCE_SECONDS)}
+                    />
+                  </svg>
+                  <span className="vd-aa-num">{autoAdvanceLeft}</span>
+                </div>
+                <span className="vd-aa-text">
+                  {`Sonraki içeriğe ${autoAdvanceLeft} saniye içinde geçilecek`}
+                </span>
+                <button type="button" onClick={advanceNow} className="vd-aa-skip">
+                  <SkipForward className="h-4 w-4" />
+                  <span>Şimdi Geç</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1161,6 +1249,7 @@ export default function VideoPlayerPage() {
                       isLocked,
                       duration: i === currentMediaIdx ? duration : 0,
                       onSelect: () => {
+                        setAutoAdvanceLeft(null);
                         setCurrentMediaIdx(i);
                         lastAllowedTime.current = 0;
                         setCurrentTime(0);
@@ -1182,7 +1271,10 @@ export default function VideoPlayerPage() {
                       isCurrent: i === currentPdfIdx,
                       isLocked,
                       duration: 0,
-                      onSelect: () => setCurrentPdfIdx(i),
+                      onSelect: () => {
+                        setAutoAdvanceLeft(null);
+                        setCurrentPdfIdx(i);
+                      },
                     });
                   })}
                 </div>

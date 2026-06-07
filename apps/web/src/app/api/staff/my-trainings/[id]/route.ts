@@ -303,6 +303,10 @@ export const GET = withStaffRoute<{ id: string }>(
         // Soru sayısı — liste endpoint'i (MyTrainingItem.questionCount) ile tutarlı.
         // Mobil sınav-öncesi bilgilendirme ekranında gösterir.
         questionCount: t._count.questions,
+        // SCORM tespiti — mobil bu eğitimi normal video/exam akışı yerine indir-ve-oynat
+        // WebView oynatıcısına yönlendirmek için kullanır (web kullanmaz, additive).
+        isScorm: t.scormEntryPoint != null,
+        scormEntryPoint: t.scormEntryPoint ?? null,
         isExpired,
         isNotStarted,
         preExamCompleted,

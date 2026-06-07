@@ -67,6 +67,7 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
               examOnly: true,
               examDurationMinutes: true,
               passingScore: true,
+              scormEntryPoint: true,
               _count: { select: { questions: true, videos: true } },
             },
           },
@@ -146,6 +147,9 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
         questionCount: t._count.questions,
         examDurationMinutes: t.examDurationMinutes,
         passingScore: t.passingScore,
+        // Mobil, SCORM eğitimini tespit edip indir-ve-oynat akışına yönlendirmek
+        // ve listede "SCORM" rozeti göstermek için kullanır (web kullanmaz, additive).
+        isScorm: t.scormEntryPoint != null,
       }
     })
 

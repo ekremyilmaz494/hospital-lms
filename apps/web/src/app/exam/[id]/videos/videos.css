@@ -250,6 +250,92 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* ── Otomatik geçiş geri sayım overlay'i ──
+   Bir içerik (video/ses) bittiğinde + ilerleme POST'u 'ok' döndükten SONRA medya
+   sahnesini (vd-media-stage) kaplar. Görünür geri sayım + "Şimdi Geç" butonu sunar.
+   z-index 6: buffer overlay'in (z-index 4) üstünde kalmalı. */
+.vd-media-stage {
+  position: relative;
+}
+.vd-aa-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  text-align: center;
+  background: rgba(10, 10, 10, 0.62);
+  backdrop-filter: blur(4px);
+}
+.vd-aa-eyebrow {
+  font-family: var(--font-display, system-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+.vd-aa-title {
+  font-family: var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #ffffff;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vd-aa-ring-wrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+.vd-aa-ring {
+  width: 100%;
+  height: 100%;
+}
+.vd-aa-arc {
+  transition: stroke-dashoffset 1s linear;
+}
+.vd-aa-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', serif;
+  font-size: 24px;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+.vd-aa-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.vd-aa-skip {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ed-ink);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-display, system-ui);
+  font-size: 13px;
+  font-weight: 600;
+}
+.vd-aa-skip:hover {
+  background: var(--ed-cream);
+}
+
 .vd-player-error {
   position: absolute;
   inset: 0;
