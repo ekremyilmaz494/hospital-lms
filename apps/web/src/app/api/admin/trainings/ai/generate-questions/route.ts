@@ -19,6 +19,10 @@ import { generateQuestions, OpenRouterError } from '@/lib/openrouter'
 import { isValidModelId } from '@/lib/openrouter-models'
 import { logger } from '@/lib/logger'
 
+// Büyük PDF kaynaklarında provider parse + 20 soru üretimi düşük default'u aşıp
+// 504 (Vercel Runtime Timeout) veriyordu. Diğer ağır route'larla aynı tavan: 300s.
+export const maxDuration = 300
+
 // sources: yeni format — her kaynak {s3Key, mimeType?, filename?}.
 // Geriye uyum için sourceS3Keys (legacy string[]) hâlâ kabul; içeride normalize edilir.
 const sourceFileSchema = z.object({

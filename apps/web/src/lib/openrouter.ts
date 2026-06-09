@@ -23,7 +23,10 @@ import {
 } from '@/lib/document-extractor';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-const REQUEST_TIMEOUT_MS = 60_000; // PDF parsing modeller için 60s — küçük PDF'lerde 5-15s yeterli
+// Büyük PDF'lerde provider parse + 20 soru üretimi 60s'i aşabiliyor (504 timeout).
+// Route maxDuration=300 ile uyumlu olacak şekilde ~280s; PDF'ler cloudflare-ai
+// text engine'iyle parse edildiğinden pratikte çok daha hızlı tamamlanır.
+const REQUEST_TIMEOUT_MS = 280_000;
 
 /** OpenRouter'dan dönen tek soru. Zod ile validate ediliyor.
  *  sourceQuote ZORUNLU — kaynaktan birebir alıntı; boş gelirse soru filtrelenir
@@ -219,13 +222,13 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
 
   let rawResponse: string | null = null;
   try {
-    const completion = await client.chat.completions.create({
+    const params = {
       model: opts.model,
       // JSON mode (destekleyen modellerde sıkı JSON çıktısı)
-      response_format: { type: 'json_object' },
+      response_format: { type: 'json_object' as const },
       messages: [
-        { role: 'system', content: QUESTION_GENERATION_SYSTEM_PROMPT },
-        { role: 'user', content: userContent },
+        { role: 'system' as const, content: QUESTION_GENERATION_SYSTEM_PROMPT },
+        { role: 'user' as const, content: userContent },
       ],
       // Faktüel/kaynağa-sadık üretim için düşük temperature.
       // 0.7 → 0.3 (hallucination riski azalır, çeşitlilik biraz düşer; sınav doğruluğu öncelik).
@@ -233,7 +236,17 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
       max_tokens: 6000, // 20 soru ~ 3.3K token; uzun sourceQuote'lu modellerde
       // truncation'ı önlemek için marj. Kesilen JSON = parse
       // fail = 20 sorunun hepsi çöpe.
-    });
+      // OpenRouter eklentisi (openai SDK tipinde yok): PDF kaynak varsa PDF'i
+      // hızlı/ücretsiz `cloudflare-ai` text engine'iyle parse ettir. Default
+      // `native` engine 12MB PDF'i token olarak Claude'a gönderip 504 timeout'a
+      // yol açıyordu. Office/görsel kaynaklarda no-op olduğundan sadece PDF varken ekle.
+      ...(hasPdf
+        ? { plugins: [{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }] }
+        : {}),
+    };
+    const completion = await client.chat.completions.create(
+      params as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming
+    );
     // OpenRouter, provider hatası / kredi / rate-limit / moderation durumunda bazen
     // HTTP 200 + { error: {...} } (choices YOK) döndürür; SDK 2xx olduğu için throw
     // ETMEZ. Envelope'u elle kontrol et ki GERÇEK sebep yüzeye çıksın — yoksa

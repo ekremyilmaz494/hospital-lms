@@ -17,6 +17,10 @@ import { generateQuestions, OpenRouterError } from '@/lib/openrouter'
 import { isValidModelId } from '@/lib/openrouter-models'
 import { logger } from '@/lib/logger'
 
+// Büyük PDF kaynaklarında provider parse süresi düşük default'u aşabiliyor.
+// generate-questions ile aynı tavan: 300s.
+export const maxDuration = 300
+
 const sourceFileSchema = z.object({
   s3Key: z.string().min(1),
   mimeType: z.string().min(1).optional(),

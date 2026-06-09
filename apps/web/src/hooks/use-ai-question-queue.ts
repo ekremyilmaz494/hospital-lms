@@ -126,6 +126,8 @@ async function readError(res: Response): Promise<string> {
   }
   if (res.status === 429) return 'Çok fazla istek — lütfen biraz sonra tekrar deneyin.';
   if (res.status === 502) return 'AI sağlayıcısına ulaşılamadı. Lütfen tekrar deneyin.';
+  if (res.status === 504)
+    return 'İşlem zaman aşımına uğradı — kaynak dosyalar çok büyük olabilir. Daha küçük veya daha az dosya ile deneyin.';
   if (res.status === 400) return 'Geçersiz istek.';
   return 'Soru üretimi başarısız oldu.';
 }
