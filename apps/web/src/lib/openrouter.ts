@@ -19,14 +19,18 @@ import {
 import {
   isOfficeMimeType,
   extractTextFromOfficeDocument,
+  extractTextFromPdf,
   OFFICE_MIME_TYPES,
 } from '@/lib/document-extractor';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-// Büyük PDF'lerde provider parse + 20 soru üretimi 60s'i aşabiliyor (504 timeout).
-// Route maxDuration=300 ile uyumlu olacak şekilde ~280s; PDF'ler cloudflare-ai
-// text engine'iyle parse edildiğinden pratikte çok daha hızlı tamamlanır.
+// Büyük kaynaklarda PDF metin çıkarımı (sunucuda) + 20 soru üretimi 60s'i
+// aşabiliyor. Route maxDuration=300 ile uyumlu olacak şekilde ~280s.
 const REQUEST_TIMEOUT_MS = 280_000;
+
+// Çok büyük (yüzlerce sayfa) PDF'in çıkarılan metnini, context-window aşımı ve
+// maliyeti sınırlamak için kaynak başına cap'le. ~200K karakter ≈ 50K token.
+const PDF_TEXT_MAX_CHARS = 200_000;
 
 /** OpenRouter'dan dönen tek soru. Zod ile validate ediliyor.
  *  sourceQuote ZORUNLU — kaynaktan birebir alıntı; boş gelirse soru filtrelenir
@@ -102,7 +106,9 @@ function createClient(customApiKey?: string | null): OpenAI {
 /**
  * Kaynak dosyayı OpenAI/Anthropic formatlı content block(s)'a çevirir.
  *
- * PDF: `file` content block (Claude native PDF parse).
+ * PDF: S3'ten buffer indir, sunucuda text'e çevir (unpdf), `text` content block.
+ *   (OpenRouter native/cloudflare-ai PDF parse'ı 12MB+ dosyalarda timeout/500
+ *    veriyordu — provider parse'a bağımlılık kaldırıldı.)
  * Image: `image_url` content block.
  * Office (DOCX/PPTX/XLSX): S3'ten buffer indir, text'e çevir, `text` content
  *   block olarak döner. Çıkan metin boşsa boş array döner (caller filtreler).
@@ -122,12 +128,28 @@ async function buildContentBlocks(
       : guessOfficeMimeFromExtension(lower);
 
   if (isPdf) {
-    const url = await getDownloadUrl(source.s3Key);
+    // PDF'i sunucuda metne çevir (office gibi) — OpenRouter PDF parse'a bağımsız.
+    const buffer = await downloadBuffer(source.s3Key);
+    let text = await extractTextFromPdf(buffer);
+    if (!text) {
+      logger.warn('openrouter', 'pdf yielded empty text (taranmış/görsel-only olabilir)', {
+        s3Key: source.s3Key,
+      });
+      return [];
+    }
+    if (text.length > PDF_TEXT_MAX_CHARS) {
+      logger.warn('openrouter', 'pdf text truncated', {
+        s3Key: source.s3Key,
+        originalChars: text.length,
+        cap: PDF_TEXT_MAX_CHARS,
+      });
+      text = text.slice(0, PDF_TEXT_MAX_CHARS);
+    }
     return [
       {
-        type: 'file',
-        file: { file_data: url, filename },
-      } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart,
+        type: 'text',
+        text: `<source filename="${filename}" type="PDF">\n${text}\n</source>`,
+      },
     ];
   }
 
@@ -222,13 +244,15 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
 
   let rawResponse: string | null = null;
   try {
-    const params = {
+    // Kaynaklar (PDF/office) zaten sunucuda metne çevrildi → modele düz metin
+    // gidiyor; OpenRouter PDF parse plugin'ine (cloudflare-ai/native) gerek yok.
+    const completion = await client.chat.completions.create({
       model: opts.model,
       // JSON mode (destekleyen modellerde sıkı JSON çıktısı)
-      response_format: { type: 'json_object' as const },
+      response_format: { type: 'json_object' },
       messages: [
-        { role: 'system' as const, content: QUESTION_GENERATION_SYSTEM_PROMPT },
-        { role: 'user' as const, content: userContent },
+        { role: 'system', content: QUESTION_GENERATION_SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
       ],
       // Faktüel/kaynağa-sadık üretim için düşük temperature.
       // 0.7 → 0.3 (hallucination riski azalır, çeşitlilik biraz düşer; sınav doğruluğu öncelik).
@@ -236,17 +260,7 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
       max_tokens: 6000, // 20 soru ~ 3.3K token; uzun sourceQuote'lu modellerde
       // truncation'ı önlemek için marj. Kesilen JSON = parse
       // fail = 20 sorunun hepsi çöpe.
-      // OpenRouter eklentisi (openai SDK tipinde yok): PDF kaynak varsa PDF'i
-      // hızlı/ücretsiz `cloudflare-ai` text engine'iyle parse ettir. Default
-      // `native` engine 12MB PDF'i token olarak Claude'a gönderip 504 timeout'a
-      // yol açıyordu. Office/görsel kaynaklarda no-op olduğundan sadece PDF varken ekle.
-      ...(hasPdf
-        ? { plugins: [{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }] }
-        : {}),
-    };
-    const completion = await client.chat.completions.create(
-      params as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming
-    );
+    });
     // OpenRouter, provider hatası / kredi / rate-limit / moderation durumunda bazen
     // HTTP 200 + { error: {...} } (choices YOK) döndürür; SDK 2xx olduğu için throw
     // ETMEZ. Envelope'u elle kontrol et ki GERÇEK sebep yüzeye çıksın — yoksa
