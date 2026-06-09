@@ -41,7 +41,34 @@ const IMG_SOURCE = {
   mimeType: 'image/png',
   filename: 'slide.png',
 };
+// PDF kaynak — buildContentBlocks getDownloadUrl ile `file` content block üretir.
+const PDF_SOURCE = {
+  s3Key: 'sources/org-1/1.pdf',
+  mimeType: 'application/pdf',
+  filename: '1.pdf',
+};
 const MODEL = 'anthropic/claude-sonnet-4.6';
+
+/** create() çağrısının geçerli (mutlu yol) yanıtı — engine testlerinde
+ *  generateQuestions'ın throw etmeden tamamlanıp çağrıyı inceleyebilmesi için. */
+const okResponse = () => ({
+  choices: [
+    {
+      message: {
+        content: JSON.stringify({
+          questions: [
+            {
+              questionText: 'El hijyeni hangi durumda zorunludur?',
+              options: ['Hasta temasından önce', 'Mola sonrası', 'Ameliyatta', 'Hiçbir zaman'],
+              correctIndex: 0,
+              sourceQuote: 'Her hasta temasından önce el hijyeni zorunludur.',
+            },
+          ],
+        }),
+      },
+    },
+  ],
+});
 
 beforeEach(() => {
   createMock.mockReset();
@@ -93,5 +120,27 @@ describe('generateQuestions — OpenRouter yanıt işleme', () => {
     expect(result).toHaveLength(1);
     expect(result[0].questionText).toBe(validQ.questionText);
     expect(result[0].correctIndex).toBe(0);
+  });
+});
+
+describe('generateQuestions — PDF parse engine (cloudflare-ai)', () => {
+  it('PDF kaynakta isteğe cloudflare-ai file-parser plugin eklenir (native token yükü = 504 önlenir)', async () => {
+    createMock.mockResolvedValue(okResponse());
+
+    await generateQuestions({ model: MODEL, sources: [PDF_SOURCE], count: 5 });
+
+    const sentParams = createMock.mock.calls[0][0] as { plugins?: unknown };
+    expect(sentParams.plugins).toEqual([
+      { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } },
+    ]);
+  });
+
+  it('PDF olmayan (görsel) kaynakta plugins eklenmez', async () => {
+    createMock.mockResolvedValue(okResponse());
+
+    await generateQuestions({ model: MODEL, sources: [IMG_SOURCE], count: 5 });
+
+    const sentParams = createMock.mock.calls[0][0] as { plugins?: unknown };
+    expect(sentParams.plugins).toBeUndefined();
   });
 });
