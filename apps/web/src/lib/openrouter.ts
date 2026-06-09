@@ -11,8 +11,16 @@ import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getDownloadUrl, downloadBuffer } from '@/lib/s3';
 import { getModel, isValidModelId } from '@/lib/openrouter-models';
-import { QUESTION_GENERATION_SYSTEM_PROMPT, buildUserPrompt, type ExcludedQuestion } from '@/lib/openrouter-prompt';
-import { isOfficeMimeType, extractTextFromOfficeDocument, OFFICE_MIME_TYPES } from '@/lib/document-extractor';
+import {
+  QUESTION_GENERATION_SYSTEM_PROMPT,
+  buildUserPrompt,
+  type ExcludedQuestion,
+} from '@/lib/openrouter-prompt';
+import {
+  isOfficeMimeType,
+  extractTextFromOfficeDocument,
+  OFFICE_MIME_TYPES,
+} from '@/lib/document-extractor';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const REQUEST_TIMEOUT_MS = 60_000; // PDF parsing modeller için 60s — küçük PDF'lerde 5-15s yeterli
@@ -56,7 +64,10 @@ export interface GenerateOptions {
 }
 
 export class OpenRouterError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  constructor(
+    message: string,
+    public cause?: unknown
+  ) {
     super(message);
     this.name = 'OpenRouterError';
   }
@@ -70,7 +81,7 @@ function createClient(customApiKey?: string | null): OpenAI {
   const apiKey = customApiKey || process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new OpenRouterError(
-      'OpenRouter API key bulunamadı. OPENROUTER_API_KEY env değişkeni tanımlı değil veya organizasyonun özel key\'i eksik.',
+      "OpenRouter API key bulunamadı. OPENROUTER_API_KEY env değişkeni tanımlı değil veya organizasyonun özel key'i eksik."
     );
   }
   return new OpenAI({
@@ -96,22 +107,25 @@ function createClient(customApiKey?: string | null): OpenAI {
  * Tek bir kaynak birden fazla content block üretebilir (örn. text wrapper).
  */
 async function buildContentBlocks(
-  source: SourceFile,
+  source: SourceFile
 ): Promise<OpenAI.Chat.Completions.ChatCompletionContentPart[]> {
   const lower = source.s3Key.toLowerCase();
   const filename = source.filename ?? source.s3Key.split('/').pop() ?? 'document';
   const isPdf = lower.endsWith('.pdf') || source.mimeType === 'application/pdf';
   const isImage = /\.(png|jpe?g|webp|gif)$/.test(lower);
-  const officeMime = source.mimeType && isOfficeMimeType(source.mimeType)
-    ? source.mimeType
-    : guessOfficeMimeFromExtension(lower);
+  const officeMime =
+    source.mimeType && isOfficeMimeType(source.mimeType)
+      ? source.mimeType
+      : guessOfficeMimeFromExtension(lower);
 
   if (isPdf) {
     const url = await getDownloadUrl(source.s3Key);
-    return [{
-      type: 'file',
-      file: { file_data: url, filename },
-    } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart];
+    return [
+      {
+        type: 'file',
+        file: { file_data: url, filename },
+      } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart,
+    ];
   }
 
   if (isImage) {
@@ -124,20 +138,28 @@ async function buildContentBlocks(
     const buffer = await downloadBuffer(source.s3Key);
     const text = await extractTextFromOfficeDocument(buffer, officeMime);
     if (!text) {
-      logger.warn('openrouter', 'office document yielded empty text', { s3Key: source.s3Key, mimeType: officeMime });
+      logger.warn('openrouter', 'office document yielded empty text', {
+        s3Key: source.s3Key,
+        mimeType: officeMime,
+      });
       return [];
     }
-    const formatLabel = officeMime === OFFICE_MIME_TYPES.DOCX ? 'Word'
-      : officeMime === OFFICE_MIME_TYPES.PPTX ? 'PowerPoint'
-      : 'Excel';
-    return [{
-      type: 'text',
-      text: `<source filename="${filename}" type="${formatLabel}">\n${text}\n</source>`,
-    }];
+    const formatLabel =
+      officeMime === OFFICE_MIME_TYPES.DOCX
+        ? 'Word'
+        : officeMime === OFFICE_MIME_TYPES.PPTX
+          ? 'PowerPoint'
+          : 'Excel';
+    return [
+      {
+        type: 'text',
+        text: `<source filename="${filename}" type="${formatLabel}">\n${text}\n</source>`,
+      },
+    ];
   }
 
   throw new OpenRouterError(
-    `Desteklenmeyen kaynak türü: ${source.s3Key}. Sadece PDF, görsel (png/jpg/webp) ve office (DOCX/PPTX/XLSX) destekleniyor.`,
+    `Desteklenmeyen kaynak türü: ${source.s3Key}. Sadece PDF, görsel (png/jpg/webp) ve office (DOCX/PPTX/XLSX) destekleniyor.`
   );
 }
 
@@ -170,11 +192,11 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
 
   const model = getModel(opts.model);
   const hasPdf = opts.sources.some(
-    (s) => s.s3Key.toLowerCase().endsWith('.pdf') || s.mimeType === 'application/pdf',
+    (s) => s.s3Key.toLowerCase().endsWith('.pdf') || s.mimeType === 'application/pdf'
   );
   if (model && !model.supportsPdf && hasPdf) {
     throw new OpenRouterError(
-      `${model.label} modeli PDF dosyalarını desteklemiyor. Lütfen PDF destekli bir model seçin (Claude veya Gemini).`,
+      `${model.label} modeli PDF dosyalarını desteklemiyor. Lütfen PDF destekli bir model seçin (Claude veya Gemini).`
     );
   }
 
@@ -185,7 +207,7 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
   const contentBlocks = blocksNested.flat();
   if (contentBlocks.length === 0) {
     throw new OpenRouterError(
-      'Kaynak dosyalardan metin çıkarılamadı. Office formatında metin yoksa (sadece görsel slide gibi), lütfen PDF olarak yükleyin.',
+      'Kaynak dosyalardan metin çıkarılamadı. Office formatında metin yoksa (sadece görsel slide gibi), lütfen PDF olarak yükleyin.'
     );
   }
 
@@ -209,19 +231,46 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
       // 0.7 → 0.3 (hallucination riski azalır, çeşitlilik biraz düşer; sınav doğruluğu öncelik).
       temperature: 0.3,
       max_tokens: 6000, // 20 soru ~ 3.3K token; uzun sourceQuote'lu modellerde
-                        // truncation'ı önlemek için marj. Kesilen JSON = parse
-                        // fail = 20 sorunun hepsi çöpe.
+      // truncation'ı önlemek için marj. Kesilen JSON = parse
+      // fail = 20 sorunun hepsi çöpe.
     });
-    rawResponse = completion.choices[0]?.message?.content ?? null;
+    // OpenRouter, provider hatası / kredi / rate-limit / moderation durumunda bazen
+    // HTTP 200 + { error: {...} } (choices YOK) döndürür; SDK 2xx olduğu için throw
+    // ETMEZ. Envelope'u elle kontrol et ki GERÇEK sebep yüzeye çıksın — yoksa
+    // `completion.choices[0]` erişimi "Cannot read properties of undefined (reading '0')"
+    // fırlatır ve asıl provider mesajı maskelenir.
+    const errorEnvelope = (
+      completion as unknown as {
+        error?: { message?: string; code?: number | string };
+      }
+    ).error;
+    if (errorEnvelope) {
+      logger.error('openrouter', 'provider returned error envelope (no choices)', {
+        model: opts.model,
+        code: errorEnvelope.code,
+        message: errorEnvelope.message,
+      });
+      throw new OpenRouterError(
+        `Model sağlayıcı hatası: ${errorEnvelope.message ?? 'bilinmeyen hata'}` +
+          (errorEnvelope.code ? ` (kod: ${errorEnvelope.code})` : '')
+      );
+    }
+    // `choices` beklenmedik şekilde yoksa optional-chaining ile güvenli eriş (?.[0]).
+    rawResponse = completion.choices?.[0]?.message?.content ?? null;
     if (!rawResponse) {
-      throw new OpenRouterError('OpenRouter boş yanıt döndü.');
+      throw new OpenRouterError(
+        'OpenRouter beklenen formatta yanıt döndürmedi (boş içerik). Lütfen tekrar deneyin veya farklı bir model seçin.'
+      );
     }
   } catch (err) {
-    logger.error('openrouter', 'chat completion failed', { model: opts.model, error: err instanceof Error ? err.message : String(err) });
+    logger.error('openrouter', 'chat completion failed', {
+      model: opts.model,
+      error: err instanceof Error ? err.message : String(err),
+    });
     if (err instanceof OpenRouterError) throw err;
     throw new OpenRouterError(
       err instanceof Error ? err.message : 'OpenRouter API çağrısı başarısız.',
-      err,
+      err
     );
   }
 
@@ -259,7 +308,9 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
     // Bazı sorular invalid olabilir; tüm cevap çöp ise hata, yoksa filter
     const arr = (parsed as { questions?: unknown[] })?.questions;
     if (!Array.isArray(arr)) {
-      logger.error('openrouter', 'response missing questions array', { keys: Object.keys(parsed as object) });
+      logger.error('openrouter', 'response missing questions array', {
+        keys: Object.keys(parsed as object),
+      });
       throw new OpenRouterError('Model beklenen formatta cevap vermedi.');
     }
     const validOnly = arr
@@ -269,7 +320,10 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
     if (validOnly.length === 0) {
       throw new OpenRouterError('Model tüm soruları geçersiz formatta döndürdü.');
     }
-    logger.warn('openrouter', 'some questions invalid, filtered', { total: arr.length, valid: validOnly.length });
+    logger.warn('openrouter', 'some questions invalid, filtered', {
+      total: arr.length,
+      valid: validOnly.length,
+    });
     return validOnly;
   }
 
