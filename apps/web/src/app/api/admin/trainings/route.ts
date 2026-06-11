@@ -181,7 +181,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
             data: {
               trainingId: t.id,
               title: videoTitle || defaultTitle,
-              videoUrl: url,
+              // Kanonik kaynak videoKey; videoUrl boş kalır (CLAUDE.md Video URL Kuralı).
+              // Ham key'i videoUrl'e yazmak frontend fallback'ini zehirler.
+              videoUrl: '',
               videoKey: url,
               durationSeconds: duration,
               contentType: ct,

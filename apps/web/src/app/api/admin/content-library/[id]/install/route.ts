@@ -65,7 +65,8 @@ export const POST = withAdminRoute<{ id: string }>(async ({ params, dbUser, orga
           trainingId:      t.id,
           title:           lib.title,
           description:     lib.description ?? undefined,
-          videoUrl:        lib.s3Key,
+          // Kanonik kaynak videoKey; videoUrl boş (CLAUDE.md Video URL Kuralı).
+          videoUrl:        '',
           videoKey:        lib.s3Key,
           contentType:     lib.contentType ?? 'video',
           durationSeconds: (lib.duration ?? 0) * 60,

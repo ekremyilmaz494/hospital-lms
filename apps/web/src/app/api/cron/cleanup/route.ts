@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
 import { BRAND } from '@/lib/brand'
-import { deleteObject, downloadBuffer } from '@/lib/s3'
+import { deleteObject, downloadBuffer, verifyS3Object } from '@/lib/s3'
 import { decryptBackup } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
 import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
@@ -449,6 +449,61 @@ export async function GET(request: Request) {
     }
   }
 
+  // 9. Orphan transcode sweep — DB hâlâ ham '.mp4' video_key'i gösteren ama S3'te
+  // '_720p.mp4' transcode çıktısı HAZIR olan videoları repoint et. completion
+  // lambda'nın DB-match=0 olunca sessizce vazgeçmesinden (retry/DLQ yok) doğan
+  // orphan'ları otomatik telafi eder (2026-06-11 Devakent incident: 5 video ham
+  // key'le kalmış, mobilde moov-atom-sonda → "video yükleniyor" sonsuz dönüyordu).
+  //
+  // Tenant guard'a gerek YOK: verifyS3Object gate'i yalnız _720p GERÇEKTEN varsa
+  // repoint eder — henüz transcode olmamış (başka org dahil) videolara dokunmaz.
+  // video_url'ye DOKUNMA: CLAUDE.md "Video URL Kuralı" — resolveTrainingVideoUrl
+  // zaten videoKey'den signed URL üretir; ham video_url yazmak 403 üretirdi.
+  const orphanVideos = await prisma.trainingVideo.findMany({
+    where: {
+      contentType: 'video',
+      videoKey: { endsWith: '.mp4' },
+      NOT: { videoKey: { contains: '_720p' } },
+    },
+    select: { id: true, videoKey: true },
+    take: 200, // heap guard — kalanı sonraki cron koşumunda
+  })
+
+  let transcodeRepointed = 0
+  let transcodeStillMissing = 0
+  const SWEEP_BATCH = 10 // HeadObject'leri partiler halinde paralel — S3 rate'ini zorlamadan
+  for (let i = 0; i < orphanVideos.length; i += SWEEP_BATCH) {
+    const batch = orphanVideos.slice(i, i + SWEEP_BATCH)
+    const checked = await Promise.all(
+      batch.map(async (v) => {
+        if (!v.videoKey) return null
+        const outKey = v.videoKey.replace(/\.mp4$/, '_720p.mp4')
+        const size = await verifyS3Object(outKey) // null = yok/erişilemedi → bu koşumda atla
+        return size ? { id: v.id, outKey, size } : null
+      }),
+    )
+    const repoints = checked.filter(
+      (x): x is { id: string; outKey: string; size: number } => x !== null,
+    )
+    transcodeStillMissing += batch.length - repoints.length
+    await Promise.all(
+      repoints.map(async (r) => {
+        try {
+          await prisma.trainingVideo.update({
+            where: { id: r.id },
+            data: { videoKey: r.outKey, fileSizeBytes: BigInt(r.size) },
+          })
+          transcodeRepointed++
+        } catch (err) {
+          logger.error('cleanup', 'Transcode repoint basarisiz', {
+            id: r.id,
+            err: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }),
+    )
+  }
+
   return NextResponse.json({
     success: true,
     deletedNotifications: deletedNotifications.count,
@@ -466,6 +521,8 @@ export async function GET(request: Request) {
     overdueRemindersSent,
     subscriptionWarningsSent,
     examRemindersSent,
+    transcodeRepointed,
+    transcodeStillMissing,
     timestamp: new Date().toISOString(),
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

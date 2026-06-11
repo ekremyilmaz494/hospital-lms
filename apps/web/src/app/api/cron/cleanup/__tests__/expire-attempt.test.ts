@@ -43,10 +43,15 @@ const { prismaMock, s3Mock, cryptoMock, emailMock } = vi.hoisted(() => ({
       update: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    trainingVideo: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+    },
   },
   s3Mock: {
     downloadBuffer: vi.fn(),
     deleteObject: vi.fn().mockResolvedValue(undefined),
+    verifyS3Object: vi.fn().mockResolvedValue(null),
   },
   cryptoMock: {
     decryptBackup: vi.fn(),

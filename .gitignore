@@ -136,3 +136,5 @@ tamamlama_raporu.pdf
 
 # Test personel seed scripti — production şifresi içerir, PUBLIC repoya ASLA commit etme
 apps/web/scripts/seed-deneme-org-staff.ts
+
+.vercel
