@@ -70,7 +70,6 @@ export const DataTable = memo(function DataTable<TData, TValue>({
   const stableData = useMemo(() => data, [data]);
   const stableColumns = useMemo(() => columns, [columns]);
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: stableData,
     columns: stableColumns,
