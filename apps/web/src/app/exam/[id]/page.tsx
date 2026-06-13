@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma';
-import { getActiveOrLatestAttemptStatus } from '@/lib/exam-helpers';
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver';
 import type { AttemptStatus } from '@/lib/exam-state-machine';
 
 /**
@@ -38,36 +38,36 @@ export default async function ExamEntrypoint({ params }: { params: Promise<{ id:
     redirect('/staff/my-trainings');
   }
 
-  // 3. Assignment + attempt paralel — `Promise.all` round-trip yarısı
-  const [assignment, attempt] = await Promise.all([
-    prisma.trainingAssignment.findFirst({
-      where: {
-        id,
-        userId: dbUser.id,
-        training: { organizationId: dbUser.organizationId },
-      },
-      select: {
-        training: { select: { scormEntryPoint: true } },
-      },
-    }),
-    getActiveOrLatestAttemptStatus(id, dbUser.id, dbUser.organizationId),
-  ]);
+  // 3. Atama + attempt + aşama: TEK doğruluk kaynağı resolveExamFlowState.
+  // id assignmentId VEYA trainingId olabilir — resolver kanonikleştirir (eski
+  // kod yalnız assignmentId kabul ediyordu; trainingId içeren eski/derin
+  // linkler haksız yere listeye atılıyordu).
+  const state = await resolveExamFlowState(id, dbUser.id, dbUser.organizationId);
 
-  if (!assignment) {
+  if (!state.assignment) {
     // Atanmamış eğitim — liste sayfası "atanmadı" durumunu zaten gösteriyor
     redirect('/staff/my-trainings');
   }
 
+  // Alt sayfalara her zaman KANONİK assignmentId ile yönlendir — id trainingId
+  // olarak geldiyse bile akışın geri kalanı tek id ailesiyle çalışsın.
+  const examId = state.assignment.id;
+
   // 4. SCORM eğitimi: kendi sayfasına (pre/post exam akışı geçerli değil)
   // `scormEntryPoint` null değilse SCORM paketi yüklenmiş demektir
   // (scorm/page.tsx:91 ve content/[...path]/route.ts:51 ile aynı tespit pattern'i).
-  if (assignment.training.scormEntryPoint) {
-    redirect(`/exam/${id}/scorm`);
+  const training = await prisma.training.findFirst({
+    where: { id: state.assignment.trainingId, organizationId: dbUser.organizationId },
+    select: { scormEntryPoint: true },
+  });
+  if (training?.scormEntryPoint) {
+    redirect(`/exam/${examId}/scorm`);
   }
 
   // 5. Hiç attempt yoksa: pre-exam'a (tek mutasyon noktası — POST /start orada)
+  const attempt = state.attempt;
   if (!attempt) {
-    redirect(`/exam/${id}/pre-exam`);
+    redirect(`/exam/${examId}/pre-exam`);
   }
 
   // 6. Aktif/son attempt status'una göre fazlanma
@@ -76,17 +76,17 @@ export default async function ExamEntrypoint({ params }: { params: Promise<{ id:
   const status = attempt.status as AttemptStatus;
   switch (status) {
     case 'pre_exam':
-      redirect(`/exam/${id}/pre-exam`);
+      redirect(`/exam/${examId}/pre-exam`);
     case 'watching_videos':
-      redirect(`/exam/${id}/videos`);
+      redirect(`/exam/${examId}/videos`);
     case 'post_exam':
-      redirect(`/exam/${id}/post-exam`);
+      redirect(`/exam/${examId}/post-exam`);
     case 'completed':
     case 'expired':
       // Terminal — eğitim detayında doğru CTA gösterilir (sertifika, yeniden dene,
       // kilit). Liste yerine detay kritik (2026-05-20 Devakent şikayeti dersi,
       // exam-state-machine.ts:255-261).
-      redirect(`/staff/my-trainings/${id}`);
+      redirect(`/staff/my-trainings/${examId}`);
     default: {
       // Bilinmeyen status — defensive fallback. Yeni status eklenirse compile
       // hata vermez ama prod'da kullanıcı en azından akıllı bir yere düşer.

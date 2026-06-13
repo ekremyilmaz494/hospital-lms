@@ -1,21 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /**
- * Bu test dosyası iki regresyonu kilitler:
+ * Bu test dosyası şu regresyonları kilitler:
  *
  *   1. POST /api/exam/[id]/start — kullanıcının assignment'ında sadece terminal
  *      (completed/expired) attempt varsa rota YENİ attempt yaratmalı, eskiyi
  *      resume ETMEMELİ. Aksi halde frontend `attemptStatus='expired'` görüp
  *      `attemptPhaseRedirect` ile detay sayfasına atılır, kullanıcı "Videoları
  *      İzle"ye basıp tekrar buraya gelir → sonsuz döngü. (2026-05-20 Devakent
- *      ÖZGÜR ÜNVER incident; PR #165 detay-redirect doğru, bu transaction
- *      double-check `not: 'completed'` filter'ı yüzünden expired attempt
- *      "existing" sayılıp resume ediliyordu.)
+ *      ÖZGÜR ÜNVER incident.)
  *
- *   2. Outer check (transaction öncesi) ve inner double-check (transaction içi
- *      SELECT FOR UPDATE sonrası) AYNI status filter'ını kullanmalı: BOTH
- *      `notIn: ['completed', 'expired']`. Aksi halde outer geçer (yeni attempt
- *      akışı), inner expired'i yakalar (resume akışı) → çelişki.
+ *   2. TEK KARAR YOLU (Haziran 2026 kök neden çözümü): resume/promote mantığı
+ *      YALNIZ transaction içinde yaşar; tx içi double-check filtresi
+ *      `notIn: ['completed', 'expired']` olmalı. Eskiden aynı blok transaction
+ *      dışında da kopyalanmıştı ve iki kopyanın filtreleri ayrışınca sonsuz
+ *      döngü doğuyordu (commit 2fa15b1). Dışarıda yalnız resolver'la "rate
+ *      limit gerekli mi?" okuması kalır — resume rate limit'e takılmaz.
  */
 
 const { prismaMock } = vi.hoisted(() => ({
@@ -62,6 +62,12 @@ vi.mock('@/lib/exam-helpers', () => ({
   }),
 }))
 
+// Route rate-limit kararını resolver'la verir; resolver davranışının kendisi
+// exam-flow-resolver.test.ts'te kilitli — burada birim sınırı olarak mock'lanır.
+vi.mock('@/lib/exam-flow-resolver', () => ({
+  resolveExamFlowState: vi.fn(),
+}))
+
 vi.mock('@/lib/date-helpers', () => ({
   isEndDatePassed: vi.fn().mockReturnValue(false),
 }))
@@ -95,6 +101,29 @@ vi.mock('@/lib/api-handler', () => ({
 }))
 
 import { POST } from '../route'
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
+import { checkRateLimit } from '@/lib/redis'
+
+/** Resolver mock'u: activeAttempt verilirse resume yolu (rate limit atlanır). */
+function mockFlow(activeAttempt: Record<string, unknown> | null) {
+  vi.mocked(resolveExamFlowState).mockResolvedValue({
+    assignment: {
+      id: 'assignment-1',
+      trainingId: 'training-1',
+      status: 'in_progress',
+      currentAttempt: 1,
+      maxAttempts: 3,
+      round: 1,
+      dueDate: null,
+    },
+    attempt: activeAttempt,
+    activeAttempt,
+    stage: ((activeAttempt?.status as string) ?? 'none') as never,
+    requiredVideoCount: 1,
+    noRequiredVideos: false,
+    redirect: null,
+  } as Awaited<ReturnType<typeof resolveExamFlowState>>)
+}
 
 function startRequest(): Request {
   return new Request('http://localhost/api/exam/assignment-1/start', {
@@ -169,10 +198,9 @@ function mockTransaction(opts: {
 }
 
 describe('POST /api/exam/[id]/start — expired attempt resume engeli (KRİTİK)', () => {
-  it('outer check: aktif attempt yoksa (sadece terminal var) yeni attempt akışına girer', async () => {
-    // Outer findFirst (status notIn [completed, expired]) → null döner.
-    // Yani aktif attempt yok, transaction'a girilmeli.
-    prismaMock.examAttempt.findFirst.mockResolvedValue(null)
+  it('aktif attempt yoksa (sadece terminal var) yeni attempt akışına girer + rate limit uygulanır', async () => {
+    // Resolver aktif attempt görmüyor → rate limit kontrolü yapılır, tx'e girilir.
+    mockFlow(null)
     mockTransaction({ innerExistingAttempt: null })
 
     const res = await POST(startRequest(), {
@@ -183,18 +211,16 @@ describe('POST /api/exam/[id]/start — expired attempt resume engeli (KRİTİK)
     const body = await res.json()
     expect(body.status).toBe('watching_videos')
     expect(body.attemptNumber).toBe(2)
-
-    // Outer findFirst'ün status filter'ı kritik: expired hariç olmalı
-    const outerCall = prismaMock.examAttempt.findFirst.mock.calls[0][0] as {
-      where: { status?: { notIn?: readonly string[] } }
-    }
-    expect(outerCall.where.status?.notIn).toEqual(['completed', 'expired'])
+    expect(checkRateLimit).toHaveBeenCalled()
+    // Route attempt tespitini transaction DIŞINDA kendi sorgusuyla YAPMAMALI —
+    // tek doğruluk kaynağı resolver (kopya sorgu = drift = 2fa15b1 sınıfı bug).
+    expect(prismaMock.examAttempt.findFirst).not.toHaveBeenCalled()
   })
 
   it('transaction içi double-check expired attempt\'i resume ETMEMELİ — yeni attempt yarat', async () => {
     // Senaryo: önceki attempt expired (cron tarafından), DB'de duruyor.
-    // Outer findFirst (notIn) onu görmez → null döner.
-    prismaMock.examAttempt.findFirst.mockResolvedValue(null)
+    // Resolver da onu aktif saymaz → yeni attempt akışı.
+    mockFlow(null)
 
     // Transaction içindeki double-check çalışacak. ESKI bug: `not: 'completed'`
     // filter expired'i de getirirdi. Bu test bug'ı saptamak için tx içinde
@@ -266,16 +292,20 @@ describe('POST /api/exam/[id]/start — expired attempt resume engeli (KRİTİK)
     expect(innerCalls[0].where.status?.notIn).toEqual(['completed', 'expired'])
   })
 
-  it('outer check aktif (non-terminal) attempt bulursa onu resume eder, transaction\'a girmez', async () => {
-    // Aktif watching_videos attempt mevcut — direkt resume edilmeli
-    prismaMock.examAttempt.findFirst.mockResolvedValue({
+  it('aktif (non-terminal) attempt varsa tx içinde resume edilir ve rate limit ATLANIR', async () => {
+    // TEK YOL mimarisi: resume da transaction içinden geçer (SELECT FOR UPDATE
+    // ile yarış güvenli) — ama resolver aktif attempt gördüğü için rate limit
+    // kontrolü hiç yapılmaz (resume rate limit'e takılmamalı).
+    const activeAttempt = {
       id: 'active-attempt',
       attemptNumber: 1,
       status: 'watching_videos',
       preExamCompletedAt: new Date(),
       trainingId: TRAINING_ID,
       videoProgress: [],
-    })
+    }
+    mockFlow(activeAttempt)
+    mockTransaction({ innerExistingAttempt: activeAttempt })
 
     const res = await POST(startRequest(), {
       params: Promise.resolve({ id: ASSIGNMENT_ID }),
@@ -286,7 +316,8 @@ describe('POST /api/exam/[id]/start — expired attempt resume engeli (KRİTİK)
     expect(body.id).toBe('active-attempt')
     expect(body.status).toBe('watching_videos')
 
-    // Transaction'a girilmemeli
-    expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    // Resume rate limit'e takılmaz; karar tek yoldan (tx) geçer.
+    expect(checkRateLimit).not.toHaveBeenCalled()
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce()
   })
 })

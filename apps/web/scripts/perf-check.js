@@ -106,6 +106,42 @@ for (const file of apiFiles) {
       }
     }
 
+    // ── Rule 8: Exam akışında attempt tespiti resolver'dan geçer (error) ──
+    // Haziran 2026 kök neden (N1): attemptNumber atama-BAŞINA benzersizdir;
+    // assignmentId/trainingId kapsamında elle examAttempt araması 6+ route'ta
+    // kopyalanmıştı ve "Yeniden Ata" round'larında eski atamanın denemesi
+    // yenisini gölgeliyordu (personel ön sınava geri atılıyordu). Attempt/aşama
+    // tespiti TEK kaynaktan yapılır: resolveExamFlowState (exam-flow-resolver.ts).
+    // Nokta atışı `where: { id: attemptId }` sorguları serbesttir; assignmentId/
+    // trainingId ile arama yasaktır. Bilinçli istisna (tek atamaya scope'lu,
+    // orderBy'lı sorgu) için satıra `// perf-check-disable-line` ekleyin.
+    const isExamApi = /src[\\/]app[\\/]api[\\/]exam[\\/]/.test(file.replace(/\\/g, '/')) ||
+                      /src\/app\/api\/exam\//.test(fileShort);
+    if (isExamApi) {
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('perf-check-disable-line')) continue;
+        if (/prisma\.examAttempt\.(findFirst|findMany)\s*\(/.test(lines[i])) {
+          // Yalnız WHERE bloğuna bak — select/include içindeki alan adları
+          // (assignmentId: true) false positive üretmesin.
+          const windowLines = lines.slice(i, i + 10);
+          const stopIdx = windowLines.findIndex(l => /^\s*(select|include|orderBy)\s*:/.test(l));
+          const whereBlock = (stopIdx > 0 ? windowLines.slice(0, stopIdx) : windowLines).join(' ');
+          if (/(assignmentId|trainingId)\s*:(?!\s*true)/.test(whereBlock)) {
+            issues.push({
+              level: 'error',
+              file: fileShort,
+              line: i + 1,
+              rule: 'exam-attempt-resolver',
+              msg: 'examAttempt assignmentId/trainingId kapsaminda elle araniyor. Attempt tespiti icin ' +
+                   'resolveExamFlowState (exam-flow-resolver.ts) kullan — kopya sorgu "Yeniden Ata" round ' +
+                   'senaryosunda yanlis attempt secer (N1). Bilincli tek-atama-scope istisnasi icin ' +
+                   '`// perf-check-disable-line` ekleyin. COMMIT ENGELLENDI.',
+            });
+          }
+        }
+      }
+    }
+
     // ── Rule 4: include without select (warn) ──
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes('perf-check-disable-line')) continue;

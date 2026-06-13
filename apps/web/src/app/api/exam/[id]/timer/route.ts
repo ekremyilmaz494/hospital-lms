@@ -81,7 +81,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
     include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
   })
   if (!attempt) {
-    attempt = await prisma.examAttempt.findFirst({
+    // Tek atamaya scope'lu + status filtreli + attemptNumber desc — N1 riski yok
+    // (timer attemptId-first çalışır; bu fallback yalnız aynı atama içindedir).
+    attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
       where: { assignmentId: id, userId: dbUser.id, organizationId, status: { in: ['pre_exam', 'post_exam'] } },
       include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
       orderBy: { attemptNumber: 'desc' },

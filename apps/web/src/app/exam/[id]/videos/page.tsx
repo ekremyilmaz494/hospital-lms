@@ -50,6 +50,7 @@ import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machi
 import { postWithRetry, type ExamPostResult, type ExamPostResultKind } from '@/lib/exam-fetch';
 import { useToast } from '@/components/shared/toast';
 import { useExamTabLock } from '@/hooks/use-exam-tab-lock';
+import { useExamStageSync } from '@/hooks/use-exam-stage-sync';
 import { ExamTabLocked } from '@/components/exam/exam-tab-locked';
 
 interface VideoItem {
@@ -98,18 +99,21 @@ export default function VideoPlayerPage() {
   // flushPosition/heartbeat no-op olur, pagehide cleanup yarışı zararsızdır.
   const { status: tabLockStatus } = useExamTabLock(isReview ? null : id);
 
+  // Sekme-dönüşü aşama senkronu: cron expire / başka sekmede ilerleme / süre
+  // dolması sonrası bayat ekranda kalmak yerine sunucunun bildiği aşamaya
+  // sessizce yönlen. "Eğitim oturumu geçersiz" dead-end modalının kök çözümü.
+  useExamStageSync(id, 'videos', !isReview && tabLockStatus !== 'blocked');
+
   const [startReady, setStartReady] = useState(isReview);
   const [startError, setStartError] = useState<string | null>(null);
   const startCalled = useRef(false);
   useEffect(() => {
     if (isReview || !id || startCalled.current) return;
-    // Transition page son 5 saniye icinde start cagirdiysa skip et (cift POST onle)
-    const recentStart = sessionStorage.getItem(`exam-start-${id}`);
-    if (recentStart && Date.now() - Number(recentStart) < 5000) {
-      startCalled.current = true;
-      setStartReady(true);
-      return;
-    }
+    // NOT: Eskiden burada sessionStorage tabanlı 5sn'lik "yakında start çağrıldı"
+    // guard'ı vardı (çift POST önleme). Kaldırıldı: POST /start artık tamamen
+    // idempotent (tek transaction yolu, resume rate-limit'siz) ve guard'ın
+    // kendisi yarış yüzeyiydi — guard "atla" derken sunucu durumu ilerlemiş
+    // olabiliyordu. Mükerrer POST zararsız; bayat client kararı zararlı.
     startCalled.current = true;
     fetch(`/api/exam/${id}/start`, { method: 'POST' })
       .then(async (res) => {
@@ -128,7 +132,6 @@ export default function VideoPlayerPage() {
           setStartError(data?.error || 'Sınav başlatılamadı');
           return;
         }
-        sessionStorage.setItem(`exam-start-${id}`, String(Date.now()));
         setStartReady(true);
       })
       .catch(() => setStartError('Sınav başlatılamadı. Lütfen tekrar deneyin.'));
@@ -507,6 +510,10 @@ export default function VideoPlayerPage() {
       watchedTime: duration,
       position: duration,
       completed: true,
+      // Oynatıcının ölçtüğü süre — DB durationSeconds şişkinse sunucu %90
+      // tamamlama tabanını bununla düzeltir (N2: "video bitiyor ama
+      // tamamlanmıyor" kök nedeni).
+      clientDuration: duration,
     }).then((result) => {
       if (result.kind === 'ok') {
         // Navigasyon yalnızca başarılı kayıttan sonra — kalıcı hatada modal açılır.
@@ -929,7 +936,7 @@ export default function VideoPlayerPage() {
                     if (isReview) return;
                     postVideoProgress({ videoId: currentVideo.id, watchedTime, position });
                   }}
-                  onComplete={() => {
+                  onComplete={(measuredDuration) => {
                     const vids = videosRef.current;
                     setLocalCompleted((prev) => new Set(prev).add(currentVideo.id));
                     videosRef.current = vids.map((v) =>
@@ -938,9 +945,11 @@ export default function VideoPlayerPage() {
                     if (isReview) return;
                     postVideoProgress({
                       videoId: currentVideo.id,
-                      watchedTime: currentVideo.duration,
-                      position: currentVideo.duration,
+                      watchedTime: measuredDuration ?? currentVideo.duration,
+                      position: measuredDuration ?? currentVideo.duration,
                       completed: true,
+                      // Oynatıcının ölçtüğü süre — N2 fix (video ile aynı taban düzeltmesi).
+                      clientDuration: measuredDuration ?? currentVideo.duration,
                     }).then((result) => {
                       if (result.kind === 'ok') {
                         if (result.data?.allVideosCompleted) {

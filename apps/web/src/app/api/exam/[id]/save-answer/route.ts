@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { withStaffRoute } from '@/lib/api-handler'
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
 import { logger } from '@/lib/logger'
 
 /** Auto-save a single exam answer (called on each answer selection) */
@@ -20,26 +21,14 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('examPhase pre veya post olmali', 400)
   }
 
-  // Find active attempt
+  // Aktif attempt — tek doğruluk kaynağı resolveExamFlowState (atama önce
+  // kanonikleştirilir, attempt atamaya scope'lanır; atamalar-arası attemptNumber
+  // sıralaması yok — N1). organizationId resolver'ın her sorgusunda WHERE'de.
   const requiredStatus = body.examPhase === 'pre' ? 'pre_exam' : 'post_exam'
-  let attempt = await prisma.examAttempt.findFirst({
-    where: { assignmentId: id, userId: dbUser.id, status: requiredStatus },
-    include: { training: { select: { organizationId: true } } },
-    orderBy: { attemptNumber: 'desc' },
-  })
-  if (!attempt) {
-    attempt = await prisma.examAttempt.findFirst({
-      where: { trainingId: id, userId: dbUser.id, status: requiredStatus },
-      include: { training: { select: { organizationId: true } } },
-      orderBy: { attemptNumber: 'desc' },
-    })
-  }
+  const flow = await resolveExamFlowState(id, dbUser.id, organizationId)
+  const attempt =
+    flow.activeAttempt && flow.activeAttempt.status === requiredStatus ? flow.activeAttempt : null
   if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı', 404)
-
-  // Verify org isolation
-  if (attempt.training.organizationId !== organizationId) {
-    return errorResponse('Yetkisiz erişim', 403)
-  }
 
   // Soru + şık üyelik doğrulaması — tek sorgu hem questionId'nin bu denemenin
   // eğitimine ait olduğunu hem de selectedOptionId'nin o soruya ait olduğunu

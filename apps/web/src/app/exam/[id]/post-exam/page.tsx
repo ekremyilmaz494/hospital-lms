@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Clock, ChevronRight, AlertTriangle, Lock, LogOut } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useExamTabLock } from '@/hooks/use-exam-tab-lock';
+import { useExamStageSync } from '@/hooks/use-exam-stage-sync';
 import { PageLoading } from '@/components/shared/page-loading';
 import { ExamTabLocked } from '@/components/exam/exam-tab-locked';
 import { useToast } from '@/components/shared/toast';
@@ -51,6 +52,10 @@ export default function PostExamPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Çoklu sekme kilidi — aynı denemenin iki sekmede cevaplanıp birbirini ezmesini önler.
   const { status: tabLockStatus } = useExamTabLock(attemptId);
+
+  // Sekme-dönüşü aşama senkronu: süre sekme gizliyken dolduysa (TIMEOUT) veya
+  // attempt başka yerde ilerlediyse bayat sınav ekranında kalma.
+  useExamStageSync(id, 'post-exam', !submitting && tabLockStatus !== 'blocked');
 
   useEffect(() => {
     if (examData?.questions) {

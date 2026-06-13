@@ -45,7 +45,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     },
   })
   if (!attempt) {
-    attempt = await prisma.examAttempt.findFirst({
+    // Tek atamaya scope'lu + attemptNumber desc — N1 riski yok (resolver
+    // burada uygun değil: aktif değil, TAMAMLANMIŞ son deneme aranıyor).
+    attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
       where: {
         assignmentId: id,
         userId: dbUser.id,
