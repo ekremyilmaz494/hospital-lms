@@ -7,6 +7,7 @@ import { PageLoading } from '@/components/shared/page-loading';
 import { ExamTabLocked } from '@/components/exam/exam-tab-locked';
 import { useToast } from '@/components/shared/toast';
 import { useExamTabLock } from '@/hooks/use-exam-tab-lock';
+import { useExamStageSync } from '@/hooks/use-exam-stage-sync';
 import { attemptPhaseRedirect, type AttemptStatus } from '@/lib/exam-state-machine';
 
 interface Option {
@@ -49,6 +50,10 @@ export default function PreExamPage() {
   const { toast } = useToast();
   // Çoklu sekme kilidi — aynı denemenin iki sekmede cevaplanıp birbirini ezmesini önler.
   const { status: tabLockStatus } = useExamTabLock(attemptId);
+
+  // Sekme-dönüşü aşama senkronu: ön sınav zaten gönderilmişse (başka sekme /
+  // bayat ekran) kullanıcıyı tekrar ön sınava sokma, doğru aşamaya yönlendir.
+  useExamStageSync(id, 'pre-exam', !submitting && tabLockStatus !== 'blocked');
 
   useEffect(() => {
     if (!confirmed) return;
@@ -276,10 +281,12 @@ export default function PreExamPage() {
         return;
       }
 
-      // Videosuz/PDF-only eğitim: backend nextStep='post-exam' döndürür → transition
-      // ara ekranı "Videolara Geç" yazısıyla yanıltıcı olur, doğrudan son sınava git.
+      // Videosuz/PDF-only eğitim: backend nextStep='post-exam' döndürür. Eskiden
+      // doğrudan son sınava atlanıyordu — kullanıcı "video aşaması nerede?" diye
+      // şaşırıyordu (şikayet d). Artık transition ekranı noVideos=1 ile açık
+      // mesaj gösterir: "Bu eğitimde izlenecek video bulunmuyor".
       if (data.nextStep === 'post-exam') {
-        router.replace(`/exam/${id}/post-exam`);
+        router.replace(`/exam/${id}/transition?from=pre&score=${data.score ?? 0}&noVideos=1`);
       } else {
         router.replace(`/exam/${id}/transition?from=pre&score=${data.score ?? 0}`);
       }

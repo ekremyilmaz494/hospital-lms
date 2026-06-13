@@ -52,9 +52,11 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
-vi.mock('@/lib/exam-helpers', () => ({
-  getAttemptStatus: vi.fn(),
-  getActiveOrLatestAttemptStatus: vi.fn(),
+// Route attempt/atama çözümünü artık resolveExamFlowState üzerinden yapar
+// (tek doğruluk kaynağı). Resolver'ın kendi davranışı (N1 sıralama, terminal
+// fallback, kanonikleştirme) exam-flow-resolver.test.ts'te ayrıca kilitli.
+vi.mock('@/lib/exam-flow-resolver', () => ({
+  resolveExamFlowState: vi.fn(),
 }));
 vi.mock('@/lib/training-video-url', () => ({
   resolveTrainingVideoUrl: vi.fn().mockResolvedValue(''),
@@ -103,7 +105,7 @@ vi.mock('@/lib/api-handler', () => ({
 
 import { GET, POST } from '../route';
 import { checkRateLimit } from '@/lib/redis';
-import { getActiveOrLatestAttemptStatus } from '@/lib/exam-helpers';
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver';
 
 function progressRequest(body: Record<string, unknown>): Request {
   return new Request('http://localhost/api/exam/assignment-1/videos', {
@@ -116,6 +118,52 @@ function progressRequest(body: Record<string, unknown>): Request {
 const VIDEO_ID = 'video-1';
 const ATTEMPT_ID = 'attempt-1';
 
+/** resolveExamFlowState mock'u için varsayılan akış durumu üret. */
+function flowState(overrides: {
+  attempt?: Record<string, unknown> | null;
+  activeAttempt?: Record<string, unknown> | null;
+  assignment?: Record<string, unknown> | null;
+  stage?: string;
+  requiredVideoCount?: number;
+} = {}) {
+  const attempt =
+    overrides.activeAttempt !== undefined
+      ? overrides.activeAttempt
+      : {
+          id: ATTEMPT_ID,
+          assignmentId: 'assignment-1',
+          trainingId: 'training-1',
+          status: 'watching_videos',
+          attemptNumber: 1,
+          preExamCompletedAt: new Date(Date.now() - 60 * 60 * 1000),
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          videosCompletedAt: null,
+          postExamStartedAt: null,
+          postExamCompletedAt: null,
+          ...((overrides.attempt as Record<string, unknown>) ?? {}),
+        };
+  return {
+    assignment:
+      overrides.assignment !== undefined
+        ? overrides.assignment
+        : {
+            id: 'assignment-1',
+            trainingId: 'training-1',
+            status: 'in_progress',
+            currentAttempt: 1,
+            maxAttempts: 3,
+            round: 1,
+            dueDate: null,
+          },
+    attempt,
+    activeAttempt: attempt,
+    stage: overrides.stage ?? ((attempt as { status?: string } | null)?.status ?? 'none'),
+    requiredVideoCount: overrides.requiredVideoCount ?? 1,
+    noRequiredVideos: false,
+    redirect: null,
+  } as Awaited<ReturnType<typeof resolveExamFlowState>>;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(checkRateLimit).mockResolvedValue(true);
@@ -123,14 +171,7 @@ beforeEach(() => {
   // preExamCompletedAt 1 saat önce → maxWatchable ~ 3600*1.5+30 = 5430s.
   // Çoğu testte K1 tavanı meşru değerleri etkilemez; K1'e özel testler
   // bu değeri yakın bir zamana çekerek tavanı düşürür.
-  prismaMock.examAttempt.findFirst.mockResolvedValue({
-    id: ATTEMPT_ID,
-    userId: 'staff-1',
-    trainingId: 'training-1',
-    status: 'watching_videos',
-    assignmentId: 'assignment-1',
-    preExamCompletedAt: new Date(Date.now() - 60 * 60 * 1000),
-  });
+  vi.mocked(resolveExamFlowState).mockResolvedValue(flowState());
 
   prismaMock.trainingVideo.findFirst.mockResolvedValue({
     id: VIDEO_ID,
@@ -250,8 +291,8 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
   });
 
   describe('attempt status guard', () => {
-    it('attempt watching_videos değilse 400 döner', async () => {
-      prismaMock.examAttempt.findFirst.mockResolvedValue(null);
+    it('aktif attempt yoksa 400 döner', async () => {
+      vi.mocked(resolveExamFlowState).mockResolvedValue(flowState({ activeAttempt: null }));
 
       const res = await POST(
         progressRequest({ videoId: VIDEO_ID, watchedTime: 30, position: 30 }),
@@ -263,15 +304,29 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       expect(body.error).toContain('Aktif video izleme');
       expect(prismaMock.videoProgress.upsert).not.toHaveBeenCalled();
     });
+
+    it('aktif attempt watching_videos değilse (post_exam) 400 döner', async () => {
+      vi.mocked(resolveExamFlowState).mockResolvedValue(
+        flowState({ attempt: { status: 'post_exam' } })
+      );
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 30, position: 30 }),
+        { params: Promise.resolve({ id: 'assignment-1' }) }
+      );
+
+      expect(res.status).toBe(400);
+      expect(prismaMock.videoProgress.upsert).not.toHaveBeenCalled();
+    });
   });
 
   describe('attempt çözüm tutarlılığı (Video Resume Kuralı)', () => {
-    // "Yeniden Ata" (round) senaryosunda kullanıcının aynı eğitim için birden çok
-    // attempt'i olabilir. orderBy'sız findFirst rastgele attempt seçer → progress
-    // yanlış attempt'e yazılır, GET başkasından okur → "kaldığım yerden devam
-    // etmiyor" sınıfı bug. POST attempt lookup'ı HER ZAMAN attemptNumber desc ile
-    // deterministik olmalı (GET ve start route ile aynı).
-    it("POST attempt lookup'ı orderBy: { attemptNumber: desc } kullanır", async () => {
+    // "Yeniden Ata" (round) senaryosunda attempt tespiti tek doğruluk kaynağından
+    // (resolveExamFlowState) yapılmalı — GET/POST/start farklı attempt seçerse
+    // progress yanlış attempt'e yazılır ("kaldığım yerden devam etmiyor" sınıfı).
+    // Sıralama/öncelik kuralları resolver'ın kendi testlerinde kilitli
+    // (exam-flow-resolver.test.ts — N1 fixture'ı).
+    it('POST attempt çözümünü resolveExamFlowState ile yapar (id + user + org)', async () => {
       prismaMock.videoProgress.findUnique.mockResolvedValue(null);
 
       const res = await POST(
@@ -280,30 +335,9 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       );
 
       expect(res.status).toBe(200);
-      const lookupArgs = prismaMock.examAttempt.findFirst.mock.calls[0][0] as {
-        where: Record<string, unknown>;
-        orderBy?: Record<string, unknown>;
-      };
-      expect(lookupArgs.orderBy).toEqual({ attemptNumber: 'desc' });
-      // assignmentId öncelikli arama da korunmalı (start route ile tutarlı)
-      expect(lookupArgs.where.assignmentId).toBe('assignment-1');
-    });
-
-    // A2 — tenant izolasyonu: POST attempt lookup'ı organizationId ile pre-filter
-    // edilmeli (requireOrganization:true org'u garanti ediyor; cross-tenant IDOR önlemi).
-    it('POST attempt lookup\'ı organizationId ile filtreler (tenant izolasyonu, A2)', async () => {
-      prismaMock.videoProgress.findUnique.mockResolvedValue(null);
-
-      const res = await POST(
-        progressRequest({ videoId: VIDEO_ID, watchedTime: 30, position: 30 }),
-        { params: Promise.resolve({ id: 'assignment-1' }) }
-      );
-
-      expect(res.status).toBe(200);
-      const lookupArgs = prismaMock.examAttempt.findFirst.mock.calls[0][0] as {
-        where: Record<string, unknown>;
-      };
-      expect(lookupArgs.where.organizationId).toBe('org-1');
+      expect(resolveExamFlowState).toHaveBeenCalledWith('assignment-1', 'staff-1', 'org-1');
+      // Route kendi başına examAttempt sorgusu ATMAMALI — kopya sorgu drift kaynağı.
+      expect(prismaMock.examAttempt.findFirst).not.toHaveBeenCalled();
     });
   });
 
@@ -354,14 +388,9 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
   describe('K1 — duvar-saati tavanı (ilk POST tam-süre iddiası clamp)', () => {
     it('ilk POST: preExamCompletedAt 10sn önce + watchedTime=300 → ~45sn tavanına clamp, tamamlanmaz', async () => {
       // maxWatchable = 10*1.5 + 30 = 45 → requestedWatched max 45.
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: new Date(Date.now() - 10 * 1000),
-      });
+      vi.mocked(resolveExamFlowState).mockResolvedValue(
+        flowState({ attempt: { preExamCompletedAt: new Date(Date.now() - 10 * 1000) } })
+      );
       prismaMock.videoProgress.findUnique.mockResolvedValue(null);
 
       const res = await POST(
@@ -384,15 +413,11 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       // sona izlenmiş video "asla tamamlanamaz" tuzağı. Yeni davranış: createdAt'a
       // düş, gerçek geçen süreyi tavan olarak kullan. Attempt 10sn önce
       // yaratıldı → maxWatchable = 10*1.5 + 30 = 45.
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: null,
-        createdAt: new Date(Date.now() - 10 * 1000),
-      });
+      vi.mocked(resolveExamFlowState).mockResolvedValue(
+        flowState({
+          attempt: { preExamCompletedAt: null, createdAt: new Date(Date.now() - 10 * 1000) },
+        })
+      );
       prismaMock.videoProgress.findUnique.mockResolvedValue(null);
 
       const res = await POST(
@@ -407,14 +432,9 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
 
     it('K1 tavanı mevcut ilerlemeyi GERİYE düşürmez — existing 200 > tavan ise existing korunur', async () => {
       // preExamCompletedAt 10sn önce → tavan 45. Ama existing 200 izlenmiş.
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: new Date(Date.now() - 10 * 1000),
-      });
+      vi.mocked(resolveExamFlowState).mockResolvedValue(
+        flowState({ attempt: { preExamCompletedAt: new Date(Date.now() - 10 * 1000) } })
+      );
       prismaMock.videoProgress.findUnique.mockResolvedValue({
         attemptId: ATTEMPT_ID,
         videoId: VIDEO_ID,
@@ -435,14 +455,9 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
 
     it('meşru gerçek-zamanlı izleyici tavanı tetiklemez — geçen süre içinde watchedTime', async () => {
       // preExamCompletedAt 200sn önce → tavan = 200*1.5+30 = 330. watchedTime 150 < 330.
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: new Date(Date.now() - 200 * 1000),
-      });
+      vi.mocked(resolveExamFlowState).mockResolvedValue(
+        flowState({ attempt: { preExamCompletedAt: new Date(Date.now() - 200 * 1000) } })
+      );
       prismaMock.videoProgress.findUnique.mockResolvedValue(null);
 
       const res = await POST(
@@ -533,14 +548,7 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
    */
   describe('durationSeconds güvenilmez — tamamlanma kapısı (Plan Faz 1, Adım 2)', () => {
     it("durationSeconds=0 + heartbeat (completed yok) → tamamlanmaz, ilerleme 0'a clamp edilmez", async () => {
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: new Date(Date.now() - 60 * 60 * 1000),
-      });
+      // Varsayılan flowState (preExam 1 saat önce) yeterli — K1 tavanı 120'yi etkilemez.
       prismaMock.trainingVideo.findFirst.mockResolvedValue({
         id: VIDEO_ID,
         trainingId: 'training-1',
@@ -566,14 +574,6 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
     });
 
     it('durationSeconds=0 + completed:true (doğal bitiş) → tamamlanır', async () => {
-      prismaMock.examAttempt.findFirst.mockResolvedValue({
-        id: ATTEMPT_ID,
-        userId: 'staff-1',
-        trainingId: 'training-1',
-        status: 'watching_videos',
-        assignmentId: 'assignment-1',
-        preExamCompletedAt: new Date(Date.now() - 60 * 60 * 1000),
-      });
       prismaMock.trainingVideo.findFirst.mockResolvedValue({
         id: VIDEO_ID,
         trainingId: 'training-1',
@@ -608,6 +608,80 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       expect(body.allVideosCompleted).toBe(false);
       // onended (completed:true) gelse de izlenen süre alt sınırın (300*0.9=270) altında → tamamlanmaz.
       expect(writtenCreate().isCompleted).toBe(false);
+    });
+  });
+
+  /**
+   * N2 — şişkin DB durationSeconds tamamlama kilidi (Haziran 2026 kök neden).
+   * DB süresi gerçek oynatılabilir süreden büyükse %90 tabanı asla tutmuyordu:
+   * video sonuna kadar izlense bile tamamlanamıyor, her girişte "tamamlanmamış"
+   * görünüyordu. Fix: taban min(DB, clientDuration) üzerinden; anti-cheat alt
+   * clamp'i DB'nin %60'ı.
+   */
+  describe('N2 — clientDuration tamamlanma tabanı düzeltmesi', () => {
+    it('şişkin DB süresi (400) + gerçek süre (300) + tam izleme → clientDuration ile tamamlanır', async () => {
+      // Eski davranış: taban 400*0.9=360 > 300 izlenen → ASLA tamamlanamaz.
+      // Yeni: effective = max(min(400,300)=300, 400*0.6=240) = 300 → taban 270 ≤ 300 → tamamlanır.
+      prismaMock.trainingVideo.findFirst.mockResolvedValue({
+        id: VIDEO_ID,
+        trainingId: 'training-1',
+        durationSeconds: 400,
+        contentType: 'video',
+        pageCount: null,
+      });
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null);
+      prismaMock.videoProgress.count.mockResolvedValue(1);
+
+      const res = await POST(
+        progressRequest({
+          videoId: VIDEO_ID,
+          watchedTime: 300,
+          position: 300,
+          completed: true,
+          clientDuration: 300,
+        }),
+        { params: Promise.resolve({ id: 'assignment-1' }) }
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.allVideosCompleted).toBe(true);
+      expect(writtenCreate().isCompleted).toBe(true);
+    });
+
+    it('sahte küçük clientDuration anti-cheat clamp\'ine takılır — %60 alt sınırın altına inemez', async () => {
+      // Hile girişimi: clientDuration=30 göndererek tabanı 27sn'e düşürme.
+      // Clamp: effective = max(min(300,30)=30, 300*0.6=180) = 180 → taban 162 > 100 izlenen → tamamlanmaz.
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null);
+
+      const res = await POST(
+        progressRequest({
+          videoId: VIDEO_ID,
+          watchedTime: 100,
+          position: 100,
+          completed: true,
+          clientDuration: 30,
+        }),
+        { params: Promise.resolve({ id: 'assignment-1' }) }
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.allVideosCompleted).toBe(false);
+      expect(writtenCreate().isCompleted).toBe(false);
+    });
+
+    it('clientDuration gönderilmezse eski davranış aynen korunur (DB süresi tabanı)', async () => {
+      prismaMock.videoProgress.findUnique.mockResolvedValue(null);
+      prismaMock.videoProgress.count.mockResolvedValue(1);
+
+      const res = await POST(
+        progressRequest({ videoId: VIDEO_ID, watchedTime: 285, position: 285, completed: true }),
+        { params: Promise.resolve({ id: 'assignment-1' }) }
+      );
+
+      expect(res.status).toBe(200);
+      expect(writtenCreate().isCompleted).toBe(true);
     });
   });
 
@@ -676,15 +750,9 @@ function videosGetRequest(id = 'training-1'): Request {
 
 describe('GET /api/exam/[id]/videos — watchedSeconds yanıt sözleşmesi', () => {
   beforeEach(() => {
-    // Phase guard: pre_exam değil → akış devam etsin.
-    vi.mocked(getActiveOrLatestAttemptStatus).mockResolvedValue({
-      status: 'watching_videos',
-    } as Awaited<ReturnType<typeof getActiveOrLatestAttemptStatus>>);
-    prismaMock.trainingAssignment.findFirst.mockResolvedValue({
-      id: 'assignment-1',
-      trainingId: 'training-1',
-      status: 'in_progress',
-    });
+    // Atama + attempt + aşama tek doğruluk kaynağından (resolver mock'u) gelir;
+    // phase guard pre_exam değil → akış devam etsin (varsayılan: watching_videos).
+    vi.mocked(resolveExamFlowState).mockResolvedValue(flowState());
     prismaMock.training.findFirst.mockResolvedValue({
       id: 'training-1',
       title: 'Test Eğitim',
@@ -699,7 +767,6 @@ describe('GET /api/exam/[id]/videos — watchedSeconds yanıt sözleşmesi', () 
         sortOrder: 0,
       },
     ]);
-    prismaMock.examAttempt.findFirst.mockResolvedValue({ id: ATTEMPT_ID });
   });
 
   it('progress kaydı varsa watchedSeconds DB değerinden döner (lastPosition ile ayrı)', async () => {

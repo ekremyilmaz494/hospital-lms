@@ -38,8 +38,16 @@ function TransitionContent() {
   const isVideosToPost = from === 'videos';
   const isPostResult = from === 'post-exam';
 
+  // Videosuz/PDF-only eğitim: video aşaması SESSİZCE atlanmaz — bu ekran açık
+  // mesaj gösterir ve CTA doğrudan son sınava götürür. Kaynak: URL parametresi
+  // (pre-exam submit nextStep='post-exam' döndürdüyse) veya start yanıtı
+  // (noRequiredVideos / resume edilen attempt zaten post_exam'daysa).
+  const [noVideos, setNoVideos] = useState(searchParams.get('noVideos') === '1');
+
   const destination = isPreToVideos
-    ? `/exam/${id}/videos`
+    ? noVideos
+      ? `/exam/${id}/post-exam`
+      : `/exam/${id}/videos`
     : isVideosToPost
       ? `/exam/${id}/post-exam`
       : '/staff/my-trainings';
@@ -60,13 +68,18 @@ function TransitionContent() {
           router.replace(`/exam/${trainingId}/feedback?attemptId=${pendingAttemptId}`);
           return;
         }
-        if (res.ok) {
-          // Videos page cift POST atmasin — 5s pencere
-          try { sessionStorage.setItem(`exam-start-${id}`, String(Date.now())); } catch { /* ignore */ }
-        }
+        // NOT: Eskiden burada videos page'in 5sn'lik sessionStorage guard'ı için
+        // `exam-start-${id}` yazılıyordu. Guard kaldırıldı — POST /start idempotent,
+        // mükerrer çağrı zararsız (bkz. videos/page.tsx start effect yorumu).
         if (isPreToVideos && data?.examOnly) {
           router.replace(`/exam/${id}/post-exam`);
           return;
+        }
+        // Videosuz eğitim sinyali: start ya şimdi atladı (noRequiredVideos) ya da
+        // attempt zaten post_exam'da resume edildi (redirectTo). İkisinde de
+        // kullanıcıya açık mesaj göster, videos sayfasına gönderip sektirme.
+        if (isPreToVideos && res.ok && (data?.noRequiredVideos === true || data?.redirectTo === 'post-exam')) {
+          setNoVideos(true);
         }
         if (isVideosToPost) {
           const alreadyPassed = !res.ok && typeof data?.error === 'string' && data.error.includes('başarıyla tamamladınız');
@@ -791,14 +804,21 @@ function TransitionContent() {
   }
 
   // ═══ COUNTDOWN TRANSITION ═══
+  const skipVideos = isPreToVideos && noVideos;
   const title = isPreToVideos ? 'Ön sınavı tamamladın' : 'Tüm videoları izledin';
-  const subtitle = isPreToVideos
-    ? 'Hazır olduğunuzda eğitim videolarına geçebilirsiniz.'
-    : 'Hazır olduğunuzda son sınava başlayabilirsiniz — başarılı olursan eğitimi tamamlamış sayılırsın.';
-  const ctaLabel = isPreToVideos ? 'Videolara Geç' : 'Son Sınava Başla';
-  const CtaIcon = isPreToVideos ? Play : Award;
+  const subtitle = skipVideos
+    ? 'Bu eğitimde izlenecek video bulunmuyor — doğrudan son sınava geçiyorsun.'
+    : isPreToVideos
+      ? 'Hazır olduğunuzda eğitim videolarına geçebilirsiniz.'
+      : 'Hazır olduğunuzda son sınava başlayabilirsiniz — başarılı olursan eğitimi tamamlamış sayılırsın.';
+  const ctaLabel = isPreToVideos && !skipVideos ? 'Videolara Geç' : 'Son Sınava Başla';
+  const CtaIcon = isPreToVideos && !skipVideos ? Play : Award;
   const HeroIcon = isPreToVideos ? CheckCircle2 : Award;
-  const eyebrowLabel = isPreToVideos ? 'Geçiş · Videolar' : 'Geçiş · Son Sınav';
+  const eyebrowLabel = skipVideos
+    ? 'Geçiş · Son Sınav'
+    : isPreToVideos
+      ? 'Geçiş · Videolar'
+      : 'Geçiş · Son Sınav';
 
   const circumference = 2 * Math.PI * 54;
   const progress = ((COUNTDOWN_SECONDS - timeLeft) / COUNTDOWN_SECONDS) * circumference;

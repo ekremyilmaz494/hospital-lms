@@ -343,7 +343,16 @@ export const GET = withStaffRoute<{ id: string }>(
         })),
       },
       200,
-      { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' }
+      // N4 FIX (Haziran 2026): aktif (devam eden) attempt varken cache YASAK.
+      // max-age=15 + swr=30 ile, ön sınavı yeni bitirip detaya dönen personel
+      // ~45 sn boyunca bayat "preExamCompleted:false" görüyor ve CTA tekrar
+      // "Ön Sınava Başla" diyordu (şikayet a'nın ikinci mekanizması). Akış
+      // ilerlerken tazelik > performans; attempt yokken eski cache kalır.
+      {
+        'Cache-Control': isActive
+          ? 'private, no-store'
+          : 'private, max-age=15, stale-while-revalidate=30',
+      }
     );
   },
   { requireOrganization: true }

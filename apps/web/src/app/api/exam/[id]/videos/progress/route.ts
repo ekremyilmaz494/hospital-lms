@@ -45,11 +45,12 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // Duvar-saati tavanı (K1 yansıması) — videos/route.ts ile aynı anti-cheat.
   // İstemci watchedSeconds'ı doğrudan gönderiyor; tavan olmadan ilk POST'ta tam
   // süre gönderip videoyu tek seferde tamamlatabilir. preExamCompletedAt'tan bu
-  // yana geçen gerçek süreyi %150 + 30sn tolerans ile cap'liyoruz. preExam henüz
-  // bitmemişse (null) yalnız 30sn izin verilir.
-  const maxWatchable = attempt.preExamCompletedAt
-    ? ((Date.now() - new Date(attempt.preExamCompletedAt).getTime()) / 1000) * 1.5 + 30
-    : 30
+  // yana geçen gerçek süreyi %150 + 30sn tolerans ile cap'liyoruz.
+  // preExamCompletedAt boşsa attempt.createdAt'a düş (videos/route.ts:362 ile
+  // aynı) — eski sabit 30sn tavanı, retry/examOnly gibi preExam damgası olmayan
+  // akışlarda videoyu "asla tamamlanamaz" yapıyordu.
+  const baseTime = attempt.preExamCompletedAt ?? attempt.createdAt
+  const maxWatchable = ((Date.now() - new Date(baseTime).getTime()) / 1000) * 1.5 + 30
   const wallCappedWatchedSeconds = Math.min(parsed.data.watchedSeconds, Math.floor(maxWatchable))
 
   // watchedSeconds & lastPositionSeconds: video suresiyle sinirla

@@ -22,7 +22,12 @@ interface AudioPlayerProps {
   duration: number
   lastPosition?: number
   onProgress: (seconds: number, position: number) => void
-  onComplete: () => void
+  /**
+   * Doğal bitişte çağrılır. `measuredDuration` oynatıcının ÖLÇTÜĞÜ gerçek süre
+   * (audio.duration) — DB durationSeconds şişkinse sunucu tamamlama tabanını
+   * bununla düzeltir (N2 fix). Ölçülemezse undefined.
+   */
+  onComplete: (measuredDuration?: number) => void
 }
 
 export function AudioPlayer({
@@ -86,7 +91,8 @@ export function AudioPlayer({
     if (!completedRef.current) {
       completedRef.current = true
       setIsComplete(true)
-      onComplete()
+      const measured = audioRef.current?.duration
+      onComplete(Number.isFinite(measured) && (measured as number) > 0 ? measured : undefined)
     }
   }, [onComplete])
 

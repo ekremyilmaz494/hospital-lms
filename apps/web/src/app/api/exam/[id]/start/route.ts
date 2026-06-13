@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/activity-logger'
 import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
 import { isTrainingAccessible } from '@/lib/training-helpers'
 import { advancePastVideosIfNoneRequired } from '@/lib/exam-helpers'
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
 import { isEndDatePassed } from '@/lib/date-helpers'
 import {
   attemptNextStatus,
@@ -90,83 +91,31 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Maksimum deneme sayısına ulaştınız')
   }
 
-  // Mevcut aktif attempt varsa dogrudan don — rate limit gereksiz.
-  // 'expired' attempt'i resume etme — cron tarafından kapatılmış olabilir
-  // (ör. eğitim süresi doldu veya 24h stale). Resume yerine yeni attempt
-  // yaratılır (currentAttempt < maxAttempts ise). Aksi halde kullanıcı
-  // expired attempt'le videos page'e atılıp redirect döngüsüne girer.
-  const existing = await prisma.examAttempt.findFirst({
-    where: {
-      assignmentId,
-      userId: dbUser.id,
-      status: { notIn: ['completed', 'expired'] },
-    },
-    include: { videoProgress: true },
-  })
+  // TEK KARAR YOLU: resume/promote mantığı YALNIZ transaction içinde yaşar.
+  // Eskiden aynı blok hem burada (hızlı yol) hem tx içinde kopyalanmıştı; iki
+  // kopyanın filtreleri ayrıştığında sonsuz redirect döngüsü doğmuştu
+  // (2026-05-20 Devakent, commit 2fa15b1). Dışarıda sadece "rate limit gerekli
+  // mi?" okuması kalır — resolver aktif attempt görüyorsa resume olacağı için
+  // rate limit atlanır (resume rate limit'e takılmamalı).
+  const preState = await resolveExamFlowState(assignmentId, dbUser.id, organizationId)
 
-  if (existing) {
-    let resumed = existing
-    // Pre_exam'da takılı kalmış attempt'i watching_videos'a yükselt:
-    //   - Retry attempt (attemptNumber > 1) AND requirePreExamOnRetry=false → ön sınav atlanır
-    //   - Ön sınavı gerçekten tamamlamış attempt (preExamCompletedAt dolu) → status senkron değil, düzelt
-    // Promote kararı state machine dışında kalır (iş mantığı koşulu); state machine
-    // yalnızca hedef status'ü hesaplar — PRE_EXAM_SUBMITTED → watching_videos.
-    const skipPreExamOnRetry = !assignment.training.requirePreExamOnRetry
-    const shouldPromote =
-      existing.status === 'pre_exam' &&
-      ((existing.attemptNumber > 1 && skipPreExamOnRetry) || existing.preExamCompletedAt !== null)
-    if (shouldPromote) {
-      const transition = attemptNextStatus(existing.status as AttemptStatus, { type: 'PRE_EXAM_SUBMITTED' })
-      if (!transition.ok) {
-        logger.error('Exam Start', 'Promote transition reddedildi', {
-          assignmentId,
-          userId: dbUser.id,
-          currentStatus: existing.status,
-          reason: transition.reason,
-        })
-        return errorResponse('Sınav durumu güncellenemedi.', 500)
-      }
-      resumed = await prisma.examAttempt.update({
-        where: { id: existing.id },
-        data: {
-          status: transition.next,
-          preExamCompletedAt: existing.preExamCompletedAt ?? new Date(),
-          preExamScore: existing.preExamScore ?? 0,
-        },
-        include: { videoProgress: true },
+  if (!preState.activeAttempt) {
+    // Rate limit SADECE yeni attempt olusturma icin — resume islemleri haric
+    const allowed = await checkRateLimit(`exam-start:${dbUser.id}`, 10, 3600)
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Çok fazla sınav başlangıcı. Lütfen 60 dakika sonra tekrar deneyin.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
       })
     }
-    // Videosuz/PDF-only eğitim: attempt watching_videos'a girdiyse otomatik
-    // post_exam'e ilerlet — aksi halde attempt sonsuza dek bu statede kalır.
-    if (resumed.status === 'watching_videos') {
-      const advance = await advancePastVideosIfNoneRequired(resumed.id, resumed.trainingId)
-      if (advance.advanced) {
-        resumed = { ...resumed, status: 'post_exam', postExamStartedAt: new Date() }
-      }
-    }
-    const examOnly = assignment.training.examOnly === true
-    const redirectTo = resumed.status === 'post_exam' ? 'post-exam' : undefined
-    return jsonResponse({
-      ...resumed,
-      examOnly,
-      redirectTo,
-    })
-  }
-
-  // Rate limit SADECE yeni attempt olusturma icin — resume islemleri haric
-  const allowed = await checkRateLimit(`exam-start:${dbUser.id}`, 10, 3600)
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: 'Çok fazla sınav başlangıcı. Lütfen 60 dakika sonra tekrar deneyin.' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
-    })
   }
 
   // B7.5 — Transaction hatalarını yakala; MAX_ATTEMPTS dışındaki hatalar 500 döndürmesin
-  let attempt: Awaited<ReturnType<typeof prisma.examAttempt.findFirst>> | null = null
+  type AttemptRecord = NonNullable<Awaited<ReturnType<typeof prisma.examAttempt.findFirst>>>
+  let txResult: { record: AttemptRecord; created: boolean } | null = null
   const txStartedAt = Date.now()
   try {
-  attempt = await prisma.$transaction(async (tx) => {
+  txResult = await prisma.$transaction(async (tx) => {
     // SELECT FOR UPDATE ile row-level lock — concurrent race condition önlenir
     await tx.$queryRaw`SELECT id FROM training_assignments WHERE id = ${assignmentId}::uuid FOR UPDATE`
 
@@ -193,11 +142,23 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
         existingInTx.status === 'pre_exam' &&
         ((existingInTx.attemptNumber > 1 && skipPreExamOnRetryInTx) || existingInTx.preExamCompletedAt !== null)
       if (shouldPromoteInTx) {
+        // Self-heal sinyali: preExamCompletedAt dolu ama status hâlâ pre_exam.
+        // submit route'un CAS'li transaction'ı bu ikisini ATOMİK yazar — bu warn
+        // görünüyorsa başka bir kod yolu senkronu bozuyor demektir. Promote
+        // kullanıcıyı kurtarır ama altta yatan bug'ı MASKELEMESİN diye loglanır.
+        if (existingInTx.preExamCompletedAt !== null) {
+          logger.warn('Exam Start', 'Self-heal promote: preExamCompletedAt dolu ama status pre_exam', {
+            assignmentId,
+            attemptId: existingInTx.id,
+            userId: dbUser.id,
+            attemptNumber: existingInTx.attemptNumber,
+          })
+        }
         const transitionInTx = attemptNextStatus(existingInTx.status as AttemptStatus, { type: 'PRE_EXAM_SUBMITTED' })
         if (!transitionInTx.ok) {
           throw new Error(`PROMOTE_TRANSITION_REJECTED: ${transitionInTx.reason}`)
         }
-        return await tx.examAttempt.update({
+        const promoted = await tx.examAttempt.update({
           where: { id: existingInTx.id },
           data: {
             status: transitionInTx.next,
@@ -206,8 +167,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
           },
           include: { videoProgress: true },
         })
+        return { record: promoted, created: false }
       }
-      return existingInTx
+      return { record: existingInTx, created: false }
     }
 
     // Create new attempt
@@ -246,7 +208,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
           ? { preExamCompletedAt: new Date(), preExamScore: 0 }
           : { preExamStartedAt: new Date() }
 
-    const created = await tx.examAttempt.create({
+    const createdAttempt = await tx.examAttempt.create({
       data: {
         assignmentId,
         userId: dbUser.id,
@@ -270,7 +232,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       data: { currentAttempt: newAttemptNumber, status: assignmentTransition.next },
     })
 
-    return created
+    return { record: createdAttempt, created: true }
   }, { timeout: 10_000, maxWait: 5_000 }).catch((err: Error) => {
     if (err.message === 'MAX_ATTEMPTS_EXCEEDED') return null
     throw err // re-throw to outer try-catch
@@ -300,32 +262,43 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     logger.warn('Exam Start', `Yavaş başlatma: ${totalElapsed}ms`, { assignmentId, userId: dbUser.id })
   }
 
-  if (!attempt) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
+  if (!txResult) return errorResponse('Maksimum deneme sayısına ulaştınız', 403)
+  let attempt = txResult.record
 
-  // Videosuz/PDF-only eğitim: watching_videos'da takılı kalmasın.
+  // Videosuz/PDF-only eğitim: watching_videos'da takılı kalmasın. TEK çağrı
+  // noktası — eskiden resume hızlı yolu + bu blok olmak üzere iki yerden
+  // çağrılıyordu (drift kaynağı). `noRequiredVideos` yanıtla döner; transition
+  // page kullanıcıya AÇIK mesaj gösterir, video aşaması sessizce atlanmaz.
+  let videosAutoSkipped = false
   if (attempt.status === 'watching_videos') {
     const advance = await advancePastVideosIfNoneRequired(attempt.id, attempt.trainingId)
     if (advance.advanced) {
       attempt = { ...attempt, status: 'post_exam', postExamStartedAt: new Date() }
+      videosAutoSkipped = true
     }
   }
 
-  await audit({
-    action: 'exam.started',
-    entityType: 'exam_attempt',
-    entityId: attempt.id,
-    newData: { trainingId: assignment.trainingId, attemptNumber: attempt.attemptNumber },
-  })
+  // Audit yalnız GERÇEK yeni denemede — her resume POST'unda 'exam.started'
+  // yazmak audit'i gürültüye boğar (videos/pre-exam/post-exam sayfaları mount'ta
+  // start çağırır).
+  if (txResult.created) {
+    await audit({
+      action: 'exam.started',
+      entityType: 'exam_attempt',
+      entityId: attempt.id,
+      newData: { trainingId: assignment.trainingId, attemptNumber: attempt.attemptNumber },
+    })
 
-  void logActivity({
-    userId: dbUser.id,
-    organizationId,
-    action: 'exam_start',
-    resourceType: 'exam_attempt',
-    resourceId: attempt.id,
-    resourceTitle: assignment.training.title,
-    metadata: { attemptNumber: attempt.attemptNumber, trainingId: assignment.trainingId },
-  })
+    void logActivity({
+      userId: dbUser.id,
+      organizationId,
+      action: 'exam_start',
+      resourceType: 'exam_attempt',
+      resourceId: attempt.id,
+      resourceTitle: assignment.training.title,
+      metadata: { attemptNumber: attempt.attemptNumber, trainingId: assignment.trainingId },
+    })
+  }
 
   const examOnly = assignment.training.examOnly === true
   const redirectTo = attempt.status === 'post_exam' ? 'post-exam' : undefined
@@ -333,5 +306,8 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     ...attempt,
     examOnly,
     redirectTo,
+    // Additive alanlar — mevcut client'lar görmezden gelir.
+    stage: attempt.status,
+    noRequiredVideos: videosAutoSkipped,
   })
 }, { requireOrganization: true })

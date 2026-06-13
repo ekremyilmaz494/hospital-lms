@@ -152,13 +152,18 @@ describe('POST /api/exam/[id]/videos/progress — K2 sertleştirme regresyon gua
       expect(body.allVideosCompleted).toBe(false)
     })
 
-    it('preExamCompletedAt null ise tavan yalnız 30sn olur', async () => {
+    it('preExamCompletedAt null ise createdAt fallback — geçen süre tavanı uygulanır', async () => {
+      // Eski davranış sabit 30sn tavanıydı: preExam damgası olmayan akışlarda
+      // (retry/examOnly) baştan sona izlenmiş video "asla tamamlanamaz" oluyordu.
+      // Yeni: attempt.createdAt'a düş (videos/route.ts ile aynı). Attempt 10sn
+      // önce yaratıldı → maxWatchable = 10*1.5 + 30 = 45.
       prismaMock.examAttempt.findFirst.mockResolvedValue({
         id: ATTEMPT_ID,
         userId: 'staff-1',
         trainingId: TRAINING_ID,
         status: 'watching_videos',
         preExamCompletedAt: null,
+        createdAt: new Date(Date.now() - 10_000),
         training: { organizationId: 'org-1' },
       })
 
@@ -168,7 +173,7 @@ describe('POST /api/exam/[id]/videos/progress — K2 sertleştirme regresyon gua
       const upsertArgs = prismaMock.videoProgress.upsert.mock.calls[0][0] as {
         create: Record<string, number | boolean>
       }
-      expect(upsertArgs.create.watchedSeconds).toBeLessThanOrEqual(30)
+      expect(upsertArgs.create.watchedSeconds).toBeLessThanOrEqual(45)
       expect(upsertArgs.create.isCompleted).toBe(false)
     })
 

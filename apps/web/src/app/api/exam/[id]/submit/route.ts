@@ -9,6 +9,7 @@ import { logActivity } from '@/lib/activity-logger'
 import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { issueCertificateForAttempt } from '@/lib/certificate-helpers'
 import { getEffectiveExamQuestions, advancePastVideosIfNoneRequired } from '@/lib/exam-helpers'
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
 import {
   attemptNextStatus,
   assignmentNextStatus,
@@ -47,16 +48,18 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
   })
   if (!attempt) {
-    attempt = await prisma.examAttempt.findFirst({
-      where: {
-        assignmentId: attemptId,
-        userId: dbUser.id,
-        status: { not: 'completed' },
-        training: { organizationId: organizationId },
-      },
-      include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
-      orderBy: { attemptNumber: 'desc' },
-    })
+    // id attemptId değilse assignmentId/trainingId olabilir — resolver
+    // kanonikleştirir ve attempt'i atamaya scope'lar (N1). Aktif attempt
+    // öncelikli; yoksa son attempt: completed çift-submit idempotent replay'e
+    // girer, expired faz guard'ında 400 alır. Eski `status: { not: 'completed' }`
+    // filtresi expired'i aktif sayıyordu (N3) — artık saymaz.
+    const flow = await resolveExamFlowState(attemptId, dbUser.id, organizationId)
+    if (flow.attempt) {
+      attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
+        where: { id: flow.attempt.id, userId: dbUser.id, training: { organizationId: organizationId } },
+        include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
+      })
+    }
   }
 
   if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı. Sınavı yeniden başlatın.', 404)

@@ -1,10 +1,17 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
+import { logger } from '@/lib/logger'
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 
 /**
  * Get an active exam attempt and verify the user is in the required phase.
  * Returns the attempt or an error response.
+ *
+ * Attempt tespiti resolveExamFlowState üzerinden yapılır (tek doğruluk kaynağı):
+ * atama önce kanonikleştirilir, attempt o atamaya scope'lanır. Eski
+ * `status: { not: 'completed' }` filtresi expired attempt'i AKTİF sayıyordu
+ * (N3) — artık yalnız non-terminal attempt faz kontrolüne girer.
  */
 export async function getAttemptWithPhaseCheck(
   id: string,
@@ -12,28 +19,21 @@ export async function getAttemptWithPhaseCheck(
   requiredPhase: string | string[],
   userOrgId: string,
 ) {
-  // Tenant isolation: training.organizationId mutlaka çağıranın org'u olmalı (cross-org leak önlemi)
-  const orgGuard = { training: { organizationId: userOrgId } }
+  const flow = await resolveExamFlowState(id, userId, userOrgId)
 
-  let attempt = await prisma.examAttempt.findFirst({
-    where: { assignmentId: id, userId, status: { not: 'completed' }, ...orgGuard },
+  if (!flow.activeAttempt) {
+    return { attempt: null, error: errorResponse('Aktif sınav denemesi bulunamadı', 404) }
+  }
+
+  // Faz kontrolünden geçecek tam kayıt (training + videoProgress include'ları
+  // çağıranların ihtiyacı) — id ile nokta atışı, tenant guard korunur.
+  const attempt = await prisma.examAttempt.findFirst({
+    where: { id: flow.activeAttempt.id, userId, training: { organizationId: userOrgId } },
     include: {
       training: { select: { id: true, passingScore: true, examDurationMinutes: true } },
       videoProgress: true,
     },
-    orderBy: { attemptNumber: 'desc' },
   })
-
-  if (!attempt) {
-    attempt = await prisma.examAttempt.findFirst({
-      where: { trainingId: id, userId, status: { not: 'completed' }, ...orgGuard },
-      include: {
-        training: { select: { id: true, passingScore: true, examDurationMinutes: true } },
-        videoProgress: true,
-      },
-      orderBy: { attemptNumber: 'desc' },
-    })
-  }
 
   if (!attempt) {
     return { attempt: null, error: errorResponse('Aktif sınav denemesi bulunamadı', 404) }
@@ -62,67 +62,15 @@ export async function getAttemptWithPhaseCheck(
   return { attempt, error: null }
 }
 
-/**
- * Get attempt status for frontend phase guard (read-only, no phase restriction)
- * Searches by assignmentId first, then by trainingId as fallback
+/*
+ * NOT: getAttemptStatus ve getActiveOrLatestAttemptStatus KALDIRILDI
+ * (Haziran 2026 kök neden temizliği). İkisi de trainingId fallback'inde
+ * atamalar-ARASI `attemptNumber desc` sıralıyordu; attemptNumber atama-başına
+ * benzersiz olduğundan "Yeniden Ata" round'larında eski atamanın denemesi
+ * yenisini gölgeliyordu (personel ön sınava geri atılıyordu). Yerine:
+ * `resolveExamFlowState` (exam-flow-resolver.ts) — attempt tespitinin tek
+ * doğruluk kaynağı. Bu fonksiyonları GERİ EKLEME.
  */
-export async function getAttemptStatus(id: string, userId: string, userOrgId: string) {
-  const orgGuard = { training: { organizationId: userOrgId } }
-
-  let attempt = await prisma.examAttempt.findFirst({
-    where: { assignmentId: id, userId, ...orgGuard },
-    orderBy: { attemptNumber: 'desc' },
-    select: { id: true, status: true, preExamCompletedAt: true, videosCompletedAt: true, postExamCompletedAt: true },
-  })
-
-  if (!attempt) {
-    attempt = await prisma.examAttempt.findFirst({
-      where: { trainingId: id, userId, ...orgGuard },
-      orderBy: { attemptNumber: 'desc' },
-      select: { id: true, status: true, preExamCompletedAt: true, videosCompletedAt: true, postExamCompletedAt: true },
-    })
-  }
-
-  return attempt
-}
-
-/**
- * Frontend phase guard için kullan. Aktif (non-terminal) bir attempt varsa onu
- * döner; yoksa latest attempt'e (terminal dahil) düşer. start POST'tan sonra
- * yaratılan taze attempt'i, eski tamamlanmış/expired bir attempt'in arkasına
- * gizlemez — bu olmadan frontend `attemptPhaseRedirect` terminal status okuyup
- * kullanıcıyı yanlışlıkla redirect ediyordu (2026-05-20 Devakent incident).
- */
-export async function getActiveOrLatestAttemptStatus(id: string, userId: string, userOrgId: string) {
-  const orgGuard = { training: { organizationId: userOrgId } }
-  const select = {
-    id: true,
-    status: true,
-    preExamCompletedAt: true,
-    videosCompletedAt: true,
-    postExamCompletedAt: true,
-  }
-  // Not: `as const` koyma — Prisma `notIn` mutable string[] bekliyor.
-  const activeFilter = { status: { notIn: ['completed', 'expired'] } }
-
-  let active = await prisma.examAttempt.findFirst({
-    where: { assignmentId: id, userId, ...orgGuard, ...activeFilter },
-    orderBy: { attemptNumber: 'desc' },
-    select,
-  })
-
-  if (!active) {
-    active = await prisma.examAttempt.findFirst({
-      where: { trainingId: id, userId, ...orgGuard, ...activeFilter },
-      orderBy: { attemptNumber: 'desc' },
-      select,
-    })
-  }
-
-  if (active) return active
-
-  return getAttemptStatus(id, userId, userOrgId)
-}
 
 /* ──────────────────────────────────────────────────────────────────────
    Soru subset seçimi — questions ve submit route'ları aynı kümeyi görmeli.
@@ -207,10 +155,24 @@ export async function advancePastVideosIfNoneRequired(
   attemptId: string,
   trainingId: string,
 ): Promise<{ advanced: boolean; status: AttemptStatus }> {
-  const requiredCount = await prisma.trainingVideo.count({
-    where: { trainingId, contentType: { not: 'pdf' } },
-  })
+  const [requiredCount, totalCount] = await Promise.all([
+    prisma.trainingVideo.count({
+      where: { trainingId, contentType: { not: 'pdf' } },
+    }),
+    prisma.trainingVideo.count({ where: { trainingId } }),
+  ])
   if (requiredCount > 0) return { advanced: false, status: 'watching_videos' }
+  // Teşhis sinyali (şikayet d — "video aşaması atlanıyor"): eğitimde içerik VAR
+  // ama zorunlu video/ses YOK. PDF-only eğitimde bu normaldir; ama video'su
+  // transcode'da silinmiş/bozulmuş bir eğitimde de aynı yoldan sessizce
+  // atlanır. Log olmadan iki durum ayırt edilemiyordu.
+  if (totalCount > 0) {
+    logger.warn('ExamFlow', 'Video aşaması otomatik atlandı: eğitimde içerik var ama zorunlu video/ses yok (PDF-only mu, bozuk/eksik transcode mu?)', {
+      trainingId,
+      attemptId,
+      totalCount,
+    })
+  }
   const now = new Date()
   const updated = await prisma.examAttempt.updateMany({
     where: { id: attemptId, status: 'watching_videos' },

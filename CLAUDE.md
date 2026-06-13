@@ -273,6 +273,45 @@ Personelin yarıda bıraktığı videoya kaldığı yerden devam edebilmesi `Vid
 
 ---
 
+## 🎯 Sınav Akışı Attempt Çözümü (KRİTİK)
+
+Personel sınav akışında (ön sınav → video → son sınav) tekrar tekrar dönen bir bug
+sınıfı vardı: ön sınavı bitiren personel geri girince tekrar ön sınava atılıyor,
+video atlanıyor, "kaldığım yerden devam etmiyor" vb. Kök neden Haziran 2026'da bulundu:
+
+**N1 — atamalar-arası `attemptNumber` sıralaması.** `attemptNumber` atama-BAŞINA benzersizdir
+(`@@unique([assignmentId, attemptNumber])`). 6+ route, trainingId fallback'inde attempt'i
+`orderBy: { attemptNumber: 'desc' }` ile **atamalar-arası** sıralıyordu. "Yeniden Ata"
+(round 2+) senaryosunda eski atamanın takılı kalmış 3. denemesi, yeni atamanın 1. denemesini
+gölgeliyordu. Her düzeltme tek kopyayı onarıyor, diğerleri kayıyordu → bug geri geliyordu.
+
+**Kurallar:**
+
+1. **Attempt/aşama tespiti TEK kaynaktan:** `resolveExamFlowState` (`src/lib/exam-flow-resolver.ts`).
+   Önce ATAMA çözülür (assignmentId, yoksa trainingId fallback'i `[{round:'desc'},{assignedAt:'desc'}]`),
+   sonra attempt **o atamaya scope'lanır**. Atamalar-arası `attemptNumber` sıralaması **YASAK**.
+2. **Doğrudan `prisma.examAttempt.findFirst({ where: { assignmentId/trainingId... }})` YASAK.**
+   `perf-check.js` `exam-attempt-resolver` kuralı commit'i ENGELLER. Nokta atışı `where: { id }`
+   serbest; bilinçli tek-atama-scope istisnası için `// perf-check-disable-line` + açıklama.
+3. **`getAttemptStatus` / `getActiveOrLatestAttemptStatus` SİLİNDİ — geri ekleme.** Yerine resolver.
+4. **`activeAttempt` vs `attempt` ayrımı:** progress yazımı/faz guard'ı `activeAttempt`'i
+   (non-terminal) kullanır; UI/redirect `attempt`'i (terminal de görünür: "Yeniden Dene" CTA'sı).
+5. **N2 — şişkin DB süresi:** video tamamlanma tabanı (`%90`) `min(durationSeconds, clientDuration)`
+   üstünden; client `onended`'de oynatıcı ölçümünü gönderir. Alt clamp DB'nin `%60`'ı (anti-cheat).
+6. **N4 — aktif attempt'te cache yok:** `my-trainings/[id]` aktif attempt varken `no-store`
+   (bayat CTA "Ön Sınava Başla" gösterip kullanıcıyı geri atıyordu).
+7. **Sekme-dönüşü senkronu:** `useExamStageSync` (`visibilitychange`/`focus`) → `GET /api/exam/[id]/state`
+   → sunucunun bildiği aşamaya `router.replace`. Cron expire / çoklu sekme / TIMEOUT sonrası
+   bayat ekran + "Eğitim oturumu geçersiz" ölü modalının kök çözümü.
+
+**Neden bu kural var:** Bu bug sınıfı (commit'ler: `2fa15b1`, `75e3143`, `d650445`, `e2c6640`)
+defalarca patch'lendi ve geri geldi çünkü düzeltmeler tek kopyayı onarıyordu. Tek doğruluk
+kaynağı (resolver) + perf-check kuralı + `exam-flow-resolver.test.ts` (N1 fixture'ı) +
+davranış matrisi (`docs/exam-flow-behavior-matrix.md`) birlikte regresyon engeli kurar — bu
+katmanları çıkarma.
+
+---
+
 ## 🔐 Auth & Redirect Döngüsü Önleme (KRİTİK)
 
 Geçmiş sonsuz yenilenme döngülerinden çıkarılmış kurallar:

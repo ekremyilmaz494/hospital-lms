@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers';
 import { withStaffRoute } from '@/lib/api-handler';
-import { getActiveOrLatestAttemptStatus } from '@/lib/exam-helpers';
+import { resolveExamFlowState } from '@/lib/exam-flow-resolver';
 import { resolveTrainingVideoUrl, resolveTrainingDocumentUrl } from '@/lib/training-video-url';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/redis';
@@ -19,12 +19,14 @@ export const GET = withStaffRoute<{ id: string }>(
     const url = new URL(request.url);
     const isReview = url.searchParams.get('mode') === 'review';
 
-    // Phase guard: aktif (non-terminal) attempt'in status'üne bak. Latest attempt'i
-    // okumak yetmiyor — start POST taze attempt yarattıktan sonra higher
-    // attemptNumber'a sahip eski completed/expired attempt frontend'i terminal
-    // redirect'e tetikleyebiliyordu (2026-05-20 Devakent incident).
-    const attemptInfo = await getActiveOrLatestAttemptStatus(id, dbUser.id, organizationId);
-    const attemptStatus = attemptInfo?.status ?? null;
+    // Tek doğruluk kaynağı: atama + attempt + aşama resolveExamFlowState'ten.
+    // Aktif (non-terminal) attempt öncelikli; yoksa son attempt (terminal dahil) —
+    // taze attempt eski terminal attempt'in arkasına gizlenmez (2026-05-20
+    // Devakent incident). Atamalar-arası attemptNumber sıralaması YOK ("Yeniden
+    // Ata" round'larında eski atamanın denemesi yenisini gölgelemez — Haziran
+    // 2026 kök neden, N1).
+    const state = await resolveExamFlowState(id, dbUser.id, organizationId);
+    const attemptStatus = state.attempt?.status ?? null;
     // Videos accessible during watching_videos, post_exam (read-only), and completed phases
     // Only block during pre_exam (hasn't finished pre-exam yet).
     // 403 yerine 200 + attemptStatus dön: frontend phase guard (attemptPhaseRedirect)
@@ -37,29 +39,15 @@ export const GET = withStaffRoute<{ id: string }>(
       });
     }
 
-    // id can be a trainingId — find the training and user's assignment
-    const assignment = await prisma.trainingAssignment.findFirst({
-      where: { trainingId: id, userId: dbUser.id },
-      select: { id: true, trainingId: true, status: true },
-    });
-
-    // Also try as assignmentId
-    const assignment2 =
-      assignment ??
-      (await prisma.trainingAssignment.findFirst({
-        where: { id, userId: dbUser.id },
-        select: { id: true, trainingId: true, status: true },
-      }));
-
-    // O1 — non-review akışta atama zorunlu. assignment2 yoksa kullanıcının bu
+    // O1 — non-review akışta atama zorunlu. Atama yoksa kullanıcının bu
     // eğitime erişim hakkı yok; id'yi trainingId fallback'i olarak kullanıp aynı
     // org'daki herhangi bir eğitimin imzalı video URL'lerini sızdırma. Review
     // yolu kendi passed kontrolünü yapar (aşağıda), bu guard'ın dışında kalır.
-    if (!isReview && !assignment2) {
+    if (!isReview && !state.assignment) {
       return errorResponse('Bu eğitim size atanmamış', 403);
     }
 
-    const trainingId = assignment2?.trainingId ?? id;
+    const trainingId = state.assignment?.trainingId ?? id;
 
     const training = await prisma.training.findFirst({
       where: { id: trainingId, organizationId },
@@ -71,7 +59,9 @@ export const GET = withStaffRoute<{ id: string }>(
     // Review mode passed kontrolü — tenant-safe (training yukarıda organizationId ile filtrelendi)
     if (isReview) {
       const [passedAttempt, passedAssignment] = await Promise.all([
-        prisma.examAttempt.findFirst({
+        // Review yetki kontrolü: "geçmişte BU EĞİTİMİ geçmiş mi?" — aktif attempt
+        // tespiti değil, tarihsel başarı sorgusu. Resolver kapsamı dışında.
+        prisma.examAttempt.findFirst({ // perf-check-disable-line
           where: {
             userId: dbUser.id,
             trainingId: training.id,
@@ -143,38 +133,11 @@ export const GET = withStaffRoute<{ id: string }>(
       orderBy: { sortOrder: 'asc' },
     });
 
-    // BUG B-2 FIX: Sadece aktif (tamamlanmamış) denemenin video ilerlemesini getir.
-    // expired'i de hariç tut — kardeş kodlarla (getActiveOrLatestAttemptStatus,
-    // start/route.ts) tutarlı. Aksi halde cron expire sonrası eski attempt'in
-    // videoProgress'i yüklenir → yanlış saniyeden resume.
-    //
-    // Attempt çözüm ÖNCELİĞİ POST ve start route ile AYNI: önce URL'deki assignment'ın
-    // attempt'i, yoksa trainingId genelinde ara. Aksi halde "Yeniden Ata" (round)
-    // senaryosunda iki atamanın da aktif attempt'i varken GET bir attempt'in
-    // progress'ini okuyup POST diğerine yazar → okuma/yazma tutarsızlığı.
-    // (assignment2 non-review akışta üstteki 403 guard'ı sayesinde her zaman dolu;
-    // TS narrowing'i bunu göremediği için null-safe yazıldı.)
-    const activeAttempt =
-      (assignment2
-        ? await prisma.examAttempt.findFirst({
-            where: {
-              userId: dbUser.id,
-              assignmentId: assignment2.id,
-              status: { notIn: ['completed', 'expired'] satisfies AttemptStatus[] },
-            },
-            orderBy: { attemptNumber: 'desc' },
-            select: { id: true },
-          })
-        : null) ??
-      (await prisma.examAttempt.findFirst({
-        where: {
-          userId: dbUser.id,
-          trainingId: training.id,
-          status: { notIn: ['completed', 'expired'] satisfies AttemptStatus[] },
-        },
-        orderBy: { attemptNumber: 'desc' },
-        select: { id: true },
-      }));
+    // BUG B-2 FIX devamı: sadece AKTİF (non-terminal) denemenin video ilerlemesini
+    // getir — resolver'ın activeAttempt alanı. Cron expire sonrası eski attempt'in
+    // videoProgress'i yüklenmez → yanlış saniyeden resume yok. GET/POST/start aynı
+    // resolver'ı kullandığı için okuma/yazma attempt uyumsuzluğu sınıfı kapandı.
+    const activeAttempt = state.activeAttempt;
 
     const progress = activeAttempt
       ? await prisma.videoProgress.findMany({
@@ -243,6 +206,16 @@ export const POST = withStaffRoute<{ id: string }>(
       completed?: boolean;
       currentPage?: number;
       mode?: string;
+      /**
+       * Oynatıcının ÖLÇTÜĞÜ süre (video.duration, onended anında). DB'deki
+       * durationSeconds gerçek oynatılabilir süreden BÜYÜKSE (transcode kırpması,
+       * hatalı ffprobe, elle girilmiş değer) %90 tamamlama tabanı matematiksel
+       * olarak asla tutmaz — video sonuna kadar izlense bile tamamlanamaz, client
+       * iyimser işaretler, sunucu reddeder, sonraki girişte video "tamamlanmamış"
+       * görünür (Haziran 2026 kök neden, N2). Taban min(DB, client) üzerinden
+       * uygulanır; anti-cheat alt clamp'i aşağıda.
+       */
+      clientDuration?: number;
     }>(request);
 
     if (queryMode === 'review' || headerMode === 'review' || body?.mode === 'review') {
@@ -255,37 +228,17 @@ export const POST = withStaffRoute<{ id: string }>(
 
     if (!body?.videoId) return errorResponse('videoId required');
 
-    // Find attempt — try assignmentId first, then trainingId.
-    // orderBy ZORUNLU: orderBy'sız findFirst çoklu attempt durumunda (örn. "Yeniden
-    // Ata" round'ları) rastgele attempt seçer → progress yanlış attempt'e yazılır,
-    // GET başka attempt'ten okur ("kaldığım yerden devam etmiyor" sınıfı bug).
-    // organizationId WHERE'de: requireOrganization:true org'u garanti ediyor; tenant
-    // izolasyonunu sorgu seviyesinde uygula (cross-tenant IDOR önlemi). ExamAttempt'in
-    // doğrudan organizationId kolonu var (start/route.ts:254 set ediyor).
-    let attempt = await prisma.examAttempt.findFirst({
-      where: {
-        assignmentId: id,
-        userId: dbUser.id,
-        organizationId,
-        status: 'watching_videos' satisfies AttemptStatus,
-      },
-      orderBy: { attemptNumber: 'desc' },
-    });
-    if (!attempt) {
-      attempt = await prisma.examAttempt.findFirst({
-        where: {
-          trainingId: id,
-          userId: dbUser.id,
-          organizationId,
-          status: 'watching_videos' satisfies AttemptStatus,
-        },
-        orderBy: { attemptNumber: 'desc' },
-      });
+    // Attempt çözümü — GET ve start ile AYNI tek doğruluk kaynağı:
+    // resolveExamFlowState. Atama önce kanonikleştirilir, attempt o atamaya
+    // scope'lanır; atamalar-arası attemptNumber sıralaması yok ("Yeniden Ata"
+    // round'larında progress yanlış attempt'e yazılmaz — Haziran 2026 N1).
+    // organizationId resolver'ın her sorgusunda WHERE'de (cross-tenant IDOR önlemi).
+    const flowState = await resolveExamFlowState(id, dbUser.id, organizationId);
+    const resolvedAttempt = flowState.activeAttempt;
+    if (!resolvedAttempt || resolvedAttempt.status !== ('watching_videos' satisfies AttemptStatus)) {
+      return errorResponse('Aktif video izleme aşaması bulunamadı', 400);
     }
-    if (!attempt) return errorResponse('Aktif video izleme aşaması bulunamadı', 400);
-    // const binding — $transaction closure içinde `let attempt` narrowing'i
-    // korunmaz; non-null garantili const referans kullan.
-    const activeAttempt = attempt;
+    const activeAttempt = resolvedAttempt;
 
     // Y3 — videoId bu attempt'in eğitimine ait olmalı; cross-training progress
     // yazımını engelle. findUnique tek başına yabancı bir video kabul ederdi.
@@ -425,9 +378,31 @@ export const POST = withStaffRoute<{ id: string }>(
         // DB durationSeconds arasındaki küçük sapmaya pay bırakır. Süre
         // güvenilmezse (durationSeconds<=0) alt sınır uygulanamaz; onended tek
         // ölçüt olur.
+        // N2 FIX (Haziran 2026): %90 tabanı DB durationSeconds yerine
+        // min(DB, oynatıcı ölçümü) üzerinden uygulanır. DB süresi gerçek
+        // oynatılabilir süreden büyükse (transcode kırpması, hatalı ffprobe)
+        // taban asla tutmuyordu → video sonuna kadar izlense bile tamamlanamıyor,
+        // her girişte "tamamlanmamış" görünüyordu. Anti-cheat korunur:
+        //   - clientDuration alt clamp'i DB süresinin %60'ı — sahte küçük süre
+        //     göndererek tabanı kaçırmak işe yaramaz (yine K1 duvar-saati tavanı
+        //     + izleme hızı denetimi nextWatched'i gerçek süreye sabitliyor).
+        //   - clientDuration yoksa/geçersizse eski davranış aynen geçerli.
         const ANTI_CHEAT_WATCH_FLOOR = 0.9;
+        const CLIENT_DURATION_MIN_RATIO = 0.6;
+        const rawClientDuration = Number(body.clientDuration);
+        const clientDuration =
+          Number.isFinite(rawClientDuration) && rawClientDuration > 0
+            ? Math.round(rawClientDuration)
+            : null;
+        const effectiveDuration =
+          hasReliableDuration && clientDuration !== null
+            ? Math.max(
+                Math.min(video.durationSeconds, clientDuration),
+                Math.floor(video.durationSeconds * CLIENT_DURATION_MIN_RATIO),
+              )
+            : video.durationSeconds;
         const watchedEnoughToComplete =
-          !hasReliableDuration || nextWatched >= video.durationSeconds * ANTI_CHEAT_WATCH_FLOOR;
+          !hasReliableDuration || nextWatched >= effectiveDuration * ANTI_CHEAT_WATCH_FLOOR;
         nextCompleted = body.completed === true && watchedEnoughToComplete;
       }
 
