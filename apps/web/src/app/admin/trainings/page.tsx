@@ -266,15 +266,32 @@ export default function TrainingsPage() {
       },
     },
     {
+      accessorKey: 'startDate',
+      header: 'Başlangıç',
+      size: 110,
+      cell: ({ row }) => {
+        const v = row.getValue('startDate') as string;
+        return (
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--k-info)' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--k-text-secondary)' }}>{v ? new Date(v).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</span>
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: 'endDate',
       header: 'Bitiş',
       size: 110,
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--k-text-secondary)' }}>{new Date(row.getValue('endDate') as string).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const v = row.getValue('endDate') as string;
+        return (
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--k-text-muted)' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--k-text-secondary)' }}>{v ? new Date(v).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</span>
+          </div>
+        );
+      },
     },
     {
       id: 'actions',

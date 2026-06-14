@@ -58,7 +58,7 @@ export default function StaffPage() {
   }, [periodId, router, searchParams]);
 
   const { data, isLoading, refetch } = useFetch<StaffPageData>(
-    `/api/admin/staff?page=${currentPage}&limit=10${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${periodId ? `&periodId=${periodId}` : ''}`
+    `/api/admin/staff?page=${currentPage}&limit=10&isActive=true${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${periodId ? `&periodId=${periodId}` : ''}`
   );
   // Mutasyon sonrası: in-memory cache + HTTP cache her ikisini de bypass'la
   const refreshDepartments = useCallback(() => {

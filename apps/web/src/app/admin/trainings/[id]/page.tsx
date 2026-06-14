@@ -6,7 +6,7 @@ import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
   FileText, RotateCcw, Download, Eye, Video, CheckCircle2, XCircle, Timer,
   ChevronRight, Award, FileDown, MessageSquare, Search, X, MoreHorizontal,
-  Loader2,
+  Loader2, UserMinus,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -101,9 +101,11 @@ export default function TrainingDetailPage() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
   const [downloadingCompletion, setDownloadingCompletion] = useState<'pdf' | 'excel' | null>(null);
-  const [downloadingTab, setDownloadingTab] = useState<'pdf' | 'excel' | null>(null);
+  const [downloadingTab, setDownloadingTab] = useState<'pdf' | 'excel' | 'pdf-completed' | 'pdf-incomplete' | null>(null);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<{ assignmentId: string; name: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
   const [staffStatusFilter, setStaffStatusFilter] = useState<StaffStatusFilter>('all');
 
@@ -164,6 +166,30 @@ export default function TrainingDetailPage() {
   ];
 
   const ghostBtnStyle = { borderColor: K.BORDER, color: K.TEXT_SECONDARY, background: K.SURFACE };
+
+  // Tab-export raporu indir (PDF/Excel). status verilirse personel sekmesinde
+  // sadece tamamlayan/tamamlamayan personeli içeren rapor üretir.
+  const downloadReport = async (
+    key: 'pdf' | 'excel' | 'pdf-completed' | 'pdf-incomplete',
+    format: 'pdf' | 'excel',
+    filename: string,
+    status?: 'completed' | 'incomplete',
+  ) => {
+    setDownloadingTab(key);
+    try {
+      const statusQs = status ? `&status=${status}` : '';
+      const res = await fetch(`/api/admin/trainings/${id}/tab-export?tab=${activeTab}&format=${format}${statusQs}`);
+      if (!res.ok) throw new Error('Rapor oluşturulamadı');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch { toast(`${format === 'pdf' ? 'PDF' : 'Excel'} raporu indirilemedi`, 'error'); }
+    finally { setDownloadingTab(null); }
+  };
 
   return (
     <div className="space-y-6">
@@ -376,6 +402,48 @@ export default function TrainingDetailPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!removeTarget} onOpenChange={(open) => { if (!open && !removing) setRemoveTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle style={{ fontSize: 18, fontFamily: K.FONT_DISPLAY, color: K.TEXT_PRIMARY }}>Personeli eğitimden çıkar</DialogTitle>
+            <DialogDescription style={{ color: K.TEXT_SECONDARY }}>
+              {removeTarget?.name} bu eğitimden çıkarılacak. İlgili sınav denemeleri de silinir. Bu işlem geri alınamaz. Devam etmek istediğinize emin misiniz?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={removing} onClick={() => setRemoveTarget(null)} style={ghostBtnStyle}>Vazgeç</Button>
+            <Button
+              disabled={removing}
+              style={{ background: K.ERROR, color: 'white' }}
+              onClick={async () => {
+                if (!removeTarget) return;
+                setRemoving(true);
+                try {
+                  const res = await fetch(`/api/admin/trainings/${id}/assignments`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assignmentId: removeTarget.assignmentId }),
+                  });
+                  if (!res.ok) {
+                    const data = await res.json().catch(() => null) as { error?: string } | null;
+                    throw new Error(data?.error || 'İşlem başarısız oldu');
+                  }
+                  toast(`${removeTarget.name} eğitimden çıkarıldı`, 'success');
+                  setRemoveTarget(null);
+                  refetch();
+                } catch (e) {
+                  toast(e instanceof Error ? e.message : 'İşlem başarısız oldu.', 'error');
+                } finally {
+                  setRemoving(false);
+                }
+              }}
+            >
+              {removing ? 'Çıkarılıyor...' : 'Evet, çıkar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Description */}
       <p className="text-sm leading-relaxed" style={{ color: K.TEXT_SECONDARY }}>
         {training.description}
@@ -420,28 +488,14 @@ export default function TrainingDetailPage() {
             ))}
           </div>
           {activeTab !== 'videos' && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-1.5 text-xs rounded-lg"
                 style={ghostBtnStyle}
                 disabled={downloadingTab === 'excel'}
-                onClick={async () => {
-                  setDownloadingTab('excel');
-                  try {
-                    const res = await fetch(`/api/admin/trainings/${id}/tab-export?tab=${activeTab}&format=excel`);
-                    if (!res.ok) throw new Error('Rapor oluşturulamadı');
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${activeTab === 'staff' ? 'personel_durumu' : 'sorular'}.xlsx`;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  } catch { toast('Excel raporu indirilemedi', 'error'); }
-                  finally { setDownloadingTab(null); }
-                }}
+                onClick={() => downloadReport('excel', 'excel', `${activeTab === 'staff' ? 'personel_durumu' : 'sorular'}.xlsx`)}
               >
                 <Download className="h-3.5 w-3.5" /> {downloadingTab === 'excel' ? 'Hazırlanıyor...' : 'Excel'}
               </Button>
@@ -451,24 +505,34 @@ export default function TrainingDetailPage() {
                 className="gap-1.5 text-xs rounded-lg"
                 style={ghostBtnStyle}
                 disabled={downloadingTab === 'pdf'}
-                onClick={async () => {
-                  setDownloadingTab('pdf');
-                  try {
-                    const res = await fetch(`/api/admin/trainings/${id}/tab-export?tab=${activeTab}&format=pdf`);
-                    if (!res.ok) throw new Error('Rapor oluşturulamadı');
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${activeTab === 'staff' ? 'personel_durumu' : 'sorular'}.pdf`;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  } catch { toast('PDF raporu indirilemedi', 'error'); }
-                  finally { setDownloadingTab(null); }
-                }}
+                onClick={() => downloadReport('pdf', 'pdf', `${activeTab === 'staff' ? 'personel_durumu' : 'sorular'}.pdf`)}
               >
-                <FileText className="h-3.5 w-3.5" /> {downloadingTab === 'pdf' ? 'Hazırlanıyor...' : 'PDF'}
+                <FileText className="h-3.5 w-3.5" /> {downloadingTab === 'pdf' ? 'Hazırlanıyor...' : `PDF${activeTab === 'staff' ? ' (Tümü)' : ''}`}
               </Button>
+              {activeTab === 'staff' && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs rounded-lg"
+                    style={{ borderColor: K.SUCCESS, color: K.PRIMARY, background: K.SURFACE }}
+                    disabled={downloadingTab === 'pdf-completed'}
+                    onClick={() => downloadReport('pdf-completed', 'pdf', 'tamamlayanlar.pdf', 'completed')}
+                  >
+                    <FileText className="h-3.5 w-3.5" /> {downloadingTab === 'pdf-completed' ? 'Hazırlanıyor...' : 'Tamamlayanlar PDF'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs rounded-lg"
+                    style={{ borderColor: K.WARNING, color: '#b45309', background: K.SURFACE }}
+                    disabled={downloadingTab === 'pdf-incomplete'}
+                    onClick={() => downloadReport('pdf-incomplete', 'pdf', 'tamamlamayanlar.pdf', 'incomplete')}
+                  >
+                    <FileText className="h-3.5 w-3.5" /> {downloadingTab === 'pdf-incomplete' ? 'Hazırlanıyor...' : 'Tamamlamayanlar PDF'}
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -656,6 +720,15 @@ export default function TrainingDetailPage() {
                               )}
                               <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium" style={{ color: K.TEXT_MUTED }}>
                                 <Eye className="h-3.5 w-3.5" /> Detay<ChevronRight className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => setRemoveTarget({ assignmentId: s.assignmentId, name: s.name })}
+                                title="Eğitimden çıkar"
+                                aria-label="Eğitimden çıkar"
+                                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium"
+                                style={{ color: K.ERROR }}
+                              >
+                                <UserMinus className="h-3.5 w-3.5" /> Çıkar
                               </button>
                             </div>
                           </div>
