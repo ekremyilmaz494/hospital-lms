@@ -7,6 +7,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
+import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
 import { BRAND } from '@/lib/brand'
 
 function formatDate(d: Date | string | null | undefined): string {
@@ -116,7 +117,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUs
         endDate: true,
         regulatoryBody: true,
         isCompulsory: true,
-        organization: { select: { name: true } },
+        organization: { select: { name: true, logoUrl: true } },
       },
     })
     if (!training) return errorResponse('Eğitim bulunamadı', 404)
@@ -124,6 +125,9 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUs
     const orgName = training.organization?.name ?? BRAND.fullName
 
     const docRef = id.slice(0, 8).toUpperCase()
+
+    // PDF başlığındaki kurum logosu (yoksa fallback logo). Excel'de gerekmez.
+    const orgLogo = format === 'pdf' ? await resolveOrgLogoDataUrl(training.organization?.logoUrl) : null
 
     if (tab === 'staff') {
       const statusWhere = status === 'all' ? {} : { status: { in: STATUS_FILTER_MAP[status] } }
@@ -135,12 +139,12 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUs
         }),
       ])
       return format === 'pdf'
-        ? buildStaffPDF(training, orgName, staffRows, assignments, docRef, status)
+        ? buildStaffPDF(training, orgName, staffRows, assignments, docRef, status, orgLogo)
         : buildStaffExcel(training, orgName, staffRows, assignments, status)
     } else {
       const questionRows = await loadQuestionRows(id)
       return format === 'pdf'
-        ? buildQuestionsPDF(training, orgName, questionRows, docRef)
+        ? buildQuestionsPDF(training, orgName, questionRows, docRef, orgLogo)
         : buildQuestionsExcel(training, orgName, questionRows)
     }
   } catch (err) {
@@ -237,6 +241,7 @@ async function buildStaffPDF(
   assignments: { status: string }[],
   docRef: string,
   status: StatusFilter = 'all',
+  logoDataUrl: string | null = null,
 ) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   await applyTurkishFont(doc)
@@ -244,7 +249,7 @@ async function buildStaffPDF(
   const H = doc.internal.pageSize.getHeight()
 
   const label = STAFF_REPORT_LABELS[status]
-  drawHeader(doc, W, orgName, training, label.subtitle, docRef)
+  drawHeader(doc, W, orgName, training, label.subtitle, docRef, logoDataUrl)
   const infoBottom = drawInfoBand(doc, W, training)
   const statsBottom = drawStaffStats(doc, W, infoBottom + 4, assignments)
   drawTableTitle(doc, W, statsBottom + 4, 'PERSONEL DURUMU')
@@ -314,13 +319,14 @@ async function buildQuestionsPDF(
   orgName: string,
   rows: QuestionRow[],
   docRef: string,
+  logoDataUrl: string | null = null,
 ) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   await applyTurkishFont(doc)
   const W = doc.internal.pageSize.getWidth()
   const H = doc.internal.pageSize.getHeight()
 
-  drawHeader(doc, W, orgName, training, 'SINAV SORULARI RAPORU', docRef)
+  drawHeader(doc, W, orgName, training, 'SINAV SORULARI RAPORU', docRef, logoDataUrl)
   const infoBottom = drawInfoBand(doc, W, training)
 
   // Questions summary stat band
@@ -499,6 +505,44 @@ async function buildQuestionsExcel(
 }
 
 // ════════════════ Shared PDF helpers ════════════════
+/**
+ * Başlık sol köşesindeki kurum logosu. Logo varsa beyaz yuvarlatılmış plaka
+ * üzerine en-boy oranı korunarak yerleştirilir; yoksa kurum adının baş harfiyle
+ * dairesel rozet çizilir (eski davranış). Plaka, dikey ayraç (x=34) solunda kalır.
+ */
+function drawOrgLogo(doc: jsPDF, orgName: string, logoDataUrl: string | null) {
+  const cx = 18, cy = 22
+
+  const drawLetterBadge = () => {
+    doc.setFillColor(...WHITE)
+    doc.circle(20, 22, 10, 'F')
+    doc.setFillColor(...PRIMARY_DK)
+    doc.circle(20, 22, 8, 'F')
+    doc.setTextColor(...WHITE)
+    doc.setFont(TURKISH_FONT_FAMILY, 'bold')
+    doc.setFontSize(13)
+    doc.text((orgName.charAt(0) || '?').toLocaleUpperCase('tr'), 20, 25.5, { align: 'center' })
+  }
+
+  if (!logoDataUrl) { drawLetterBadge(); return }
+
+  try {
+    const props = doc.getImageProperties(logoDataUrl)
+    const fmt = logoDataUrl.includes('image/jpeg') || logoDataUrl.includes('jpg') ? 'JPEG' : 'PNG'
+    const maxW = 22, maxH = 20
+    const ratio = props.width / props.height
+    let lw = maxW, lh = lw / ratio
+    if (lh > maxH) { lh = maxH; lw = lh * ratio }
+    const padX = 3, padY = 2.5
+    // Beyaz plaka — logo yeşil zeminde okunur olsun
+    doc.setFillColor(...WHITE)
+    doc.roundedRect(cx - lw / 2 - padX, cy - lh / 2 - padY, lw + padX * 2, lh + padY * 2, 2, 2, 'F')
+    doc.addImage(logoDataUrl, fmt, cx - lw / 2, cy - lh / 2, lw, lh)
+  } catch {
+    drawLetterBadge()
+  }
+}
+
 function drawHeader(
   doc: jsPDF,
   W: number,
@@ -506,6 +550,7 @@ function drawHeader(
   training: TrainingMeta,
   subtitle: string,
   docRef: string,
+  logoDataUrl: string | null = null,
 ) {
   // Main band
   doc.setFillColor(...PRIMARY)
@@ -521,15 +566,8 @@ function drawHeader(
   doc.setFillColor(245, 158, 11)
   doc.rect(0, 44.5, W, 1.5, 'F')
 
-  // Logo — concentric discs
-  doc.setFillColor(...WHITE)
-  doc.circle(20, 22, 10, 'F')
-  doc.setFillColor(...PRIMARY_DK)
-  doc.circle(20, 22, 8, 'F')
-  doc.setTextColor(...WHITE)
-  doc.setFont(TURKISH_FONT_FAMILY, 'bold')
-  doc.setFontSize(13)
-  doc.text(orgName.charAt(0).toUpperCase(), 20, 25.5, { align: 'center' })
+  // Logo — kurum logosu beyaz plaka üzerinde (yoksa baş harf rozeti)
+  drawOrgLogo(doc, orgName, logoDataUrl)
 
   // Vertical separator
   doc.setDrawColor(255, 255, 255)
