@@ -4,6 +4,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { createAssignmentSchema } from '@/lib/validations'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
+import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { getOrCreateActivePeriodForAssignment, findActivePeriod } from '@/lib/training-periods'
 
@@ -397,4 +398,45 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
   })
 
   return jsonResponse({ success: true, newMaxAttempts })
+}, { requireOrganization: true })
+
+/**
+ * DELETE — Yönetici: personeli eğitimden çıkar (atamayı sil).
+ * Durumdan bağımsız çalışır; ilgili sınav denemeleri cascade ile silinir.
+ * Body: { assignmentId } (tercih) veya { userId }.
+ */
+export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
+  const { id: trainingId } = params
+
+  const allowed = await checkRateLimit(`assignment:delete:${dbUser.id}`, 30, 60)
+  if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
+
+  const body = await parseBody<{ assignmentId?: string; userId?: string }>(request)
+  if (!body?.assignmentId && !body?.userId) return errorResponse('assignmentId veya userId zorunludur')
+
+  // Tenant guard: atama bu kuruma ait mi? (organizationId denormalize alanı kullanılır)
+  const assignment = await prisma.trainingAssignment.findFirst({
+    where: {
+      trainingId,
+      organizationId,
+      ...(body.assignmentId ? { id: body.assignmentId } : { userId: body.userId }),
+    },
+    orderBy: { round: 'desc' },
+    select: { id: true, userId: true, status: true, round: true },
+  })
+  if (!assignment) return errorResponse('Atama bulunamadı', 404)
+
+  // ExamAttempt → assignment ilişkisi onDelete: Cascade; denemeler otomatik silinir.
+  await prisma.trainingAssignment.delete({ where: { id: assignment.id } })
+
+  await audit({
+    action: 'unassign',
+    entityType: 'training_assignment',
+    entityId: assignment.id,
+    oldData: { userId: assignment.userId, status: assignment.status, round: assignment.round },
+  })
+
+  try { await invalidateDashboardCache(organizationId) } catch {}
+
+  return jsonResponse({ success: true })
 }, { requireOrganization: true })

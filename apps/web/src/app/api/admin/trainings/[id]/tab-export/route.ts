@@ -61,6 +61,14 @@ const C_ALT_ROW    = 'FFF8FAFC'
 
 type Tab = 'staff' | 'questions'
 type Format = 'pdf' | 'excel'
+type StatusFilter = 'all' | 'completed' | 'incomplete'
+
+// Eğitim detay sayfasındaki "Tamamladı / Tamamlamadı" filtresiyle birebir aynı
+// (bkz. admin/trainings/[id]/page.tsx — COMPLETED_STATUSES / INCOMPLETE_STATUSES).
+const STATUS_FILTER_MAP: Record<Exclude<StatusFilter, 'all'>, string[]> = {
+  completed: ['passed', 'failed'],
+  incomplete: ['in_progress', 'assigned'],
+}
 
 interface StaffRow {
   name: string
@@ -89,8 +97,10 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUs
   const url = new URL(request.url)
   const tab = (url.searchParams.get('tab') ?? 'staff') as Tab
   const format = (url.searchParams.get('format') ?? 'pdf') as Format
+  const status = (url.searchParams.get('status') ?? 'all') as StatusFilter
   if (!['staff', 'questions'].includes(tab)) return errorResponse('Geçersiz tab', 400)
   if (!['pdf', 'excel'].includes(format)) return errorResponse('Geçersiz format', 400)
+  if (!['all', 'completed', 'incomplete'].includes(status)) return errorResponse('Geçersiz durum', 400)
 
   const allowed = await checkRateLimit(`report:tab:${dbUser.id}`, 10, 60)
   if (!allowed) return errorResponse('Çok fazla rapor isteği. Lütfen bekleyin.', 429)
@@ -116,16 +126,17 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUs
     const docRef = id.slice(0, 8).toUpperCase()
 
     if (tab === 'staff') {
+      const statusWhere = status === 'all' ? {} : { status: { in: STATUS_FILTER_MAP[status] } }
       const [staffRows, assignments] = await Promise.all([
-        loadStaffRows(id),
+        loadStaffRows(id, status),
         prisma.trainingAssignment.findMany({
-          where: { trainingId: id },
+          where: { trainingId: id, ...statusWhere },
           select: { status: true },
         }),
       ])
       return format === 'pdf'
-        ? buildStaffPDF(training, orgName, staffRows, assignments, docRef)
-        : buildStaffExcel(training, orgName, staffRows, assignments)
+        ? buildStaffPDF(training, orgName, staffRows, assignments, docRef, status)
+        : buildStaffExcel(training, orgName, staffRows, assignments, status)
     } else {
       const questionRows = await loadQuestionRows(id)
       return format === 'pdf'
@@ -138,9 +149,10 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, dbUs
   }
 }, { requireOrganization: true })
 
-async function loadStaffRows(trainingId: string): Promise<StaffRow[]> {
+async function loadStaffRows(trainingId: string, status: StatusFilter = 'all'): Promise<StaffRow[]> {
+  const statusWhere = status === 'all' ? {} : { status: { in: STATUS_FILTER_MAP[status] } }
   const rows = await prisma.trainingAssignment.findMany({
-    where: { trainingId },
+    where: { trainingId, ...statusWhere },
     select: {
       status: true,
       currentAttempt: true,
@@ -210,6 +222,13 @@ type TrainingMeta = {
   isCompulsory: boolean
 }
 
+// Status filtresine göre rapor başlığı / dosya adı.
+const STAFF_REPORT_LABELS: Record<StatusFilter, { subtitle: string; kind: string }> = {
+  all:        { subtitle: 'PERSONEL DURUMU RAPORU', kind: 'personel_durumu' },
+  completed:  { subtitle: 'TAMAMLAYANLAR RAPORU',    kind: 'tamamlayanlar' },
+  incomplete: { subtitle: 'TAMAMLAMAYANLAR RAPORU',  kind: 'tamamlamayanlar' },
+}
+
 // ════════════════ PDF: Staff ════════════════
 async function buildStaffPDF(
   training: TrainingMeta,
@@ -217,13 +236,15 @@ async function buildStaffPDF(
   rows: StaffRow[],
   assignments: { status: string }[],
   docRef: string,
+  status: StatusFilter = 'all',
 ) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   await applyTurkishFont(doc)
   const W = doc.internal.pageSize.getWidth()
   const H = doc.internal.pageSize.getHeight()
 
-  drawHeader(doc, W, orgName, training, 'PERSONEL DURUMU RAPORU', docRef)
+  const label = STAFF_REPORT_LABELS[status]
+  drawHeader(doc, W, orgName, training, label.subtitle, docRef)
   const infoBottom = drawInfoBand(doc, W, training)
   const statsBottom = drawStaffStats(doc, W, infoBottom + 4, assignments)
   drawTableTitle(doc, W, statsBottom + 4, 'PERSONEL DURUMU')
@@ -284,7 +305,7 @@ async function buildStaffPDF(
   })
 
   drawPageFooter(doc, W, H, orgName, training.title)
-  return pdfResponse(doc, training.title, 'personel_durumu')
+  return pdfResponse(doc, training.title, label.kind)
 }
 
 // ════════════════ PDF: Questions ════════════════
@@ -369,6 +390,7 @@ async function buildStaffExcel(
   orgName: string,
   rows: StaffRow[],
   assignments: { status: string }[],
+  status: StatusFilter = 'all',
 ) {
   const wb = createWorkbook(orgName)
   const ws = wb.addWorksheet('Personel Durumu', {
@@ -426,7 +448,7 @@ async function buildStaffExcel(
 
   ws.autoFilter = { from: { row: 8, column: 1 }, to: { row: 8 + rows.length, column: 7 } }
 
-  return excelResponse(await wb.xlsx.writeBuffer(), training.title, 'personel_durumu')
+  return excelResponse(await wb.xlsx.writeBuffer(), training.title, STAFF_REPORT_LABELS[status].kind)
 }
 
 // ════════════════ Excel: Questions ════════════════
