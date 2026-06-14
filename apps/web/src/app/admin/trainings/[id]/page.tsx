@@ -711,25 +711,29 @@ export default function TrainingDetailPage() {
                             <p className="text-xs font-medium text-center" style={{ fontFamily: 'var(--font-mono)', color: K.TEXT_SECONDARY }}>{s.completedAt ? new Date(s.completedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</p>
                             {/* Actions */}
                             <div className="flex justify-end">
-                              {s.status === 'failed' && (
-                                <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold rounded-lg" style={{ borderColor: K.PRIMARY, color: K.PRIMARY, background: K.SURFACE }}
-                                  onClick={() => setResetTarget({ userId: s.userId, name: s.name })}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" /> Yeni Hak Ver
-                                </Button>
-                              )}
-                              <button onClick={() => router.push(`/admin/staff/${s.userId}`)} className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium" style={{ color: K.TEXT_MUTED }}>
-                                <Eye className="h-3.5 w-3.5" /> Detay<ChevronRight className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={() => setRemoveTarget({ assignmentId: s.assignmentId, name: s.name })}
-                                title="Eğitimden çıkar"
-                                aria-label="Eğitimden çıkar"
-                                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium"
-                                style={{ color: K.ERROR }}
-                              >
-                                <UserMinus className="h-3.5 w-3.5" /> Çıkar
-                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-accent" aria-label="Personel işlemleri">
+                                  <MoreHorizontal className="h-4 w-4" style={{ color: K.TEXT_MUTED }} />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem className="gap-2" onClick={() => router.push(`/admin/staff/${s.userId}`)}>
+                                    <Eye className="h-4 w-4" /> Detay Görüntüle
+                                  </DropdownMenuItem>
+                                  {s.status === 'failed' && (
+                                    <DropdownMenuItem className="gap-2" onClick={() => setResetTarget({ userId: s.userId, name: s.name })}>
+                                      <RotateCcw className="h-4 w-4" style={{ color: K.PRIMARY }} /> Yeni Hak Ver
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    style={{ color: K.ERROR }}
+                                    onClick={() => setRemoveTarget({ assignmentId: s.assignmentId, name: s.name })}
+                                  >
+                                    <UserMinus className="h-4 w-4" /> Eğitimden Çıkar
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
                         );
