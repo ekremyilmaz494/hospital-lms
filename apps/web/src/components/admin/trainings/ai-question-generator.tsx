@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Sparkles, CheckCircle2, Trash2, RefreshCw, AlertCircle,
-  Loader2, PlusCircle, Zap, ChevronDown, FileCheck2, BookOpenCheck,
+  Loader2, PlusCircle, Zap, BookOpenCheck,
   UploadCloud, X,
 } from 'lucide-react';
 import { CURATED_MODELS, DEFAULT_MODEL_ID, getModel } from '@/lib/openrouter-models';
@@ -65,16 +65,6 @@ const ACCEPTED_TYPES = [
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.pptx,.xlsx';
 const ACCEPTED_LABEL = 'PDF, Word (.docx), PowerPoint (.pptx) veya Excel (.xlsx)';
 
-// Tier rozetleri için sıkı emerald tabanlı sofistike palet — varsayılan medikal AI
-// renk kombinasyonlarından (mor/mavi gradient) kaçınıyoruz.
-const tierStyles: Record<string, { dot: string; label: string; bg: string }> = {
-  premium: { dot: '#0d9668', label: '#065f46', bg: '#ecfdf5' },
-  dengeli: { dot: '#0891b2', label: '#155e75', bg: '#ecfeff' },
-  hızlı: { dot: '#d97706', label: '#92400e', bg: '#fffbeb' },
-  'uzun-context': { dot: '#7c3aed', label: '#5b21b6', bg: '#f5f3ff' },
-  'açık-kaynak': { dot: '#475569', label: '#1e293b', bg: '#f1f5f9' },
-};
-
 const FONT_EDITORIAL = "var(--font-editorial, Georgia, serif)";
 
 export default function AiQuestionGenerator({
@@ -97,9 +87,10 @@ export default function AiQuestionGenerator({
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
+  // Model seçimi kaldırıldı — sistem her zaman premium Claude Sonnet 4.6 kullanır.
+  // selectedModel yalnızca yükleme bandındaki etiket için tutuluyor.
+  const modelId = DEFAULT_MODEL_ID;
   const selectedModel = getModel(modelId) ?? CURATED_MODELS[0];
-  const tierColor = tierStyles[selectedModel.tier] ?? tierStyles.premium;
 
   // Hastane sınavlarında toplam soru sayısı sabit 10. AI sadece manuel'in
   // tamamlamadığı kadarını üretir; ek 5 yedek hook içinde otomatik gelir.
@@ -349,47 +340,6 @@ export default function AiQuestionGenerator({
                 {uploadError}
               </p>
             )}
-          </section>
-
-          {/* Adım 2 — Model */}
-          <section className="aiq-section">
-            <header className="aiq-section-head">
-              <span className="aiq-step-num">02</span>
-              <span className="aiq-step-label">Yapay Zeka Modeli</span>
-            </header>
-            <div className="aiq-model-select-wrap">
-              <span className="aiq-model-tier-dot" style={{ background: tierColor.dot }} />
-              <select
-                className="aiq-model-select"
-                value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
-              >
-                {CURATED_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label} — {m.tier}{m.supportsPdf ? '' : ' (PDF yok)'}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="aiq-model-chevron" />
-            </div>
-            <div className="aiq-model-meta">
-              <span
-                className="aiq-tier-pill"
-                style={{ background: tierColor.bg, color: tierColor.label }}
-              >
-                {selectedModel.tier}
-              </span>
-              {selectedModel.supportsPdf ? (
-                <span className="aiq-pdf-pill aiq-pdf-pill--on">
-                  <FileCheck2 size={11} strokeWidth={2.5} /> PDF native
-                </span>
-              ) : (
-                <span className="aiq-pdf-pill aiq-pdf-pill--off">
-                  <AlertCircle size={11} strokeWidth={2.5} /> PDF yok
-                </span>
-              )}
-            </div>
-            <p className="aiq-model-desc">{selectedModel.description}</p>
           </section>
 
           {/* Generate / regenerate */}
