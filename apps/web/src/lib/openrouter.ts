@@ -132,10 +132,25 @@ async function buildContentBlocks(
     const buffer = await downloadBuffer(source.s3Key);
     let text = await extractTextFromPdf(buffer);
     if (!text) {
-      logger.warn('openrouter', 'pdf yielded empty text (taranmış/görsel-only olabilir)', {
+      // Gömülü metni olmayan PDF (taranmış/görsel-only) → unpdf çıkaramaz.
+      // Sessizce DÜŞÜRME: çoklu kaynakta bu PDF'ten hiç soru gelmiyordu
+      // (kullanıcı şikâyeti). Model PDF destekliyor (generateQuestions üstte
+      // garanti eder) → PDF'i native `file` bloğuyla gönder, Claude vision ile
+      // okusun. Text PDF'ler hızlı unpdf yolunda kalır (#189 timeout kazancı
+      // korunur; native yol yalnızca gerçekten vision gereken taranmış PDF'e
+      // dokunur). Büyük taranmış PDF native parse yavaş olabilir → 280s timeout
+      // + "zaman aşımı" mesajı güvenlik ağı. (Gelecekte daha sağlam OCR için
+      //  OpenRouter mistral-ocr plugin'i değerlendirilebilir — ücretli.)
+      logger.warn('openrouter', 'pdf metni boş — native PDF (vision) fallback', {
         s3Key: source.s3Key,
       });
-      return [];
+      const url = await getDownloadUrl(source.s3Key);
+      return [
+        {
+          type: 'file',
+          file: { file_data: url, filename },
+        } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart,
+      ];
     }
     if (text.length > PDF_TEXT_MAX_CHARS) {
       logger.warn('openrouter', 'pdf text truncated', {
