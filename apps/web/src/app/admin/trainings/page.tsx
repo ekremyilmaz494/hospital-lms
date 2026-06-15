@@ -190,7 +190,7 @@ export default function TrainingsPage() {
           </div>
           <div className="min-w-0">
             <p
-              className="font-semibold truncate"
+              className="font-semibold line-clamp-2 [text-wrap:balance]"
               style={{ color: 'var(--k-text-primary)', transition: 'color 160ms ease' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--k-primary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--k-text-primary)'; }}
