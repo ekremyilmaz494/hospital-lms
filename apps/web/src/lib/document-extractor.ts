@@ -10,20 +10,20 @@
  * çağrılır, dönen text Claude'a `text` content olarak gönderilir.
  */
 
-import mammoth from 'mammoth'
-import JSZip from 'jszip'
-import ExcelJS from 'exceljs'
+import mammoth from 'mammoth';
+import JSZip from 'jszip';
+import ExcelJS from 'exceljs';
 
 export const OFFICE_MIME_TYPES = {
   DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   PPTX: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-} as const
+} as const;
 
-export type OfficeMimeType = (typeof OFFICE_MIME_TYPES)[keyof typeof OFFICE_MIME_TYPES]
+export type OfficeMimeType = (typeof OFFICE_MIME_TYPES)[keyof typeof OFFICE_MIME_TYPES];
 
 export function isOfficeMimeType(mimeType: string): mimeType is OfficeMimeType {
-  return Object.values(OFFICE_MIME_TYPES).some(t => t === mimeType)
+  return Object.values(OFFICE_MIME_TYPES).some((t) => t === mimeType);
 }
 
 /**
@@ -32,83 +32,105 @@ export function isOfficeMimeType(mimeType: string): mimeType is OfficeMimeType {
  */
 export async function extractTextFromOfficeDocument(
   buffer: Buffer,
-  mimeType: string,
+  mimeType: string
 ): Promise<string> {
   switch (mimeType) {
     case OFFICE_MIME_TYPES.DOCX:
-      return extractDocx(buffer)
+      return extractDocx(buffer);
     case OFFICE_MIME_TYPES.PPTX:
-      return extractPptx(buffer)
+      return extractPptx(buffer);
     case OFFICE_MIME_TYPES.XLSX:
-      return extractXlsx(buffer)
+      return extractXlsx(buffer);
     default:
-      throw new Error(`Desteklenmeyen office formatı: ${mimeType}`)
+      throw new Error(`Desteklenmeyen office formatı: ${mimeType}`);
   }
+}
+
+/**
+ * PDF Buffer'ından düz metin çıkarır (sunucu tarafı).
+ *
+ * Neden burada: OpenRouter'ın PDF parse engine'leri 12MB+ PDF'lerde kırılgan —
+ * `native` engine fonksiyonu timeout'a düşürüyordu (504), `cloudflare-ai` engine
+ * Cloudflare Workers AI'ın 128MB Worker bellek limitine takılıp 500 veriyordu.
+ * Bunun yerine office dosyaları gibi metni burada çıkarıp modele düz metin
+ * gönderiyoruz — deterministik, provider PDF-parse katmanından bağımsız.
+ *
+ * unpdf kullanılır (PDF.js'in serverless-paketlenmiş wrapper'ı; Vercel'de worker/
+ * canvas kurulumu gerektirmez, yalnız text-layer okur). Taranmış/görsel-only
+ * PDF'lerde boş string döner (OCR yapmaz) → caller filtreler.
+ */
+export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  // Dinamik import: unpdf yalnızca PDF kaynağı işlenirken yüklensin (cold-start).
+  const { getDocumentProxy, extractText } = await import('unpdf');
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  // mergePages: true → tüm sayfalar tek birleşik string (LLM prompt'una ideal).
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text.trim();
 }
 
 async function extractDocx(buffer: Buffer): Promise<string> {
   // mammoth düz metin döndürür; dipnot/header/footer dahil paragraf bazlı.
   // Style markup kaybolur ama AI için yeterli (sadece içerik lazım).
-  const result = await mammoth.extractRawText({ buffer })
-  return result.value.trim()
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value.trim();
 }
 
 async function extractPptx(buffer: Buffer): Promise<string> {
   // PPTX = ZIP arşivi; ppt/slides/slideN.xml içinde <a:t>...</a:t> tag'leri text içerir.
   // sax veya XML parser yerine basit regex — performans + dependency minimum.
-  const zip = await JSZip.loadAsync(buffer)
+  const zip = await JSZip.loadAsync(buffer);
   const slideEntries = Object.keys(zip.files)
-    .filter(name => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
     .sort((a, b) => {
-      const aNum = parseInt(a.match(/slide(\d+)/)?.[1] ?? '0', 10)
-      const bNum = parseInt(b.match(/slide(\d+)/)?.[1] ?? '0', 10)
-      return aNum - bNum
-    })
+      const aNum = parseInt(a.match(/slide(\d+)/)?.[1] ?? '0', 10);
+      const bNum = parseInt(b.match(/slide(\d+)/)?.[1] ?? '0', 10);
+      return aNum - bNum;
+    });
 
-  const parts: string[] = []
+  const parts: string[] = [];
   for (const entry of slideEntries) {
-    const xml = await zip.files[entry].async('string')
-    const slideNum = entry.match(/slide(\d+)/)?.[1] ?? '?'
+    const xml = await zip.files[entry].async('string');
+    const slideNum = entry.match(/slide(\d+)/)?.[1] ?? '?';
     const texts = Array.from(xml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g))
-      .map(m => m[1])
-      .filter(t => t.trim().length > 0)
+      .map((m) => m[1])
+      .filter((t) => t.trim().length > 0);
     if (texts.length > 0) {
-      parts.push(`--- Slide ${slideNum} ---\n${texts.join('\n')}`)
+      parts.push(`--- Slide ${slideNum} ---\n${texts.join('\n')}`);
     }
   }
-  return parts.join('\n\n').trim()
+  return parts.join('\n\n').trim();
 }
 
 async function extractXlsx(buffer: Buffer): Promise<string> {
   // Her sheet, her satır, her hücreyi tab-delimited text olarak yaz.
   // Formula sonucu (cached) kullanılır; raw formula göstermez.
-  const wb = new ExcelJS.Workbook()
-  await wb.xlsx.load(buffer as unknown as ArrayBuffer)
-  const parts: string[] = []
-  wb.eachSheet(ws => {
-    const sheetParts: string[] = [`--- Sheet: ${ws.name} ---`]
-    ws.eachRow({ includeEmpty: false }, row => {
-      const cells: string[] = []
-      row.eachCell({ includeEmpty: false }, cell => {
-        const v = cell.value
-        if (v == null) return
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+  const parts: string[] = [];
+  wb.eachSheet((ws) => {
+    const sheetParts: string[] = [`--- Sheet: ${ws.name} ---`];
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      const cells: string[] = [];
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        const v = cell.value;
+        if (v == null) return;
         if (v instanceof Date) {
-          cells.push(v.toISOString().slice(0, 10))
+          cells.push(v.toISOString().slice(0, 10));
         } else if (typeof v === 'object') {
           // Hyperlink, formula, richText vs. — TS union çok geniş, unknown-cast.
-          const obj = v as unknown as { text?: unknown; result?: unknown; richText?: unknown }
-          if (typeof obj.text === 'string') cells.push(obj.text)
-          else if (obj.result != null) cells.push(String(obj.result))
+          const obj = v as unknown as { text?: unknown; result?: unknown; richText?: unknown };
+          if (typeof obj.text === 'string') cells.push(obj.text);
+          else if (obj.result != null) cells.push(String(obj.result));
           else if (Array.isArray(obj.richText)) {
-            cells.push(obj.richText.map(r => (r as { text?: string }).text ?? '').join(''))
-          } else cells.push(JSON.stringify(v))
+            cells.push(obj.richText.map((r) => (r as { text?: string }).text ?? '').join(''));
+          } else cells.push(JSON.stringify(v));
         } else {
-          cells.push(String(v))
+          cells.push(String(v));
         }
-      })
-      if (cells.length > 0) sheetParts.push(cells.join('\t'))
-    })
-    if (sheetParts.length > 1) parts.push(sheetParts.join('\n'))
-  })
-  return parts.join('\n\n').trim()
+      });
+      if (cells.length > 0) sheetParts.push(cells.join('\t'));
+    });
+    if (sheetParts.length > 1) parts.push(sheetParts.join('\n'));
+  });
+  return parts.join('\n\n').trim();
 }

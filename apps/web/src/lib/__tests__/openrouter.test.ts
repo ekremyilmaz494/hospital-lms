@@ -14,12 +14,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *   3. mutlu yol → geçerli JSON questions dizisi döner
  */
 
-const { createMock, s3Mock } = vi.hoisted(() => ({
+const { createMock, s3Mock, extractTextMock } = vi.hoisted(() => ({
   createMock: vi.fn(),
   s3Mock: {
     getDownloadUrl: vi.fn().mockResolvedValue('https://s3.example/signed.png'),
-    downloadBuffer: vi.fn().mockResolvedValue(Buffer.from('')),
+    downloadBuffer: vi.fn().mockResolvedValue(Buffer.from('%PDF-1.4 fake')),
   },
+  // unpdf.extractText mock'u — PDF kaynak testlerinde server-side metni kontrol et.
+  extractTextMock: vi
+    .fn()
+    .mockResolvedValue({ totalPages: 2, text: 'PDF içeriği: el hijyeni beş adımı.' }),
 }));
 
 // `new OpenAI()` → instance'ında chat.completions.create = controllable mock.
@@ -29,6 +33,11 @@ vi.mock('openai', () => ({
   },
 }));
 vi.mock('@/lib/s3', () => s3Mock);
+// unpdf — gerçek pdfjs yüklemesin; getDocumentProxy no-op, extractText kontrol edilir.
+vi.mock('unpdf', () => ({
+  getDocumentProxy: vi.fn().mockResolvedValue({}),
+  extractText: extractTextMock,
+}));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -41,7 +50,8 @@ const IMG_SOURCE = {
   mimeType: 'image/png',
   filename: 'slide.png',
 };
-// PDF kaynak — buildContentBlocks getDownloadUrl ile `file` content block üretir.
+// PDF kaynak — buildContentBlocks downloadBuffer + extractTextFromPdf (unpdf) ile
+// sunucuda metne çevirip `text` content block üretir (provider PDF parse'a bağımsız).
 const PDF_SOURCE = {
   s3Key: 'sources/org-1/1.pdf',
   mimeType: 'application/pdf',
@@ -72,6 +82,9 @@ const okResponse = () => ({
 
 beforeEach(() => {
   createMock.mockReset();
+  s3Mock.downloadBuffer.mockClear();
+  extractTextMock.mockReset();
+  extractTextMock.mockResolvedValue({ totalPages: 2, text: 'PDF içeriği: el hijyeni beş adımı.' });
   process.env.OPENROUTER_API_KEY = 'test-key';
 });
 
@@ -123,24 +136,36 @@ describe('generateQuestions — OpenRouter yanıt işleme', () => {
   });
 });
 
-describe('generateQuestions — PDF parse engine (cloudflare-ai)', () => {
-  it('PDF kaynakta isteğe cloudflare-ai file-parser plugin eklenir (native token yükü = 504 önlenir)', async () => {
+describe('generateQuestions — PDF sunucu-tarafı metin çıkarımı', () => {
+  it('PDF kaynak sunucuda metne çevrilip text block olarak gönderilir; OpenRouter PDF-parse plugin YOK', async () => {
     createMock.mockResolvedValue(okResponse());
 
     await generateQuestions({ model: MODEL, sources: [PDF_SOURCE], count: 5 });
 
-    const sentParams = createMock.mock.calls[0][0] as { plugins?: unknown };
-    expect(sentParams.plugins).toEqual([
-      { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } },
-    ]);
+    // S3'ten buffer indirildi (URL fetch'e dayanmıyor)
+    expect(s3Mock.downloadBuffer).toHaveBeenCalledWith(PDF_SOURCE.s3Key);
+
+    const params = createMock.mock.calls[0][0] as {
+      plugins?: unknown;
+      messages: { role: string; content: { type: string; text?: string }[] }[];
+    };
+    // Provider PDF parse engine'i (cloudflare-ai/native) artık kullanılmıyor
+    expect(params.plugins).toBeUndefined();
+    // Çıkarılan PDF metni user content'inde text block olarak var
+    const userMsg = params.messages.find((m) => m.role === 'user');
+    const pdfBlock = userMsg?.content.find((c) => c.text?.includes('type="PDF"'));
+    expect(pdfBlock).toBeDefined();
+    expect(pdfBlock?.text).toContain('PDF içeriği');
   });
 
-  it('PDF olmayan (görsel) kaynakta plugins eklenmez', async () => {
+  it('boş metin dönen (taranmış/görsel-only) PDF kaynak content üretmez → "metin çıkarılamadı" hatası', async () => {
+    extractTextMock.mockResolvedValueOnce({ totalPages: 1, text: '   ' });
     createMock.mockResolvedValue(okResponse());
 
-    await generateQuestions({ model: MODEL, sources: [IMG_SOURCE], count: 5 });
-
-    const sentParams = createMock.mock.calls[0][0] as { plugins?: unknown };
-    expect(sentParams.plugins).toBeUndefined();
+    await expect(
+      generateQuestions({ model: MODEL, sources: [PDF_SOURCE], count: 5 })
+    ).rejects.toThrow(/metin çıkarılamadı/);
+    // Metin çıkmadıysa LLM çağrısı hiç yapılmamalı
+    expect(createMock).not.toHaveBeenCalled();
   });
 });
