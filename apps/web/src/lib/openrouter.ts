@@ -251,10 +251,15 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
     );
   }
 
+  // Kaynak adları — çoklu kaynakta modele "tüm belgelere dağıt" talimatı için.
+  const sourceNames = opts.sources.map(
+    (s) => s.filename ?? s.s3Key.split('/').pop() ?? 'belge',
+  );
+
   // User mesaj content'i: önce tüm kaynaklar, sonra prompt metni
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
     ...contentBlocks,
-    { type: 'text', text: buildUserPrompt(opts.count, opts.excluded) },
+    { type: 'text', text: buildUserPrompt(opts.count, opts.excluded, sourceNames) },
   ];
 
   let rawResponse: string | null = null;

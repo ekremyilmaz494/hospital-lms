@@ -27,4 +27,19 @@ describe('buildUserPrompt', () => {
     const out = buildUserPrompt(5)
     expect(out).not.toContain('ZATEN üretilmiş')
   })
+
+  it('birden fazla kaynak verildiğinde TÜM belgelere dağıtma talimatı + belge adlarını yazar', () => {
+    const out = buildUserPrompt(10, [], ['rehber.pdf', 'sunum.pptx'])
+    expect(out).toContain('2 ayrı kaynak belge')
+    expect(out).toContain('rehber.pdf')
+    expect(out).toContain('sunum.pptx')
+    expect(out).toContain('TÜMÜNE dengeli dağıt')
+    expect(out).toContain('hiçbir belgeyi atlama')
+  })
+
+  it('tek kaynak verildiğinde çoklu-kaynak dağıtma talimatı yazmaz', () => {
+    const out = buildUserPrompt(10, [], ['rehber.pdf'])
+    expect(out).not.toContain('TÜMÜNE dengeli dağıt')
+    expect(out).toContain('ekteki kaynak materyale dayanarak')
+  })
 })

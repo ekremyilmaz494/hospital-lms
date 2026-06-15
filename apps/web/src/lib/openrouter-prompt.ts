@@ -59,10 +59,29 @@ KRİTİK KURALLAR (HALLUCINATION YASAK):
  *
  * @param count - kaç soru üretilsin
  * @param excluded - tekrar etmemesi gereken mevcut sorular (replenish için)
+ * @param sourceNames - ekteki kaynak belge adları. Birden fazlaysa modele
+ *   "soruları TÜM belgelere dengeli dağıt" talimatı eklenir (tek belgeye
+ *   yığmayı / diğer belgeleri yok saymayı önler).
  */
-export function buildUserPrompt(count: number, excluded: ExcludedQuestion[] = []): string {
+export function buildUserPrompt(
+  count: number,
+  excluded: ExcludedQuestion[] = [],
+  sourceNames: string[] = [],
+): string {
   const lines: string[] = [];
-  lines.push(`Lütfen ekteki kaynak materyale dayanarak ${count} adet sınav sorusu üret.`);
+  if (sourceNames.length > 1) {
+    // Çoklu kaynak: model son/baskın content bloğuna yığmasın — kapsamı zorla.
+    lines.push(
+      `Ekte ${sourceNames.length} ayrı kaynak belge var: ${sourceNames
+        .map((n, i) => `(${i + 1}) ${n}`)
+        .join(', ')}.`,
+    );
+    lines.push(
+      `Soruları bu belgelerin TÜMÜNE dengeli dağıt — HER belgeden soru üret, hiçbir belgeyi atlama, tek bir belgeye yığma. Toplam ${count} adet sınav sorusu üret.`,
+    );
+  } else {
+    lines.push(`Lütfen ekteki kaynak materyale dayanarak ${count} adet sınav sorusu üret.`);
+  }
 
   if (excluded.length > 0) {
     lines.push('');
