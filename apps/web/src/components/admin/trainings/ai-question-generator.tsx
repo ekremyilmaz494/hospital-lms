@@ -53,7 +53,9 @@ export interface AiQuestionGeneratorProps {
 
 type UploadedSource = AiUploadedSource;
 
-const MAX_SOURCES = 3;
+// Tek kaynak: çoklu belgede model soruları tek belgeye yığıp diğerlerini
+// atlayabiliyordu (güvenilir dağıtım sağlanamadı) → yalnızca 1 kaynağa izin ver.
+const MAX_SOURCES = 1;
 const MAX_TOTAL_SIZE_MB = 30;
 // Claude native PDF; office formatları sunucuda text'e çevrilip prompt'a gömülür.
 const ACCEPTED_TYPES = [
@@ -77,7 +79,8 @@ export default function AiQuestionGenerator({
   onSourcesChange,
 }: AiQuestionGeneratorProps) {
   // initialSources sadece ilk mount'ta tohum; sonraki güncellemeler onSourcesChange üzerinden parent'a iletilir.
-  const [uploadedSources, setUploadedSources] = useState<UploadedSource[]>(() => initialSources ?? []);
+  // Tek kaynak sınırı: eski (çoklu kaynaklı) draft restore edilse bile yalnızca ilkini al.
+  const [uploadedSources, setUploadedSources] = useState<UploadedSource[]>(() => (initialSources ?? []).slice(0, MAX_SOURCES));
   // Her uploadedSources değişiminde parent'a bildir — draft auto-save için.
   useEffect(() => {
     onSourcesChange?.(uploadedSources);
@@ -138,7 +141,7 @@ export default function AiQuestionGenerator({
       return;
     }
     if (uploadedSources.length >= MAX_SOURCES) {
-      setUploadError(`En fazla ${MAX_SOURCES} kaynak yüklenebilir.`);
+      setUploadError('Yalnızca tek kaynak yüklenebilir. Yeni dosya için mevcut kaynağı kaldırın.');
       return;
     }
     const totalMb = (uploadedSources.reduce((sum, s) => sum + s.sizeBytes, 0) + file.size) / (1024 * 1024);
@@ -188,8 +191,9 @@ export default function AiQuestionGenerator({
   }, [uploadedSources]);
 
   const handleFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
-    Array.from(files).forEach((f) => void uploadFile(f));
+    if (!files || files.length === 0) return;
+    // Tek kaynak — birden fazla seçilse/sürüklense bile yalnızca ilkini al.
+    void uploadFile(files[0]);
   }, [uploadFile]);
 
   // Skeleton placeholder kartlar (queue boşken silinen slot için) — admin
@@ -309,7 +313,6 @@ export default function AiQuestionGenerator({
                   ref={fileInputRef}
                   type="file"
                   accept={ACCEPTED_EXTENSIONS}
-                  multiple
                   onChange={(e) => {
                     handleFiles(e.target.files);
                     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -328,7 +331,7 @@ export default function AiQuestionGenerator({
                     {uploading ? 'Yükleniyor…' : 'Dosya sürükle veya seçmek için tıkla'}
                   </span>
                   <span className="aiq-uploader-hint">
-                    {ACCEPTED_LABEL} · Maks {MAX_SOURCES} dosya · toplam {MAX_TOTAL_SIZE_MB}MB
+                    {ACCEPTED_LABEL} · Tek dosya · maks {MAX_TOTAL_SIZE_MB}MB
                   </span>
                 </div>
               </label>
