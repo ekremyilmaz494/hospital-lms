@@ -79,7 +79,7 @@ export async function getUploadUrl(
   opts?: { accelerate?: boolean },
 ) {
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
-    throw new Error(`İzin verilmeyen dosya türü: ${contentType}. Sadece video, PDF, PPTX ve ses dosyaları yüklenebilir.`)
+    throw new Error(`İzin verilmeyen dosya türü: ${contentType}. Sadece video, PDF, Office (Word/PowerPoint/Excel), ses ve görsel dosyaları yüklenebilir.`)
   }
 
   const command = new PutObjectCommand({
@@ -315,7 +315,9 @@ export function backupKey(orgId: string) {
 const ALLOWED_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
 
 const ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'ogg']
-const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'pptx']
+// AI soru üretimi kaynakları: PDF + Office (Word/PowerPoint/Excel). Sunucu
+// tarafında metne çevrilip (document-extractor) prompt'a gömülür.
+const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'pptx', 'docx', 'xlsx']
 const ALLOWED_AUDIO_EXTENSIONS = ['mp3', 'wav', 'm4a', 'ogg', 'aac']
 
 /** Generate video storage key using a random UUID — avoids path traversal and filename guessing */
@@ -328,7 +330,7 @@ export function videoKey(orgId: string, trainingId: string, filename: string) {
   return `videos/${orgId}/${trainingId}/${id}.${ext}`
 }
 
-/** Generate document storage key (PDF, PPTX) */
+/** Generate document storage key (PDF, PPTX, DOCX, XLSX) */
 export function documentKey(orgId: string, trainingId: string, filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
   if (!ALLOWED_DOCUMENT_EXTENSIONS.includes(ext)) {
