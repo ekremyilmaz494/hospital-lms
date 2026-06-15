@@ -35,7 +35,13 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
       key = videoKey(orgId, tid, fileName)
     } else if (contentType.startsWith('audio/')) {
       key = audioKey(orgId, tid, fileName)
-    } else if (contentType === 'application/pdf' || contentType.includes('presentation')) {
+    } else if (
+      contentType === 'application/pdf' ||
+      contentType.includes('presentation') || // PPTX (...presentationml.presentation)
+      contentType.includes('wordprocessing') || // DOCX (...wordprocessingml.document)
+      contentType.includes('spreadsheet') // XLSX (...spreadsheetml.sheet)
+    ) {
+      // AI soru üretimi kaynakları: PDF + Office (Word/PowerPoint/Excel).
       key = documentKey(orgId, tid, fileName)
     } else {
       return errorResponse('İzin verilmeyen dosya türü', 400)
