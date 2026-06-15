@@ -19,6 +19,10 @@ import { generateQuestions, OpenRouterError } from '@/lib/openrouter'
 import { isValidModelId } from '@/lib/openrouter-models'
 import { logger } from '@/lib/logger'
 
+// 20 soruyu büyük PDF'lerden üretmek (Claude native PDF parse) dakikalar sürebilir;
+// default function süresi yetmediğinde Vercel isteği erken kesip 504 üretiyordu.
+export const maxDuration = 300
+
 // sources: yeni format — her kaynak {s3Key, mimeType?, filename?}.
 // Geriye uyum için sourceS3Keys (legacy string[]) hâlâ kabul; içeride normalize edilir.
 const sourceFileSchema = z.object({
@@ -85,7 +89,8 @@ export const POST = withAdminRoute(
           model,
           error: err.message,
         })
-        throw new ApiError(err.message, 502)
+        // Timeout → 504 (Gateway Timeout); diğer sağlayıcı hataları → 502.
+        throw new ApiError(err.message, err.code === 'timeout' ? 504 : 502)
       }
       throw err
     }

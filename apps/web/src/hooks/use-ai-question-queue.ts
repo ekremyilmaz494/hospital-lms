@@ -88,6 +88,19 @@ interface RawQuestion {
   sourcePage?: number;
 }
 
+/** Sunucu timeout mesajıyla aynı — 504 ve tarayıcı abort'unda gösterilir. */
+const TIMEOUT_MESSAGE =
+  'İşlem zaman aşımına uğradı — kaynak dosyalar çok büyük olabilir. Daha küçük veya daha az dosya ile tekrar deneyin.';
+
+/** Tarayıcı tarafı abort süresi — sunucu bütçesinin (function maxDuration 300s)
+ *  biraz altında tutuluyor ki fetch sonsuza dek asılı kalmasın. */
+const CLIENT_TIMEOUT_MS = 280_000;
+
+/** Bir hatanın fetch timeout/abort olup olmadığını söyler.
+ *  AbortSignal.timeout → DOMException name 'TimeoutError'; manuel abort → 'AbortError'. */
+const isAbortLike = (err: unknown): boolean =>
+  err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError');
+
 const DEFAULT_DISPLAY_TARGET = 10;
 /** Tek çağrıda üretilen toplam soru sayısı (display + queue). Kullanıcı kararı:
  *  "tek çağrıda 20 soru, en az yarısı yedek". PDF input'u tekrar tekrar
@@ -126,6 +139,7 @@ async function readError(res: Response): Promise<string> {
   }
   if (res.status === 429) return 'Çok fazla istek — lütfen biraz sonra tekrar deneyin.';
   if (res.status === 502) return 'AI sağlayıcısına ulaşılamadı. Lütfen tekrar deneyin.';
+  if (res.status === 504) return TIMEOUT_MESSAGE;
   if (res.status === 400) return 'Geçersiz istek.';
   return 'Soru üretimi başarısız oldu.';
 }
@@ -201,6 +215,7 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
           count: TOTAL_GENERATE,
           excluded: staticExcludedRef.current,
         }),
+        signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
       });
       if (!res.ok) {
         const msg = await readError(res);
@@ -217,8 +232,8 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
       }
       setDisplayed(all.slice(0, displayTargetSafe));
       setQueue(all.slice(displayTargetSafe, TOTAL_GENERATE));
-    } catch {
-      setError('Ağ hatası — lütfen tekrar deneyin.');
+    } catch (err) {
+      setError(isAbortLike(err) ? TIMEOUT_MESSAGE : 'Ağ hatası — lütfen tekrar deneyin.');
     } finally {
       setIsGenerating(false);
     }
@@ -242,6 +257,8 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sources, model, excluded }),
+      // Tek soru çok daha hızlı döner; takılı bağlantı kuyruğu kilitlemesin.
+      signal: AbortSignal.timeout(150_000),
     });
     if (!res.ok) {
       // Replenish çağrıları arka plan; global banner panik yaratmasın.

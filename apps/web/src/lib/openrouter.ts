@@ -6,16 +6,19 @@
  * Anthropic Claude formatında "type: file" content block ile gönderiliyor;
  * OpenRouter bu formatı kabul edilen tüm modellere route ediyor.
  */
-import OpenAI from 'openai';
+import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getDownloadUrl, downloadBuffer } from '@/lib/s3';
 import { getModel, isValidModelId } from '@/lib/openrouter-models';
 import { QUESTION_GENERATION_SYSTEM_PROMPT, buildUserPrompt, type ExcludedQuestion } from '@/lib/openrouter-prompt';
 import { isOfficeMimeType, extractTextFromOfficeDocument, OFFICE_MIME_TYPES } from '@/lib/document-extractor';
+import { computeTimeoutMs, computeMaxRetries } from '@/lib/openrouter-budget';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-const REQUEST_TIMEOUT_MS = 60_000; // PDF parsing modeller için 60s — küçük PDF'lerde 5-15s yeterli
+
+// Zaman aşımı bütçesi saf hesaplaması ayrı modülde (test edilebilirlik için).
+export { computeTimeoutMs, computeMaxRetries, MAX_FUNCTION_DURATION_MS } from '@/lib/openrouter-budget';
 
 /** OpenRouter'dan dönen tek soru. Zod ile validate ediliyor.
  *  sourceQuote ZORUNLU — kaynaktan birebir alıntı; boş gelirse soru filtrelenir
@@ -56,7 +59,9 @@ export interface GenerateOptions {
 }
 
 export class OpenRouterError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  /** `code: 'timeout'` → route bunu 504'e çevirir (502 yerine), frontend de
+   *  kullanıcıya "kaynak büyük olabilir" mesajını gösterir. */
+  constructor(message: string, public cause?: unknown, public code?: 'timeout' | 'generic') {
     super(message);
     this.name = 'OpenRouterError';
   }
@@ -76,7 +81,8 @@ function createClient(customApiKey?: string | null): OpenAI {
   return new OpenAI({
     apiKey,
     baseURL: OPENROUTER_BASE_URL,
-    timeout: REQUEST_TIMEOUT_MS,
+    // Varsayılan üst sınır; gerçek bütçe istek başına computeTimeoutMs ile geçilir.
+    timeout: computeTimeoutMs(20),
     defaultHeaders: {
       // OpenRouter rankings için opsiyonel ama önerilen
       'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://klinovax.com',
@@ -211,6 +217,11 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
       max_tokens: 6000, // 20 soru ~ 3.3K token; uzun sourceQuote'lu modellerde
                         // truncation'ı önlemek için marj. Kesilen JSON = parse
                         // fail = 20 sorunun hepsi çöpe.
+    }, {
+      // Soru sayısına göre ölçeklenen bütçe + retry'ı kapat (büyük çağrıda
+      // stack'lenen timeout maxDuration'ı aşmasın).
+      timeout: computeTimeoutMs(opts.count),
+      maxRetries: computeMaxRetries(opts.count),
     });
     rawResponse = completion.choices[0]?.message?.content ?? null;
     if (!rawResponse) {
@@ -219,6 +230,14 @@ export async function generateQuestions(opts: GenerateOptions): Promise<Generate
   } catch (err) {
     logger.error('openrouter', 'chat completion failed', { model: opts.model, error: err instanceof Error ? err.message : String(err) });
     if (err instanceof OpenRouterError) throw err;
+    // Timeout/abort → kullanıcıya "kaynak büyük olabilir" yönlendirmesi; route 504 döner.
+    if (err instanceof APIConnectionTimeoutError || err instanceof APIUserAbortError) {
+      throw new OpenRouterError(
+        'İşlem zaman aşımına uğradı — kaynak dosyalar çok büyük olabilir. Daha küçük veya daha az dosya ile tekrar deneyin.',
+        err,
+        'timeout',
+      );
+    }
     throw new OpenRouterError(
       err instanceof Error ? err.message : 'OpenRouter API çağrısı başarısız.',
       err,

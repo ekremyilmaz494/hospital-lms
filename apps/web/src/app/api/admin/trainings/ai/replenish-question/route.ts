@@ -17,6 +17,9 @@ import { generateQuestions, OpenRouterError } from '@/lib/openrouter'
 import { isValidModelId } from '@/lib/openrouter-models'
 import { logger } from '@/lib/logger'
 
+// Tek soru üretimi de büyük PDF'lerde 60s'yi aşabilir; function süresini uzat.
+export const maxDuration = 300
+
 const sourceFileSchema = z.object({
   s3Key: z.string().min(1),
   mimeType: z.string().min(1).optional(),
@@ -79,7 +82,7 @@ export const POST = withAdminRoute(
           model,
           error: err.message,
         })
-        throw new ApiError(err.message, 502)
+        throw new ApiError(err.message, err.code === 'timeout' ? 504 : 502)
       }
       throw err
     }
