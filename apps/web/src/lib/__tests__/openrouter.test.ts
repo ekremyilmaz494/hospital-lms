@@ -158,14 +158,22 @@ describe('generateQuestions — PDF sunucu-tarafı metin çıkarımı', () => {
     expect(pdfBlock?.text).toContain('PDF içeriği');
   });
 
-  it('boş metin dönen (taranmış/görsel-only) PDF kaynak content üretmez → "metin çıkarılamadı" hatası', async () => {
+  it('boş metin dönen (taranmış/görsel-only) PDF → sessizce düşürülmez, native PDF (vision) fallback ile gönderilir', async () => {
+    // unpdf gömülü metin bulamaz (taranmış PDF). Eskiden bu kaynak sessizce
+    // düşürülüyordu → çoklu kaynakta "bu PDF'ten hiç soru gelmedi" şikâyeti.
     extractTextMock.mockResolvedValueOnce({ totalPages: 1, text: '   ' });
     createMock.mockResolvedValue(okResponse());
 
-    await expect(
-      generateQuestions({ model: MODEL, sources: [PDF_SOURCE], count: 5 })
-    ).rejects.toThrow(/metin çıkarılamadı/);
-    // Metin çıkmadıysa LLM çağrısı hiç yapılmamalı
-    expect(createMock).not.toHaveBeenCalled();
+    await generateQuestions({ model: MODEL, sources: [PDF_SOURCE], count: 5 });
+
+    // Düşürülmedi → LLM çağrısı yapıldı, PDF native `file` bloğu olarak gönderildi
+    expect(createMock).toHaveBeenCalled();
+    expect(s3Mock.getDownloadUrl).toHaveBeenCalledWith(PDF_SOURCE.s3Key);
+    const params = createMock.mock.calls[0][0] as {
+      messages: { role: string; content: { type: string }[] }[];
+    };
+    const userMsg = params.messages.find((m) => m.role === 'user');
+    const fileBlock = userMsg?.content.find((c) => c.type === 'file');
+    expect(fileBlock).toBeDefined();
   });
 });
