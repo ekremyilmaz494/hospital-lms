@@ -38,7 +38,6 @@ Yeni özellik veya migration canlıya doğrudan gönderiliyor. Bir hata = 102 ku
 **Kullanım senaryoları:**
 - Müşteri adayına "test hesabı" açmak (production'a dokunmadan)
 - Yeni migration'ı canlıya atmadan önce gerçek DB'de denemek
-- HIS entegrasyonunu müşterinin dev API'si ile test etmek
 - QA ekibi / dış denetçi için erişilebilir demo
 - E2E testlerini gerçek DB ile çalıştırmak
 

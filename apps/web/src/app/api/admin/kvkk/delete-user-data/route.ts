@@ -84,7 +84,6 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           tcHash: null,
           tcAddedAt: null,
           tcAddedBy: null,
-          hisExternalId: null,
         },
       }),
       // 2. Audit log — oldData/newData içindeki PII'yı temizle

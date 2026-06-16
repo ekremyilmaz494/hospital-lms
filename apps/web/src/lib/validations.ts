@@ -514,26 +514,6 @@ export const updateSmgPeriodSchema = z.object({
   { message: 'Bitiş tarihi başlangıç tarihinden sonra olmalıdır', path: ['endDate'] }
 )
 
-// ── HIS Entegrasyon ──
-export const hisIntegrationSchema = z.object({
-  name:         z.string().min(1).max(255),
-  baseUrl:      z.string().url('Geçerli bir URL girin'),
-  authType:     z.enum(['API_KEY', 'BASIC_AUTH', 'OAUTH2']),
-  credentials:  z.record(z.string(), z.string()),
-  syncInterval: z.coerce.number().int().min(1).max(1440).default(60),
-  fieldMapping: z.record(z.string(), z.string()).default({}),
-  isActive:     z.boolean().default(true),
-})
-
-export const hisSyncSchema = z.object({
-  syncType: z.enum(['STAFF_IMPORT', 'DEPARTMENT_IMPORT', 'FULL_SYNC']).default('STAFF_IMPORT'),
-})
-
-export const hisWebhookSchema = z.object({
-  event: z.string().min(1).max(100),
-  data:  z.unknown(),
-})
-
 // ── 360° YETKİNLİK DEĞERLENDİRME ──
 export const competencyItemSchema = z.object({
   text: z.string().min(2).max(500),

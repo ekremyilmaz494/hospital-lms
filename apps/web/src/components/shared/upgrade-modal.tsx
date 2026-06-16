@@ -73,7 +73,7 @@ export function UpgradeModal({ open, onOpenChange, featureLabel }: UpgradeModalP
             </li>
             <li className="flex items-center gap-2">
               <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, var(--brand-600))' }} />
-              HIS entegrasyonu ve SSO destegi
+              SSO (tek oturum acma) destegi
             </li>
             <li className="flex items-center gap-2">
               <SparklesIcon className="h-4 w-4 shrink-0" style={{ color: 'var(--color-primary, var(--brand-600))' }} />

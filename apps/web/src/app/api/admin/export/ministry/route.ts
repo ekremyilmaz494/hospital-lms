@@ -34,7 +34,6 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgI
           firstName: true,
           lastName: true,
           email: true,
-          hisExternalId: true,
           title: true,
           departmentRel: { select: { name: true } },
         },
@@ -67,7 +66,7 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgI
     kurumAdi: org?.name ?? '',
     kurumKodu: org?.code ?? '',
     // Personel Bilgileri
-    personelKodu: cert.user.hisExternalId ?? '',
+    personelKodu: '',
     personelAdi: `${cert.user.firstName} ${cert.user.lastName}`,
     personelEposta: cert.user.email,
     unvan: cert.user.title ?? '',

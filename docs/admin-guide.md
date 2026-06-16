@@ -215,10 +215,6 @@ Hangi olaylarda otomatik bildirim ve e-posta gonderilecegini bu sekmeden yapilan
 
 Guvenlik sekmesinde oturum zaman asimi suresini (varsayilan 30 dakika), sifre politikasini ve iki faktorlu dogrulama gereksinimini ayarlayabilirsiniz. Oturum zaman asimi, personelin belirli bir sure islem yapmamasi durumunda otomatik cikis yapmasini saglar. Bu sure kurumunuzun guvenlik politikasina gore ayarlanmalidir.
 
-### HIS Entegrasyonu
-
-Hastane Bilgi Sistemi (HIS) entegrasyonu sekmesinden hastanenizin mevcut HIS sistemi ile veri senkronizasyonu ayarlarini yapabilirsiniz. Entegrasyon aktif edildiginde personel bilgileri HIS'ten otomatik olarak senkronize edilir. Senkronizasyon her gun 04:00'te otomatik calisan bir gorev ile gerceklestirilir.
-
 ### Markalama
 
 Markalama sekmesinden sisteminizin gorunumunu ozellestirebilirsiniz. Hastanenizin logosunu, renk temasini ve giris sayfasi mesajini ayarlayabilirsiniz. Bu ayarlar personelin sisteme giris yaptiginda gorecegi tum sayfalara yansir.

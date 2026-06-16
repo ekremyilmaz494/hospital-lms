@@ -38,8 +38,6 @@ ALTER TABLE smg_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smg_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE content_library ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_content_library ENABLE ROW LEVEL SECURITY;
-ALTER TABLE his_integrations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sync_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_forms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_items ENABLE ROW LEVEL SECURITY;
@@ -180,12 +178,6 @@ CREATE POLICY "all_content_library_select" ON content_library FOR SELECT USING (
 -- ORGANIZATION CONTENT LIBRARY
 CREATE POLICY "admin_org_content_library_all" ON organization_content_library FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_org_content_library_select" ON organization_content_library FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
-
--- HIS INTEGRATIONS
-CREATE POLICY "admin_his_integrations_all" ON his_integrations FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
-
--- SYNC LOGS
-CREATE POLICY "admin_sync_logs_select" ON sync_logs FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- COMPETENCY FORMS
 CREATE POLICY "admin_comp_forms_all" ON competency_forms FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));

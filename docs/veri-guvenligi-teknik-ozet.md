@@ -165,4 +165,4 @@ Anahtar: ENCRYPTION_KEY ortam değişkeni (Base64, 256-bit)
 ---
 
 **İletişim:** Teknik sorular için sistem yöneticisi ile iletişime geçin.
-**Detaylı dokümanlar:** `docs/kvkk-teknik-uyum.md`, `docs/disaster-recovery.md`, `docs/his-entegrasyon-rehberi.md`
+**Detaylı dokümanlar:** `docs/kvkk-teknik-uyum.md`, `docs/disaster-recovery.md`

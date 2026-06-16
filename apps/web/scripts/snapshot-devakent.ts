@@ -62,8 +62,6 @@ async function takeSnapshot(): Promise<Snapshot> {
     { key: 'accreditationReports',   fn: () => prisma.accreditationReport.count({ where }) },
     { key: 'accreditationStandards', fn: () => prisma.accreditationStandard.count({ where }) },
     { key: 'competencyForms',        fn: () => prisma.competencyForm.count({ where }) },
-    { key: 'hisIntegrations',        fn: () => prisma.hisIntegration.count({ where }) },
-    { key: 'syncLogs',               fn: () => prisma.syncLog.count({ where }) },
     { key: 'contentLibraryInstalls', fn: () => prisma.organizationContentLibrary.count({ where }) },
     { key: 'orgContentLibrary',      fn: () => prisma.contentLibrary.count({ where }) },
     { key: 'notifications',          fn: () => prisma.notification.count({ where }) },

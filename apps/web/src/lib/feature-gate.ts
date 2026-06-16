@@ -4,7 +4,6 @@ import { getCached, setCached } from '@/lib/redis'
 /** Feature flag names matching SubscriptionPlan boolean columns */
 export type FeatureName =
   | 'scormSupport'
-  | 'hisIntegration'
   | 'advancedReports'
   | 'ssoSupport'
   | 'competencyModule'
@@ -24,7 +23,6 @@ export interface LimitCheckResult {
 /** Maps FeatureName → SubscriptionPlan column key */
 const FEATURE_TO_COLUMN: Record<FeatureName, string> = {
   scormSupport: 'hasScormSupport',
-  hisIntegration: 'hasHisIntegration',
   advancedReports: 'hasAdvancedReports',
   ssoSupport: 'hasSsoSupport',
   competencyModule: 'hasCompetencyModule',

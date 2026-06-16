@@ -170,7 +170,7 @@ NEXT_PUBLIC_SUPPORT_EMAIL=destek@yourdomain.com
 # --- CDN (opsiyonel — profil fotograflari) ---
 NEXT_PUBLIC_CDN_URL=
 
-# --- HIS Entegrasyon Sifreleme ---
+# --- Uygulama Sifreleme (TC kimlik, SSO secret, AI API key) ---
 # Olusturmak icin: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ENCRYPTION_KEY=
 
@@ -444,7 +444,6 @@ Proje deploy edildikten sonra `vercel.json` dosyasindaki cron job'lar otomatik o
 | Her gun 03:00 UTC | `/api/cron/cleanup` | Eski bildirimler, stale sinav girisimleri, audit log temizligi |
 | Her gun 03:15 UTC | `/api/cron/backup` | Otomatik veritabani yedekleme |
 | Her gun 07:00 UTC | `/api/cron/reminders` | Egitim hatirlatma bildirimleri |
-| Her gun 04:00 UTC | `/api/cron/his-sync` | HIS veri senkronizasyonu |
 | Her gun 08:00 UTC | `/api/cron/subscription-reminders` | Abonelik hatirlatmalari |
 
 Cron job'larin calismasi icin `CRON_SECRET` ortam degiskeninin ayarlanmis olmasi gerekir. Vercel, cron isteklerini bu secret ile dogrular.
