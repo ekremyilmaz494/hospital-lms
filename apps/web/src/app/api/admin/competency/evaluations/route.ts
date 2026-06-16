@@ -39,7 +39,9 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   if (!body) return errorResponse('Geçersiz istek gövdesi')
 
   const parsed = startEvaluationSchema.safeParse(body)
-  if (!parsed.success) return errorResponse(parsed.error.message)
+  // zod v4'te error.message tüm issue'ları içeren ham JSON string'idir — kullanıcıya
+  // okunaksız/İngilizce path döner. İlk issue mesajını (Türkçe) ver.
+  if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? 'Doğrulama hatası', 400)
 
   const { formId, subjectId, managerId, peerIds, subordinateIds, includeSelf } = parsed.data
 
@@ -59,14 +61,18 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
 
   if (evaluators.length === 0) return errorResponse('En az bir değerlendirici gereklidir')
 
-  // Tüm evaluator ID'lerinin bu organizasyona ait olduğunu doğrula
-  const evaluatorIds = evaluators.map(e => e.id)
+  // Tüm değerlendiricilerin VE değerlendirilen kişinin (subjectId) bu organizasyona
+  // ait olduğunu doğrula. subjectId yalnız includeSelf=true iken evaluators'a girer;
+  // includeSelf=false ise hiç doğrulanmadan createMany/notification'a akar → admin,
+  // başka org'a ait bir kullanıcıyı subject yapıp cross-tenant kayıt/bildirim yazabilir.
+  // Set ile dedup: subjectId zaten evaluators'da (SELF) ise sayım tutarlı kalır.
+  const idsToValidate = Array.from(new Set([subjectId, ...evaluators.map(e => e.id)]))
   const validUsers = await prisma.user.findMany({
-    where: { id: { in: evaluatorIds }, organizationId },
+    where: { id: { in: idsToValidate }, organizationId },
     select: { id: true },
   })
-  if (validUsers.length !== evaluatorIds.length) {
-    return errorResponse('Bazı değerlendiriciler bu kuruluşa ait değil', 400)
+  if (validUsers.length !== idsToValidate.length) {
+    return errorResponse('Bazı kullanıcılar bu kuruluşa ait değil', 400)
   }
 
   // Evaluations oluştur (mevcut olanları atla)

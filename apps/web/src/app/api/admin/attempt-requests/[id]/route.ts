@@ -51,8 +51,14 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
       if (req.status !== 'pending') throw new Error('ALREADY_REVIEWED')
 
       if (parsed.data.action === 'approve') {
+        // ExamAttemptRequest yalnız trainingId+userId taşır; @@unique([trainingId,userId,
+        // periodId,round]) nedeniyle aynı eğitim için birden çok atama (Yeniden Ata round'u)
+        // olabilir. orderBy'sız findFirst non-deterministik bir round seçip ek deneme hakkını
+        // YANLIŞ (eski terminal) round'a yazabilir → personel yine sınava giremez (N1 sınıfı).
+        // resolveExamFlowState ile aynı sıralama: en yeni round'u deterministik seç.
         const assignment = await tx.trainingAssignment.findFirst({
-          where: { trainingId: req.trainingId, userId: req.userId },
+          where: { trainingId: req.trainingId, userId: req.userId, organizationId },
+          orderBy: [{ round: 'desc' }, { assignedAt: 'desc' }],
           select: { id: true, maxAttempts: true, status: true },
         })
         if (!assignment) throw new Error('ASSIGNMENT_NOT_FOUND')

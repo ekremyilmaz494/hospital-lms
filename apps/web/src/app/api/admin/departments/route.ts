@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@/generated/prisma/client'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createDepartmentSchema } from '@/lib/validations'
@@ -93,19 +94,35 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     }
   }
 
-  const department = await prisma.department.create({
-    data: {
-      organizationId,
-      name,
-      description: description || null,
-      color: color || '#0d9668',
-      sortOrder: sortOrder ?? 0,
-      parentId: parentId ?? null,
-    },
-    include: {
-      _count: { select: { users: true } },
-    },
-  })
+  // findFirst kontrolü ile create arasında eşzamanlı istek yarışı (TOCTOU) olabilir; DB'deki
+  // partial unique index (departments_org_name_root/parent_unique) ikinci create'i P2002 ile
+  // reddeder. Bunu yakalayıp amaçlanan 409'u dön — aksi halde withApiHandler generic 500 verir.
+  let department
+  try {
+    department = await prisma.department.create({
+      data: {
+        organizationId,
+        name,
+        description: description || null,
+        color: color || '#0d9668',
+        sortOrder: sortOrder ?? 0,
+        parentId: parentId ?? null,
+      },
+      include: {
+        _count: { select: { users: true } },
+      },
+    })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return errorResponse(
+        parentId
+          ? 'Bu isimde bir alt departman bu üst departman altında zaten mevcut'
+          : 'Bu isimde bir kök departman zaten mevcut',
+        409,
+      )
+    }
+    throw err
+  }
 
   await audit({
     action: 'department.create',

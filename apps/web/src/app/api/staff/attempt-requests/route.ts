@@ -64,7 +64,12 @@ export const POST = withStaffRoute(async ({ request, dbUser, organizationId }) =
     // Atama dogrulamasi + bekleyen talep kontrolu paralel — birbirinden bagimsiz
     const [assignment, existing] = await Promise.all([
       prisma.trainingAssignment.findFirst({
-        where: { trainingId: parsed.data.trainingId, userId: dbUser.id },
+        // Aynı eğitim için birden çok atama (Yeniden Ata round'u) olabilir; orderBy'sız
+        // findFirst non-deterministik round seçer → guard'lar (status/currentAttempt) yanlış
+        // round'a uygulanıp hatalı talep oluşturulabilir. resolveExamFlowState ile aynı
+        // sıralama: en yeni round'u deterministik seç. organizationId defense-in-depth.
+        where: { trainingId: parsed.data.trainingId, userId: dbUser.id, organizationId },
+        orderBy: [{ round: 'desc' }, { assignedAt: 'desc' }],
         select: {
           id: true,
           status: true,

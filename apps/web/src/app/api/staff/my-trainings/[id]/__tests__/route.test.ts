@@ -403,3 +403,27 @@ describe('Staff my-trainings detail — questionCount yanıt alanı', () => {
     expect(body.questionCount).toBe(25);
   });
 });
+
+/**
+ * N1 round determinizm kilidi: id (assignmentId) ile bulunamazsa trainingId fallback'i
+ * EN YENİ round'u deterministik seçmeli (resolveExamFlowState ile aynı sıralama). orderBy
+ * olmadan eski round seçilip exam-flow ile çelişen aşama gösterilebiliyordu (N1 sınıfı).
+ */
+describe('Staff my-trainings detail — trainingId fallback round sıralaması', () => {
+  it('assignmentId miss → trainingId fallback orderBy [{round:desc},{assignedAt:desc}] ile çağrılır', async () => {
+    prismaMock.trainingAssignment.findFirst
+      .mockResolvedValueOnce(null) // 1) assignmentId branch — bulunamadı
+      .mockResolvedValueOnce(makeAssignment()); // 2) trainingId fallback — bulundu
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) });
+    expect(res.status).toBe(200);
+
+    // İkinci (fallback) çağrı resolver sıralamasıyla yapılmalı.
+    const fallbackCall = prismaMock.trainingAssignment.findFirst.mock.calls[1][0] as {
+      where: { trainingId: string };
+      orderBy: unknown;
+    };
+    expect(fallbackCall.where.trainingId).toBe(ASSIGNMENT_ID);
+    expect(fallbackCall.orderBy).toEqual([{ round: 'desc' }, { assignedAt: 'desc' }]);
+  });
+});

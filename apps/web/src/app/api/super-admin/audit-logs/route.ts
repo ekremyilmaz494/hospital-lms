@@ -4,8 +4,11 @@ import { withSuperAdminRoute } from '@/lib/api-handler'
 
 export const GET = withSuperAdminRoute(async ({ request }) => {
   const { searchParams } = new URL(request.url)
-  const page = Number(searchParams.get('page') ?? '1')
-  const limit = Number(searchParams.get('limit') ?? '50')
+  // Pagination clamp — platform-geneli (org filtresiz) en büyük tablo: sınırsız take = DoS,
+  // NaN/negatif değer Prisma'yı patlatır. Varsayılan sayfa boyutu (50) korunur; üst sınır 100.
+  const page = Math.max(1, Math.floor(Number(searchParams.get('page')) || 1))
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(searchParams.get('limit')) || 50)))
+  const skip = (page - 1) * limit
   const entityType = searchParams.get('entityType')
   const action = searchParams.get('action')
 
@@ -18,7 +21,7 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
       where,
       include: { user: { select: { firstName: true, lastName: true, email: true } }, organization: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
+      skip,
       take: limit,
     }),
     prisma.auditLog.count({ where }),

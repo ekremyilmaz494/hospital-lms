@@ -73,6 +73,10 @@ export const GET = withStaffRoute<{ id: string }>(
           userId: dbUser.id,
           training: trainingFilter,
         },
+        // Aynı eğitimde birden çok atama (Yeniden Ata round'u) olabilir. orderBy'sız
+        // findFirst non-deterministik bir round seçip exam-flow ile çelişen aşama/attempt
+        // gösterebilir (N1 sınıfı). resolveExamFlowState ile AYNI sıralama: en yeni round.
+        orderBy: [{ round: 'desc' }, { assignedAt: 'desc' }],
         include: {
           training: {
             include: {

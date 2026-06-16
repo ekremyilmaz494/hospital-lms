@@ -46,6 +46,15 @@ export const PUT = withApiHandler(async ({ request, organizationId, audit }) => 
     ssoAutoProvision, ssoDefaultRole,
   } = body
 
+  // ssoDefaultRole allow-list — 'super_admin' (veya geçersiz değer) YASAK.
+  // Aksi halde org-scope'lu admin, ssoDefaultRole='super_admin' yazıp SSO ile giren
+  // kullanıcıyı platform-geneli super_admin'e yükseltebilir (privilege escalation):
+  // sso/callback bu değeri auto-provision rolü olarak kullanıyor. UserRole enum'u
+  // super_admin'i içerdiği için Prisma yazımı engellemez — guard burada zorunlu.
+  if (ssoDefaultRole !== undefined && ssoDefaultRole !== 'admin' && ssoDefaultRole !== 'staff') {
+    return errorResponse('Geçersiz SSO varsayılan rolü — yalnızca "admin" veya "staff" olabilir', 400)
+  }
+
   // OIDC client secret at-rest encryption — boş string gönderildiyse dokunma
   // (UI'da "değiştirme" için placeholder geçilmiş olabilir).
   let oidcClientSecretEncrypted: string | undefined
