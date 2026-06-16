@@ -25,7 +25,6 @@ Aşağıdaki sorulardan size uygun olanı seçin, ilgili doc'a gidin.
 | Müşteri sözleşmesinde SLA maddeleri lazım | [SLA.md](./SLA.md) |
 | Müşteriye olay bildirimi göndermem lazım | [INCIDENT_TEMPLATE.md](./INCIDENT_TEMPLATE.md) |
 | KVKK uyumluluğu hakkında soru | [kvkk-teknik-uyum.md](./kvkk-teknik-uyum.md) |
-| HIS entegrasyonu sorusu | [his-entegrasyon-rehberi.md](./his-entegrasyon-rehberi.md) |
 | Müşteri admin panelinde kayboldum | [admin-guide.md](./admin-guide.md) |
 | Personel paneli kullanım sorusu | [staff-guide.md](./staff-guide.md) |
 | Veri güvenliği teknik özet | [veri-guvenligi-teknik-ozet.md](./veri-guvenligi-teknik-ozet.md) |
@@ -46,7 +45,6 @@ Aşağıdaki sorulardan size uygun olanı seçin, ilgili doc'a gidin.
 | Genel hazırlık kontrol listesi (büyük resim) | [go-live-checklist.md](./go-live-checklist.md) |
 | Mevcut güvenlik script'lerini doğrula (komut komut) | [PRE_LAUNCH_VERIFICATION.md](./PRE_LAUNCH_VERIFICATION.md) |
 | Canlı sonrası izleme | [go-live-monitoring-runbook.md](./go-live-monitoring-runbook.md) |
-| API anahtarı yönetimi | [api-key-rehberi.md](./api-key-rehberi.md) |
 
 ---
 
@@ -55,13 +53,11 @@ Aşağıdaki sorulardan size uygun olanı seçin, ilgili doc'a gidin.
 | Doküman | Konu | Kim İçin | Son Güncelleme |
 |---------|------|----------|----------------|
 | [admin-guide.md](./admin-guide.md) | Hastane yöneticisi paneli kullanımı | Müşteri Esas Yöneticisi | — |
-| [api-key-rehberi.md](./api-key-rehberi.md) | API anahtarı yönetimi | Operatör | — |
 | [claude-code-agent-teams-rehberi.md](./claude-code-agent-teams-rehberi.md) | Claude Code takım yapılandırması | Operatör | — |
 | [deployment-guide.md](./deployment-guide.md) | Deploy süreci | Operatör | — |
 | [disaster-recovery.md](./disaster-recovery.md) | Büyük felaket senaryoları (RTO/RPO) | Operatör | 2026-04-09 |
 | [go-live-checklist.md](./go-live-checklist.md) | Canlıya çıkış öncesi genel kontrol listesi | Operatör | 2026-04-05 |
 | [go-live-monitoring-runbook.md](./go-live-monitoring-runbook.md) | Canlıya çıkış sonrası izleme | Operatör | 2026-04-23 |
-| [his-entegrasyon-rehberi.md](./his-entegrasyon-rehberi.md) | HIS sistemi ile entegrasyon | Operatör | — |
 | **[INCIDENT_TEMPLATE.md](./INCIDENT_TEMPLATE.md)** ⭐ | Olay yönetimi şablonları | Operatör + Müşteri | 2026-05-08 |
 | [kvkk-teknik-uyum.md](./kvkk-teknik-uyum.md) | KVKK uyumluluk teknik detay | Operatör + Hukuk | — |
 | **[ONBOARDING.md](./ONBOARDING.md)** ⭐ | Yeni geliştirici 1. gün rehberi | Yeni Dev | 2026-05-08 |
@@ -122,8 +118,6 @@ ONBOARDING.md (1-5. gün) ──► CLAUDE.md (kurallar) ──► PERFORMANCE_R
 ```
 admin-guide.md ─────► Esas Yönetici nasıl kullanır
 staff-guide.md ─────► Personel nasıl kullanır
-his-entegrasyon-rehberi.md ─► HIS bağlantısı
-api-key-rehberi.md ─► API anahtarları
 ```
 
 ### Aile 5 — Yasal / Uyumluluk

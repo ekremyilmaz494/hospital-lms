@@ -61,7 +61,6 @@ Asagidaki tablo, sistemde saklanan tum kisisel veri alanlarini, sifreleme duruml
 | Unvan / Gorev | `title` | Duz metin | Is iliskisi suresince | KVKK md. 5/2-c |
 | Departman bilgisi | `departmentId` | Referans (UUID) | Is iliskisi suresince | KVKK md. 5/2-c |
 | Profil fotografi | `avatarUrl` | URL (S3 signed) | Is iliskisi suresince | KVKK md. 5/1 (Acik riza) |
-| HIS Dis Sistem ID | `hisExternalId` | Duz metin | Is iliskisi suresince | KVKK md. 5/2-c |
 | KVKK Onam Durumu | `kvkkConsent` | Boolean | Surekli | KVKK md. 5/1 |
 | KVKK Onam Tarihi | `kvkkConsentDate` | Tarih/saat | Surekli | KVKK md. 5/1 |
 | Kullanim Sartlari Onayi | `termsAccepted` | Boolean | Surekli | KVKK md. 5/2-c |
