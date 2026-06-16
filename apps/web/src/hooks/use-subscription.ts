@@ -6,7 +6,6 @@ import { useFetch } from '@/hooks/use-fetch'
 /** Ozellik isimleri (sunucu tarafindaki FeatureName ile eslesir) */
 type FeatureName =
   | 'scormSupport'
-  | 'hisIntegration'
   | 'advancedReports'
   | 'ssoSupport'
   | 'competencyModule'
@@ -19,7 +18,6 @@ type LimitName = 'maxStaff' | 'maxTrainings' | 'maxStorageGb'
 
 interface PlanFeatures {
   scormSupport: boolean
-  hisIntegration: boolean
   advancedReports: boolean
   ssoSupport: boolean
   competencyModule: boolean
@@ -68,7 +66,6 @@ interface UseSubscriptionReturn {
 
 const DEFAULT_FEATURES: PlanFeatures = {
   scormSupport: false,
-  hisIntegration: false,
   advancedReports: false,
   ssoSupport: false,
   competencyModule: false,

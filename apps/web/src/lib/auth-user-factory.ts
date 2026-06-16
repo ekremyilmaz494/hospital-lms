@@ -79,7 +79,6 @@ interface OrgUserParams extends BaseParams {
   phone?: string
   title?: string
   departmentId?: string | null
-  hisExternalId?: string
   isActive?: boolean
   mustChangePassword?: boolean
   /**
@@ -176,7 +175,6 @@ export async function createAuthUser(params: CreateAuthUserParams): Promise<Crea
           phone: params.phone,
           title: params.title,
           departmentId: params.departmentId ?? undefined,
-          hisExternalId: params.hisExternalId,
           isActive: params.isActive,
           mustChangePassword: params.mustChangePassword,
         }),

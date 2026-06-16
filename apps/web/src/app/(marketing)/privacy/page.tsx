@@ -67,8 +67,8 @@ export default function PrivacyPage() {
               <strong>Iletisim Bilgileri:</strong> E-posta adresi, telefon numarasi
             </li>
             <li>
-              <strong>Mesleki Bilgiler:</strong> Gorev tanimi, calisan numarasi (HIS
-              entegrasyonu), sertifika ve yetkinlik bilgileri
+              <strong>Mesleki Bilgiler:</strong> Gorev tanimi, calisan numarasi,
+              sertifika ve yetkinlik bilgileri
             </li>
             <li>
               <strong>Egitim ve Sinav Verileri:</strong> Egitim tamamlama durumlari,

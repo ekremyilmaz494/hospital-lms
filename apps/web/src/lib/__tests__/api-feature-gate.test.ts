@@ -43,7 +43,6 @@ const ORG_ID = 'org-feature-test'
 
 const FULL_PLAN = {
   hasScormSupport: true,
-  hasHisIntegration: true,
   hasAdvancedReports: true,
   hasSsoSupport: true,
   hasCompetencyModule: true,
@@ -57,7 +56,6 @@ const FULL_PLAN = {
 
 const BASIC_PLAN = {
   hasScormSupport: false,
-  hasHisIntegration: false,
   hasAdvancedReports: false,
   hasSsoSupport: false,
   hasCompetencyModule: false,
@@ -114,7 +112,7 @@ describe('checkFeature — Ozellik kontrolu', () => {
 
     const { checkFeature } = await import('../feature-gate')
     const features = [
-      'scormSupport', 'hisIntegration',
+      'scormSupport',
       'advancedReports', 'ssoSupport', 'competencyModule',
       'accreditationModule', 'bulkImport', 'customCertificates',
     ] as const

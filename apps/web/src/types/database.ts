@@ -64,7 +64,6 @@ export interface User {
   role: UserRole;
   avatarUrl: string | null;
   isActive: boolean;
-  hisExternalId?: string | null;
   kvkkNoticeAcknowledgedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -379,42 +378,6 @@ export interface DepartmentTrainingRule {
   updatedAt: string;
 }
 
-// ── HIS Entegrasyon Tipleri ──
-
-export type HisAuthType = 'API_KEY' | 'BASIC_AUTH' | 'OAUTH2';
-export type SyncType = 'STAFF_IMPORT' | 'DEPARTMENT_IMPORT' | 'FULL_SYNC';
-export type SyncStatus = 'RUNNING' | 'SUCCESS' | 'FAILED';
-
-export interface HisIntegration {
-  id: string;
-  organizationId: string;
-  name: string;
-  baseUrl: string;
-  authType: HisAuthType;
-  credentials: { masked: true } | { v: string };
-  isActive: boolean;
-  lastSyncAt: string | null;
-  syncInterval: number;
-  fieldMapping: Record<string, string>;
-  webhookToken: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SyncLog {
-  id: string;
-  organizationId: string;
-  integrationId: string;
-  syncType: SyncType;
-  status: SyncStatus;
-  totalRecords: number;
-  processedRecords: number;
-  errors: Array<{ externalId: string; error: string }>;
-  startedAt: string;
-  completedAt: string | null;
-  updatedAt: string;
-}
-
 // ── SORU BANKASI TİPLERİ ──
 
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
@@ -442,12 +405,3 @@ export interface QuestionBankOption {
   updatedAt: string;
 }
 
-export interface SyncResult {
-  success: boolean;
-  totalRecords: number;
-  processedRecords: number;
-  created: number;
-  updated: number;
-  deactivated: number;
-  errors: Array<{ externalId: string; error: string }>;
-}

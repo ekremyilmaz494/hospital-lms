@@ -49,7 +49,6 @@ model SubscriptionPlan {
   isActive               Boolean  @default(true) @map("is_active")
   // Feature gates
   hasScormSupport        Boolean  @default(false) @map("has_scorm_support")
-  hasHisIntegration      Boolean  @default(false) @map("has_his_integration")
   hasAdvancedReports     Boolean  @default(false) @map("has_advanced_reports")
   hasSsoSupport          Boolean  @default(false) @map("has_sso_support")
   hasCompetencyModule    Boolean  @default(false) @map("has_competency_module")
@@ -144,9 +143,7 @@ model Organization {
   smgCategories          SmgCategory[]
   smgTargetsList         SmgTarget[]                  @relation("SmgTargetOrg")
   contentLibraryInstalls OrganizationContentLibrary[]
-  hisIntegrations        HisIntegration[]
   competencyForms        CompetencyForm[]
-  syncLogs               SyncLog[]
   accreditationReports   AccreditationReport[]
   accreditationStandards AccreditationStandard[]      @relation("OrgAccreditationStandards")
   trainingCategories     TrainingCategory[]
@@ -300,7 +297,6 @@ model User {
   role                     UserRole
   avatarUrl                String?   @map("avatar_url") @db.Text
   isActive                 Boolean   @default(true) @map("is_active")
-  hisExternalId            String?   @map("his_external_id") @db.VarChar(100)
   // TC Kimlik No — KVKK gereği AES-256-GCM ile şifrelenmiş + HMAC-SHA256 ile hash'lenmiş.
   // tcEncrypted: ciphertext (görüntüleme için decrypt). tcHash: deterministic, lookup için.
   tcEncrypted              String?   @map("tc_encrypted") @db.Text
@@ -363,7 +359,6 @@ model User {
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
   @@index([departmentId], map: "idx_users_department")
-  @@index([hisExternalId], map: "idx_users_his_external_id")
   // Performance: composite indexes for filtered queries
   @@index([organizationId, isActive], map: "idx_users_org_active")
   @@index([organizationId, departmentId], map: "idx_users_org_department")
@@ -1048,52 +1043,6 @@ model OrganizationContentLibrary {
   @@map("organization_content_library")
 }
 
-// ── HIS ENTEGRASYONU ──
-model HisIntegration {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  name           String    @db.VarChar(255)
-  baseUrl        String    @map("base_url") @db.VarChar(500)
-  authType       String    @map("auth_type") @db.VarChar(20)
-  credentials    Json
-  isActive       Boolean   @default(true) @map("is_active")
-  lastSyncAt     DateTime? @map("last_sync_at") @db.Timestamptz
-  syncInterval   Int       @default(60) @map("sync_interval")
-  fieldMapping   Json      @default("{}") @map("field_mapping")
-  webhookToken   String    @unique @map("webhook_token") @db.VarChar(128)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  syncLogs     SyncLog[]
-
-  @@index([organizationId], map: "idx_his_integrations_org")
-  @@index([isActive], map: "idx_his_integrations_active")
-  @@map("his_integrations")
-}
-
-// ── SENKRONIZASYON LOGLARI ──
-model SyncLog {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId   String    @map("organization_id") @db.Uuid
-  integrationId    String    @map("integration_id") @db.Uuid
-  syncType         String    @map("sync_type") @db.VarChar(30)
-  status           String    @default("RUNNING") @db.VarChar(20)
-  totalRecords     Int       @default(0) @map("total_records")
-  processedRecords Int       @default(0) @map("processed_records")
-  errors           Json      @default("[]")
-  startedAt        DateTime  @default(now()) @map("started_at") @db.Timestamptz
-  completedAt      DateTime? @map("completed_at") @db.Timestamptz
-  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  integration  HisIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId], map: "idx_sync_logs_org")
-  @@index([integrationId], map: "idx_sync_logs_integration")
-  @@index([status], map: "idx_sync_logs_status")
-  @@map("sync_logs")
-}
 
 // ── 360° YETKİNLİK DEĞERLENDİRME ──
 

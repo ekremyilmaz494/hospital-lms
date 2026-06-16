@@ -86,10 +86,6 @@ const INTENTIONALLY_EXCLUDED = new Set([
   // İçerik kütüphanesi link tablosu — global tabloya bağlı
   'OrganizationContentLibrary',
 
-  // HIS entegrasyonu — config + sync log (her org farklı, restore manuel kurulum gerektirir)
-  'HisIntegration',
-  'SyncLog',
-
   // Yetkinlik değerlendirme modülü (yeni feature — henüz backup scope'unda değil)
   'CompetencyForm',
   'CompetencyCategory',

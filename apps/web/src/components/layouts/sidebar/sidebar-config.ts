@@ -62,10 +62,6 @@ export function filterNavBySector(groups: NavGroup[], sector: Sector): NavGroup[
     .filter((g) => g.items.length > 0);
 }
 
-// Geliştirme aşamasındaki modüller — müşteriye (demo/prod) kapalı.
-// Tamamlanınca true yapılır veya NEXT_PUBLIC_ENABLE_BETA=true ile geçici açılır.
-const BETA_MODULES_ENABLED = process.env.NEXT_PUBLIC_ENABLE_BETA === 'true';
-
 // ─────────────────────────────────────────────────────────
 // SUPER ADMIN
 // ─────────────────────────────────────────────────────────
@@ -200,9 +196,6 @@ export const adminNav: NavGroup[] = [
         icon: Settings,
         children: [
           { title: 'Genel Ayarlar', href: '/admin/settings' },
-          ...(BETA_MODULES_ENABLED
-            ? [{ title: 'Entegrasyonlar', href: '/admin/settings/integrations' }]
-            : []),
         ],
       },
     ],
