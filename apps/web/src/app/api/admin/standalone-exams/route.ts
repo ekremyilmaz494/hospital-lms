@@ -268,9 +268,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
     return jsonResponse(exam, 201)
   } catch (err: unknown) {
-    return errorResponse(
-      (err as Error).message || 'Sınav oluşturulurken bir hata oluştu',
-      500,
-    )
+    // Ham err.message (Prisma constraint/kolon adı vb. iç detay) kullanıcıya sızdırılmaz —
+    // sunucuya logla, kullanıcıya generic Türkçe mesaj dön ([id] PUT ile tutarlı).
+    logger.error('StandaloneExamCreate', 'Sınav oluşturulurken hata', err)
+    return errorResponse('Sınav oluşturulurken bir hata oluştu', 500)
   }
 }, { requireOrganization: true })

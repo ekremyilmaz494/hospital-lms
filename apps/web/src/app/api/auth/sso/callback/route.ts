@@ -215,11 +215,16 @@ async function provisionAndLogin({
   if (!dbUser) {
     // Auto-provision: create Supabase auth user + DB user via factory
     try {
+      // Çalışma-zamanı guard: DB'de zehirli/legacy bir ssoDefaultRole (örn. super_admin)
+      // bulunsa bile SSO auto-provision ASLA super_admin üretmez — 'admin' dışındaki her
+      // değer güvenli varsayılan 'staff'a düşer. (`as 'admin'|'staff'` cast'i runtime'da
+      // hiçbir koruma sağlamıyordu; defense-in-depth: config PUT allow-list'i ilk kapı.)
+      const provisionRole: 'admin' | 'staff' = org.ssoDefaultRole === 'admin' ? 'admin' : 'staff'
       const result = await createAuthUser({
         email,
         firstName,
         lastName,
-        role: org.ssoDefaultRole as 'admin' | 'staff',
+        role: provisionRole,
         organizationId: org.id,
         emailConfirm: true,
         extraUserMetadata: { sso_provider: 'sso' },

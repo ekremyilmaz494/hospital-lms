@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logActivity } from '@/lib/activity-logger'
+import { logger } from '@/lib/logger'
 
 export const GET = withStaffRoute(async ({ dbUser }) => {
   const profile = await prisma.user.findUnique({
@@ -142,7 +143,10 @@ export const PATCH = withStaffRoute(async ({ request, dbUser, organizationId, au
       password: body.newPassword,
     })
     if (updateError) {
-      return errorResponse('Şifre güncellenemedi: ' + updateError.message)
+      // Supabase Auth'un ham (İngilizce) iç hata metni kullanıcıya sızdırılmaz —
+      // sunucuya logla, kullanıcıya generic Türkçe mesaj dön.
+      logger.error('StaffProfile', 'Şifre güncelleme hatası', updateError)
+      return errorResponse('Şifre güncellenemedi, lütfen tekrar deneyin', 400)
     }
 
     await audit({

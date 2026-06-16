@@ -325,6 +325,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
     return jsonResponse(training, 201)
   } catch (err: unknown) {
-    return errorResponse((err as Error).message || 'Eğitim kaydedilirken bir hata oluştu', 500)
+    // Ham err.message (Prisma constraint/tablo/kolon adı vb.) kullanıcıya sızdırılmaz —
+    // sunucuya logla, kullanıcıya generic Türkçe mesaj dön.
+    logger.error('admin-trainings-create', 'Eğitim kaydedilirken hata', err)
+    return errorResponse('Eğitim kaydedilirken bir hata oluştu', 500)
   }
 }, { requireOrganization: true })
