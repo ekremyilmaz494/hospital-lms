@@ -55,6 +55,7 @@ interface AiPendingSnapshot {
     correctIndex: number;
     sourceQuote: string;
     sourcePage?: number;
+    sourceKey?: string;
     clientId: string;
   }>;
   queue: Array<{
@@ -63,6 +64,7 @@ interface AiPendingSnapshot {
     correctIndex: number;
     sourceQuote: string;
     sourcePage?: number;
+    sourceKey?: string;
     clientId: string;
   }>;
 }
@@ -210,7 +212,13 @@ export default function DraftWizardPage() {
             setQuestionsActiveMode(draftData.questionsActiveMode);
           }
           if (draftData.aiPending && Array.isArray(draftData.aiPending.displayed) && Array.isArray(draftData.aiPending.queue)) {
-            setAiPending(draftData.aiPending);
+            // Eski draft'larda yarıda kalmış skeleton placeholder (questionText:'')
+            // kaydedilmiş olabilir → restore'da temizle; aksi halde "Soruları Ekle"
+            // kalıcı disabled kalıp admin'i draft'ta kilitler.
+            setAiPending({
+              displayed: draftData.aiPending.displayed.filter((q) => q.questionText.trim() !== ''),
+              queue: draftData.aiPending.queue.filter((q) => q.questionText.trim() !== ''),
+            });
           }
           if (Array.isArray(draftData.aiUploadedSources)) {
             setAiUploadedSources(draftData.aiUploadedSources);

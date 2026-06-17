@@ -53,9 +53,10 @@ export interface AiQuestionGeneratorProps {
 
 type UploadedSource = AiUploadedSource;
 
-// Tek kaynak: çoklu belgede model soruları tek belgeye yığıp diğerlerini
-// atlayabiliyordu (güvenilir dağıtım sağlanamadı) → yalnızca 1 kaynağa izin ver.
-const MAX_SOURCES = 1;
+// İki kaynak: eskiden tek sorguda model soruları tek belgeye yığıp diğerini
+// atlıyordu. Artık hook her kaynağa AYRI sorgu gönderip soruları kaynak-başına
+// dengeler (her kaynaktan eşit göster/yedek) → çoklu kaynak güvenli.
+const MAX_SOURCES = 2;
 const MAX_TOTAL_SIZE_MB = 30;
 // Claude native PDF; office formatları sunucuda text'e çevrilip prompt'a gömülür.
 const ACCEPTED_TYPES = [
@@ -126,9 +127,13 @@ export default function AiQuestionGenerator({
   // Eskiden unmount'ta 0 dönüyorduk; artık pending state lift edildi (mode geçişinde
   // hook unmount olmaz forceMount sayesinde, sayfa yenilemede draft'tan restore olur),
   // o yüzden cleanup'a gerek yok.
+  // Placeholder (skeleton) kartları SAYMA — parent bu sayıyı "Sonraki Adım"ı
+  // engellemek için kullanıyor; yedek hazırlanırken (veya restore'da kalmış bir
+  // placeholder varsa) gerçekte eklenebilir soru sayısı bu olmalı.
+  const realPendingCount = queue.displayed.filter((q) => !q.isPlaceholder).length;
   useEffect(() => {
-    onPendingChange?.(queue.displayed.length);
-  }, [queue.displayed.length, onPendingChange]);
+    onPendingChange?.(realPendingCount);
+  }, [realPendingCount, onPendingChange]);
 
   const removeSource = (s3Key: string) => {
     setUploadedSources((prev) => prev.filter((s) => s.s3Key !== s3Key));
@@ -141,7 +146,7 @@ export default function AiQuestionGenerator({
       return;
     }
     if (uploadedSources.length >= MAX_SOURCES) {
-      setUploadError('Yalnızca tek kaynak yüklenebilir. Yeni dosya için mevcut kaynağı kaldırın.');
+      setUploadError(`En fazla ${MAX_SOURCES} kaynak yüklenebilir. Yeni dosya için mevcut bir kaynağı kaldırın.`);
       return;
     }
     const totalMb = (uploadedSources.reduce((sum, s) => sum + s.sizeBytes, 0) + file.size) / (1024 * 1024);
@@ -192,9 +197,20 @@ export default function AiQuestionGenerator({
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
-    // Tek kaynak — birden fazla seçilse/sürüklense bile yalnızca ilkini al.
-    void uploadFile(files[0]);
-  }, [uploadFile]);
+    const remaining = MAX_SOURCES - uploadedSources.length;
+    if (remaining <= 0) {
+      setUploadError(`En fazla ${MAX_SOURCES} kaynak yüklenebilir. Yeni dosya için mevcut bir kaynağı kaldırın.`);
+      return;
+    }
+    // Kalan slot kadarını sırayla yükle (her biri presign+PUT; state functional
+    // update ile birikir). Fazlası sessizce atılır — cap aşılmaz.
+    const toUpload = Array.from(files).slice(0, remaining);
+    void (async () => {
+      for (const f of toUpload) {
+        await uploadFile(f);
+      }
+    })();
+  }, [uploadFile, uploadedSources.length]);
 
   // Skeleton placeholder kartlar (queue boşken silinen slot için) — admin
   // "Soruları Ekle" basarsa boş soru gönderilmesin diye add'den de exclude
@@ -331,7 +347,7 @@ export default function AiQuestionGenerator({
                     {uploading ? 'Yükleniyor…' : 'Dosya sürükle veya seçmek için tıkla'}
                   </span>
                   <span className="aiq-uploader-hint">
-                    {ACCEPTED_LABEL} · Tek dosya · maks {MAX_TOTAL_SIZE_MB}MB
+                    {ACCEPTED_LABEL} · En fazla {MAX_SOURCES} dosya · toplam maks {MAX_TOTAL_SIZE_MB}MB
                   </span>
                 </div>
               </label>
@@ -447,7 +463,7 @@ export default function AiQuestionGenerator({
                   </p>
                 ) : (
                   <p>
-                    Sistem tek çağrıda <em>20</em> soru üretecek. {aiCountToGenerate} tanesi burada görünür, {20 - aiCountToGenerate} tanesi yedek olarak sahne arkasında bekler.
+                    Sistem toplam <em>20</em> soru üretecek (kaynaklara dengeli dağıtılır). {aiCountToGenerate} tanesi burada görünür, {20 - aiCountToGenerate} tanesi yedek olarak sahne arkasında bekler.
                   </p>
                 )}
                 {aiCountToGenerate > 0 && (

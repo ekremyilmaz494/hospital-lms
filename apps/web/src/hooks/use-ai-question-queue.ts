@@ -1,27 +1,36 @@
 'use client';
 
 /**
- * AI question generation queue hook — tek çağrıda 20 soru üretir.
+ * AI question generation queue hook — KAYNAK-BAŞINA dengeli üretim.
  *
- * Initial generate(): tek HTTP isteğiyle 20 soru üretilir. İlk N tanesi
- * (displayTarget) `displayed`'a, kalan 20-N tanesi gizli `queue`'a düşer.
- * Manuel 0 → 10 göster + 10 yedek. Manuel 5 → 5 göster + 15 yedek.
+ * Çoklu kaynak (max 2): her kaynak için AYRI sorgu gönderilir. Tek bir sorguda
+ * birden çok belge verildiğinde model soruları son/tek belgeye yığıp diğerini
+ * atlıyordu → her kaynağa kendi çağrısı yapılır, böylece her konu temsil edilir.
  *
- * Silme davranışı (in-place):
- *  - Queue'da yedek varsa → silinen kart **aynı indekste** queue'dan gelen
- *    soruyla değiştirilir (en alta DEĞİL).
- *  - Queue boşsa → silinen indekse skeleton placeholder bırakılır;
- *    background replenish API'si döndüğünde gerçek soru o slota yerleşir.
- *  - İki yolda da display sayısı görsel olarak hep sabit kalır.
+ * Dağıtım (toplam invariant'ları korunur):
+ *  - Toplam üretim her zaman TOTAL_GENERATE(20); kaynaklara EŞİT bölünür
+ *    (distributeEven) → 1 kaynak [20], 2 kaynak [10,10].
+ *  - Gösterilen toplam = displayTarget (varsayılan 10); kaynaklara EŞİT bölünür
+ *    → 1 kaynak [10], 2 kaynak [5,5]. displayed liste kaynaklar arası round-robin
+ *    harmanlanır (admin ilk birkaçına baksa bile her konuyu görür).
+ *  - Yedek (queue) = üretim − gösterilen, kaynak başına. 2 kaynak D=10 → 5+5 yedek.
+ *  - Tek kaynakta davranış birebir korunur (20 üret / 10 göster / 10 yedek).
  *
- * State persistence: `initialState` prop ile parent state'ten restore
- * eder; her displayed/queue değişiminde `onStateChange` çağrılır → parent
- * state'e ve draft'a kaydedilir. Bu sayede admin Manuel ↔ AI tab geçişi
- * yapsa veya sayfa yenilese bile pending AI soruları kaybolmaz.
+ * Silme davranışı KAYNAK-BAŞINA (in-place, dengeyi korur):
+ *  - Silinen kartın kaynağından (sourceKey) bir yedek varsa → aynı indekse onunla
+ *    değiştirilir. Böylece "5 A + 5 B" dengesi bozulmaz (A silinince A gelir).
+ *  - O kaynağın yedeği boşsa → skeleton placeholder; background replenish O KAYNAKTAN
+ *    soru getirir ve slota yerleştirir.
  *
- * sourceQuote zorunluluğu: Backend her soruda kaynaktan birebir alıntı
- * (sourceQuote) ister. Boş gelirse hook filtreler — model "kaynak dışı"
- * üretmiş demektir, hallucination koruması.
+ * Sağlamlık katmanları:
+ *  - Placeholder'lar snapshot'a (onStateChange) DAHİL EDİLMEZ — draft'a sızıp
+ *    restore'da "yapışık" placeholder yaratıp admin'i kilitlemesin.
+ *  - generationRef (epoch): reset()/generate() epoch'u artırır; in-flight replenish
+ *    eski epoch'tan geldiyse state'e YAZMAZ (regenerate sonrası stale enjeksiyon yok).
+ *  - Aynı kaynağa giden replenish'ler SERİ + accumulator ile çalışır (duplicate yedek
+ *    önlenir); kaynaklar arası paralel kalır.
+ *
+ * sourceQuote zorunluluğu: boş gelirse hook filtreler (hallucination koruması).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -35,6 +44,10 @@ export interface GeneratedQuestion {
   sourceQuote: string;
   /** Opsiyonel sayfa numarası (PDF için). */
   sourcePage?: number;
+  /** Bu sorunun üretildiği kaynağın s3Key'i — kaynak-başına denge/silme/replenish için.
+   *  Opsiyonel: bu özellikten ÖNCE kaydedilmiş draft'larda (tek kaynak) bulunmaz;
+   *  o durumda replenish tek/ilk kaynağa düşer (geriye dönük uyum). */
+  sourceKey?: string;
   /** Stable client-side id for React keys. */
   clientId: string;
   /** Skeleton/loading slot — queue boşken silinen indekse bırakılır,
@@ -51,17 +64,16 @@ export interface AiPendingState {
 export interface UseAiQuestionQueueOptions {
   sources: SourceFile[];
   model: string;
-  /** Admin'in hedeflediği toplam soru sayısı (default 10). Hook bu sayı kadar
-   * `displayed` tutar; queue ise her zaman 5 yedek. Hedef 0 veya negatifse
-   * generate() error verir (UI'da disabled tutulmalı). */
+  /** Admin'in hedeflediği toplam gösterilen soru sayısı (default 10). Kaynaklara
+   * eşit bölünür. Hedef 0 veya negatifse generate() error verir (UI disabled tutmalı). */
   displayTarget?: number;
   /** Manuel olarak yazılmış soruların metinleri — AI'nın dedup için tekrar
-   * etmemesi gereken sorular. excluded listesine her çağrıda eklenir
-   * (initial generate + her replenish). */
+   * etmemesi gereken sorular. excluded listesine her çağrıda eklenir. */
   staticExcluded?: { text: string }[];
   /** Parent'tan restore edilecek pending state (mode geçişi/sayfa yenileme sonrası). */
   initialState?: AiPendingState;
-  /** Her displayed/queue değişiminde parent'a snapshot — draft'a kaydetmek için. */
+  /** Her displayed/queue değişiminde parent'a snapshot — draft'a kaydetmek için.
+   *  NOT: placeholder'lar bu snapshot'a dahil edilmez (kalıcılaşmamalı). */
   onStateChange?: (state: AiPendingState) => void;
 }
 
@@ -73,8 +85,7 @@ export interface UseAiQuestionQueueReturn {
   generate: () => Promise<void>;
   remove: (clientId: string) => void;
   reset: () => void;
-  /** Yedekleri (queue) hedef sayıya kadar paralel olarak doldurur.
-   *  Tüm yedekler tüketildiyse veya admin manuel olarak yenilemek isterse. */
+  /** Yedekleri (queue) kaynak-başına hedefe kadar doldurur (kaynak-içi seri, kaynaklar-arası paralel). */
   refillQueue: () => Promise<void>;
   isGenerating: boolean;
   isReplenishing: boolean;
@@ -89,10 +100,33 @@ interface RawQuestion {
 }
 
 const DEFAULT_DISPLAY_TARGET = 10;
-/** Tek çağrıda üretilen toplam soru sayısı (display + queue). Kullanıcı kararı:
- *  "tek çağrıda 20 soru, en az yarısı yedek". PDF input'u tekrar tekrar
- *  göndermemek için tek isteğe topluyoruz (replenish'lerden ~5-7× ucuz). */
+/** Toplam üretilen soru sayısı (display + queue). Kullanıcı kararı: "toplam 20 soru,
+ *  en az yarısı yedek". Çoklu kaynakta bu toplam kaynaklara eşit bölünür. */
 const TOTAL_GENERATE = 20;
+
+/** total'i n parçaya olabildiğince eşit böler; kalan ilk parçalara +1 olarak dağılır.
+ *  distributeEven(20,2)=[10,10]; distributeEven(10,2)=[5,5]; distributeEven(7,2)=[4,3].
+ *  (Test edilebilirlik için export edilir.) */
+export function distributeEven(total: number, n: number): number[] {
+  if (n <= 0) return [];
+  const base = Math.floor(total / n);
+  const rem = total % n;
+  return Array.from({ length: n }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+/** Kaynak-başına displayed gruplarını round-robin harmanlar (A,B,A,B,…).
+ *  (Test edilebilirlik için export edilir.) */
+export function interleave(groups: GeneratedQuestion[][]): GeneratedQuestion[] {
+  const out: GeneratedQuestion[] = [];
+  const max = groups.reduce((m, g) => Math.max(m, g.length), 0);
+  for (let r = 0; r < max; r++) {
+    for (const g of groups) {
+      const item = g[r];
+      if (item !== undefined) out.push(item);
+    }
+  }
+  return out;
+}
 
 const newId = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -103,8 +137,8 @@ const newId = (): string => {
 
 /** RawQuestion → GeneratedQuestion. sourceQuote eksikse null döner (caller filtreler).
  *  Bu hallucination koruma katmanıdır; system prompt sourceQuote ister, model
- *  uymadıysa o soru gözükmesin. */
-const withId = (q: RawQuestion): GeneratedQuestion | null => {
+ *  uymadıysa o soru gözükmesin. sourceKey üretildiği kaynağı etiketler. */
+const withId = (q: RawQuestion, sourceKey: string): GeneratedQuestion | null => {
   const quote = (q.sourceQuote ?? '').trim();
   if (!quote) return null;
   return {
@@ -113,6 +147,7 @@ const withId = (q: RawQuestion): GeneratedQuestion | null => {
     correctIndex: q.correctIndex,
     sourceQuote: quote,
     sourcePage: q.sourcePage,
+    sourceKey,
     clientId: newId(),
   };
 };
@@ -160,19 +195,26 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
   displayedRef.current = displayed;
   queueRef.current = queue;
 
+  // Generation epoch — reset()/generate() artırır. In-flight replenish eski epoch'tan
+  // geldiyse state'e yazmaz (regenerate/abandon sonrası stale soru enjeksiyonu önlenir).
+  const generationRef = useRef(0);
+
   // onStateChange ref — her render'da dependency olmasın diye.
   const onStateChangeRef = useRef(onStateChange);
   onStateChangeRef.current = onStateChange;
 
   // displayed/queue değiştikçe parent'a snapshot ilet (draft persistence için).
-  // `initialState` ilk render'da set edilmiş olabileceği için ilk effect'te de tetiklenir;
-  // sonsuz loop'tan kaçınmak için referansları aynı tuttuğumuzdan parent'ın güvenli
-  // useState/useReducer kullanması yeterli.
+  // Placeholder'lar (skeleton) snapshot'a DAHİL EDİLMEZ — draft'a sızıp restore'da
+  // kalıcı "yapışık" placeholder yaratıp "Soruları Ekle"yi kalıcı disabled bırakmasın.
   useEffect(() => {
-    onStateChangeRef.current?.({ displayed, queue });
+    onStateChangeRef.current?.({
+      displayed: displayed.filter((q) => !q.isPlaceholder),
+      queue,
+    });
   }, [displayed, queue]);
 
   const reset = useCallback(() => {
+    generationRef.current += 1; // in-flight replenish'leri geçersiz kıl
     setDisplayed([]);
     setQueue([]);
     setError(null);
@@ -189,36 +231,71 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
       setError('Üretilecek soru sayısı 0. Hedef toplamı manuel sorulardan büyük belirleyin.');
       return;
     }
+    const gen = (generationRef.current += 1); // yeni nesil; eski in-flight'lar geçersiz
     setIsGenerating(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/trainings/ai/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sources,
-          model,
-          // Tek çağrıda 20 soru — manuel sayısından bağımsız. Display'i
-          // displayTargetSafe kadar göster, kalanı queue'da yedek tut.
-          count: TOTAL_GENERATE,
-          excluded: staticExcludedRef.current,
+      const n = sources.length;
+      // Toplam 20 üretim + toplam displayTarget gösterim, kaynaklara eşit bölünür.
+      const genPer = distributeEven(TOTAL_GENERATE, n);
+      const shownPer = distributeEven(displayTargetSafe, n);
+
+      // Her kaynak için AYRI çağrı (paralel) — tek sorguda yığılma sorununun çözümü.
+      const perSource = await Promise.all(
+        sources.map(async (src, i) => {
+          try {
+            const res = await fetch('/api/admin/trainings/ai/generate-questions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sources: [src],
+                model,
+                count: genPer[i],
+                excluded: staticExcludedRef.current,
+              }),
+            });
+            if (!res.ok) return { i, ok: false, questions: [] as GeneratedQuestion[], errorMsg: await readError(res) };
+            const data = (await res.json()) as { questions?: RawQuestion[] };
+            const qs = (Array.isArray(data.questions) ? data.questions : [])
+              .map((q) => withId(q, src.s3Key))
+              .filter((q): q is GeneratedQuestion => q !== null);
+            return { i, ok: true, questions: qs, errorMsg: undefined };
+          } catch {
+            return { i, ok: false, questions: [] as GeneratedQuestion[], errorMsg: undefined };
+          }
         }),
-      });
-      if (!res.ok) {
-        const msg = await readError(res);
-        setError(msg);
+      );
+
+      // Eski nesil (regenerate/abandon araya girdiyse) sonucu yazma.
+      if (generationRef.current !== gen) return;
+
+      // Kaynak-başına: ilk shownPer[i] → displayed grubu, kalan → queue.
+      const displayedGroups: GeneratedQuestion[][] = sources.map(() => []);
+      const newQueue: GeneratedQuestion[] = [];
+      for (const r of perSource) {
+        const shown = shownPer[r.i] ?? 0;
+        displayedGroups[r.i] = r.questions.slice(0, shown);
+        newQueue.push(...r.questions.slice(shown));
+      }
+
+      // Bir kaynak HTTP hatası döndürdüyse (429/502/504 vb.) spesifik mesajı koru.
+      const specificError = perSource.find((r) => r.errorMsg)?.errorMsg;
+
+      const interleaved = interleave(displayedGroups);
+      if (interleaved.length === 0) {
+        setError(specificError ?? 'Hiç soru üretilemedi. Model kaynak alıntısı veremedi — farklı bir kaynak veya model deneyin.');
         return;
       }
-      const data = (await res.json()) as { questions?: RawQuestion[] };
-      const all = (Array.isArray(data.questions) ? data.questions : [])
-        .map(withId)
-        .filter((q): q is GeneratedQuestion => q !== null);
-      if (all.length === 0) {
-        setError('Hiç soru üretilemedi. Model kaynak alıntısı veremedi — farklı bir kaynak veya model deneyin.');
-        return;
+      setDisplayed(interleaved);
+      setQueue(newQueue);
+      // Gösterilen hedefin altında kaldıysa (bir kaynak kotasından az/hata döndü) admin'i uyar.
+      if (interleaved.length < displayTargetSafe) {
+        setError(
+          specificError ??
+            `Hedeflenen ${displayTargetSafe} sorudan ${interleaved.length} tanesi üretilebildi — bazı kaynaklardan yeterli soru çıkmadı. ` +
+              'Eksikler için "Tümünü Yeniden Üret" veya yedek üretmeyi deneyin.',
+        );
       }
-      setDisplayed(all.slice(0, displayTargetSafe));
-      setQueue(all.slice(displayTargetSafe, TOTAL_GENERATE));
     } catch {
       setError('Ağ hatası — lütfen tekrar deneyin.');
     } finally {
@@ -226,138 +303,167 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     }
   }, [sources, model, displayTargetSafe]);
 
-  /** Tek soru üretir ve hedeflenen yere yerleştirir. Internal — hem
-   *  fireReplenish hem refillQueue tarafından kullanılır.
+  /** Belirli BİR kaynaktan tek soru üretir ve yerleştirir. Internal.
    *
-   *  @param replaceClientId - verilirse displayed'da bu id'li skeleton'u
-   *    gerçek soruyla değiştirir; verilmezse queue'ya ekler.
-   *  @returns success boolean */
-  const fetchOneToQueue = useCallback(async (replaceClientId?: string): Promise<boolean> => {
-    const excluded = [
-      ...staticExcludedRef.current,
-      ...displayedRef.current
-        .filter((q) => !q.isPlaceholder)
-        .map((q) => ({ text: q.questionText })),
-      ...queueRef.current.map((q) => ({ text: q.questionText })),
-    ];
-    const res = await fetch('/api/admin/trainings/ai/replenish-question', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sources, model, excluded }),
-    });
-    if (!res.ok) {
-      // Replenish çağrıları arka plan; global banner panik yaratmasın.
-      // Sadece manuel refillQueue tetikledi ise kullanıcıya göster — onu
-      // refillQueue içinde ayrıca yakalıyoruz. In-place skeleton path için
-      // sessizce false dön; caller skeleton'u kaldırır.
-      return false;
-    }
-    const data = (await res.json()) as { question?: RawQuestion };
-    if (!data.question) return false;
-    const withSource = withId(data.question);
-    if (!withSource) return false; // sourceQuote yoktu → atla
-
-    if (replaceClientId) {
-      // Skeleton slotunu gerçek soruyla in-place değiştir
-      let placed = false;
-      setDisplayed((prev) => {
-        const idx = prev.findIndex((q) => q.clientId === replaceClientId);
-        if (idx < 0) return prev; // slot artık yok (reset/regenerate edildi)
-        placed = true;
-        return prev.toSpliced(idx, 1, withSource);
+   *  @param sourceKey - hangi kaynaktan üretilecek (kaynak-başına denge korunur)
+   *  @param replaceClientId - verilirse displayed'da bu id'li skeleton'u gerçek
+   *    soruyla değiştirir; verilmezse queue'ya ekler.
+   *  @param extraExcluded - aynı seri içinde önceki çağrıların ürettiği metinler
+   *    (paralel/ardışık üretimde duplicate önlemek için).
+   *  @returns üretilen soru veya null (başarısız/atlandı) */
+  const fetchOneToQueue = useCallback(
+    async (
+      sourceKey: string | undefined,
+      replaceClientId?: string,
+      extraExcluded: { text: string }[] = [],
+    ): Promise<GeneratedQuestion | null> => {
+      // Eski draft'larda sourceKey olmayabilir → tek/ilk kaynağa düş (geriye dönük uyum).
+      const src = sources.find((s) => s.s3Key === sourceKey) ?? sources[0];
+      if (!src) return null;
+      const gen = generationRef.current;
+      const excluded = [
+        ...staticExcludedRef.current,
+        ...displayedRef.current
+          .filter((q) => !q.isPlaceholder)
+          .map((q) => ({ text: q.questionText })),
+        ...queueRef.current.map((q) => ({ text: q.questionText })),
+        ...extraExcluded,
+      ];
+      // Replenish route excluded'ı zorunlu (min 1) ister — boşsa çağrı yapma.
+      if (excluded.length === 0) return null;
+      const res = await fetch('/api/admin/trainings/ai/replenish-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sources: [src], model, excluded }),
       });
-      // Slot bulunamadıysa kaybetmeyelim — queue'ya at
-      if (!placed) {
+      if (!res.ok) {
+        // Replenish çağrıları arka plan; global banner panik yaratmasın.
+        return null;
+      }
+      const data = (await res.json()) as { question?: RawQuestion };
+      if (!data.question) return null;
+      // Çözülen kaynağın key'iyle etiketle (fallback durumunda da tutarlı sourceKey).
+      const withSource = withId(data.question, src.s3Key);
+      if (!withSource) return null; // sourceQuote yoktu → atla
+
+      // Bu çağrı başladıktan sonra reset/regenerate olduysa state'e yazma (stale).
+      if (generationRef.current !== gen) return null;
+
+      if (replaceClientId) {
+        // Skeleton slotunu gerçek soruyla in-place değiştir
+        let placed = false;
+        setDisplayed((prev) => {
+          const idx = prev.findIndex((q) => q.clientId === replaceClientId);
+          if (idx < 0) return prev; // slot artık yok (reset/regenerate edildi)
+          placed = true;
+          return prev.toSpliced(idx, 1, withSource);
+        });
+        // Slot bulunamadıysa kaybetmeyelim — queue'ya at
+        if (!placed) {
+          setQueue((prev) => [...prev, withSource]);
+        }
+      } else {
+        // Normal yedek doldurma → queue'ya ekle
         setQueue((prev) => [...prev, withSource]);
       }
-    } else {
-      // Normal yedek doldurma → queue'ya ekle
-      setQueue((prev) => [...prev, withSource]);
-    }
-    return true;
-  }, [sources, model]);
+      return withSource;
+    },
+    [sources, model],
+  );
 
-  const fireReplenish = useCallback(async (replaceClientId?: string) => {
-    setReplenishCount((c) => c + 1);
-    try {
-      const ok = await fetchOneToQueue(replaceClientId);
-      if (!ok && replaceClientId) {
-        // Replenish başarısız → skeleton'ı sessizce kaldır, display sayısı
-        // 1 azalır. Global error banner GÖSTERME — kullanıcı her silmede
-        // panik görmemeli; havuz tamamen tükendi ise zaten manuel "yedek
-        // üret" butonu var.
-        setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
+  const fireReplenish = useCallback(
+    async (sourceKey: string | undefined, replaceClientId?: string) => {
+      setReplenishCount((c) => c + 1);
+      try {
+        const result = await fetchOneToQueue(sourceKey, replaceClientId);
+        if (!result && replaceClientId) {
+          // Replenish başarısız → skeleton'ı sessizce kaldır (display 1 azalır).
+          setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
+        }
+      } catch {
+        if (replaceClientId) {
+          setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
+        }
+      } finally {
+        setReplenishCount((c) => Math.max(0, c - 1));
       }
-    } catch {
-      // Network/exception → yine sessiz; skeleton temizle.
-      if (replaceClientId) {
-        setDisplayed((prev) => prev.filter((q) => q.clientId !== replaceClientId));
-      }
-    } finally {
-      setReplenishCount((c) => Math.max(0, c - 1));
-    }
-  }, [fetchOneToQueue]);
+    },
+    [fetchOneToQueue],
+  );
 
   const refillQueue = useCallback(async () => {
-    // Yedek hedefi dinamik: TOTAL_GENERATE - displayTarget
-    // (manuel 0 → 10 yedek, manuel 5 → 15 yedek hedefi)
-    const queueTarget = Math.max(0, TOTAL_GENERATE - displayTargetSafe);
-    const need = queueTarget - queueRef.current.length;
-    if (need <= 0) return;
-    setReplenishCount((c) => c + need);
+    const n = sources.length;
+    if (n === 0) return;
+    // Kaynak-başına yedek hedefi = genPer - shownPer. Eksik kadar üret.
+    const genPer = distributeEven(TOTAL_GENERATE, n);
+    const shownPer = distributeEven(displayTargetSafe, n);
+    const perSourceNeed = sources.map((s, i) => {
+      const sourceKey = s.s3Key;
+      const target = Math.max(0, (genPer[i] ?? 0) - (shownPer[i] ?? 0));
+      // Geriye dönük uyum: sourceKey'i olmayan (eski draft) yedekleri ilk kaynağa say.
+      const have = queueRef.current.filter(
+        (q) => (q.sourceKey ?? sources[0]?.s3Key) === sourceKey,
+      ).length;
+      return { sourceKey, need: Math.max(0, target - have) };
+    });
+    const totalNeed = perSourceNeed.reduce((sum, p) => sum + p.need, 0);
+    if (totalNeed === 0) return;
+    setReplenishCount((c) => c + totalNeed);
     setError(null);
     try {
-      // Paralel — N paralel API çağrısı; her biri 1 soru getirir, queue'ya eklenir.
-      // Race güvenli çünkü her çağrı kendi `excluded` listesini hesaplar
-      // (current displayed + queue + static); ufak bir tekrar riski vardır
-      // ama tekrar gelen sorular zaten farklı clientId ile kaydedilir.
-      const results = await Promise.all(
-        Array.from({ length: need }, () => fetchOneToQueue()),
+      // Kaynaklar arası PARALEL, kaynak içi SERİ + accumulator: aynı kaynaktan
+      // ardışık üretilen sorular birbirinin excluded'ına girer (duplicate yedek önlenir).
+      const perSourceSuccess = await Promise.all(
+        perSourceNeed.map(async ({ sourceKey, need }) => {
+          const produced: { text: string }[] = [];
+          for (let k = 0; k < need; k++) {
+            const q = await fetchOneToQueue(sourceKey, undefined, produced);
+            if (q) produced.push({ text: q.questionText });
+          }
+          return produced.length;
+        }),
       );
-      // Manuel buton — kullanıcı geri bildirim bekliyor. Hepsi başarısızsa
-      // göster, kısmen başarılıysa sessiz (yedek arttı, kullanıcı görür).
-      const successCount = results.filter(Boolean).length;
+      const successCount = perSourceSuccess.reduce((sum, c) => sum + c, 0);
       if (successCount === 0) {
         setError('Yedek üretimi başarısız — model uygun cevap döndüremedi. Lütfen tekrar deneyin.');
       }
     } catch {
       setError('Yedek üretimi başarısız — lütfen tekrar deneyin.');
     } finally {
-      setReplenishCount((c) => Math.max(0, c - need));
+      setReplenishCount((c) => Math.max(0, c - totalNeed));
     }
-  }, [fetchOneToQueue, displayTargetSafe]);
+  }, [fetchOneToQueue, displayTargetSafe, sources]);
 
   const remove = useCallback(
     (clientId: string) => {
-      // In-place replenish: silinen kartın yeri korunur (en alta atılmaz).
-      // - Queue dolu ise: yedek aynı indekse girer (hemen görünür).
-      // - Queue boş ise: skeleton placeholder bırakılır, replenish API'si
-      //   döndüğünde gerçek soru o slota yerleşir.
+      // In-place + KAYNAK-BAŞINA: silinen kartın kaynağından yedek gelir (denge korunur).
       const currentDisplayed = displayedRef.current;
       const currentQueue = queueRef.current;
       const idx = currentDisplayed.findIndex((q) => q.clientId === clientId);
       if (idx < 0) return;
+      const removed = currentDisplayed[idx];
+      const sourceKey = removed.sourceKey;
 
-      if (currentQueue.length > 0) {
-        // 20 soruluk havuzdan in-place al — ekstra API çağrısı YOK.
-        // Havuz tüketilene kadar (10 silmeye kadar) yeni üretim gereksiz.
-        // Kullanıcı manuel "yedek üret" butonuyla cömertçe doldurabilir.
-        const pulled = currentQueue[0];
-        setQueue(currentQueue.slice(1));
+      // Aynı kaynaktan ilk yedeği bul.
+      const qIdx = currentQueue.findIndex((q) => q.sourceKey === sourceKey);
+      if (qIdx >= 0) {
+        const pulled = currentQueue[qIdx];
+        setQueue(currentQueue.filter((_, i) => i !== qIdx));
         setDisplayed(currentDisplayed.toSpliced(idx, 1, pulled));
       } else {
+        // O kaynağın yedeği yok → skeleton bırak, aynı kaynaktan replenish et.
         const placeholderId = newId();
         const placeholder: GeneratedQuestion = {
           questionText: '',
           options: [],
           correctIndex: 0,
           sourceQuote: '',
+          sourceKey,
           clientId: placeholderId,
           isPlaceholder: true,
         };
         setDisplayed(currentDisplayed.toSpliced(idx, 1, placeholder));
-        // Replenish bittiğinde skeleton'u gerçek soruyla değiştir
-        void fireReplenish(placeholderId);
+        void fireReplenish(sourceKey, placeholderId);
       }
     },
     [fireReplenish],
