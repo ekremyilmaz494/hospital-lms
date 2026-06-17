@@ -89,6 +89,8 @@ export interface UseAiQuestionQueueReturn {
   refillQueue: () => Promise<void>;
   isGenerating: boolean;
   isReplenishing: boolean;
+  /** Dondurulmuş hedefe göre üretilebilecek yedek sayısı (component refill butonu için). */
+  refillNeed: number;
 }
 
 interface RawQuestion {
@@ -188,6 +190,10 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
   const [isGenerating, setIsGenerating] = useState(false);
   const [replenishCount, setReplenishCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // ÜRETİM ANINDAKİ hedef — generate() ile DONDURULUR. Üretimden sonra manuel soru
+  // eklenip displayTarget (canlı) değişse bile refill hedefleri kaymaz; üretilmiş set
+  // neyse yedek dengesi de ona göre kalır. (Regenerate yeni hedefle yeniden dondurur.)
+  const [effectiveDisplayTarget, setEffectiveDisplayTarget] = useState(displayTargetSafe);
 
   // Race-safety: Refs for current state to use in fire-and-forget callbacks.
   const displayedRef = useRef<GeneratedQuestion[]>([]);
@@ -234,6 +240,8 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     const gen = (generationRef.current += 1); // yeni nesil; eski in-flight'lar geçersiz
     setIsGenerating(true);
     setError(null);
+    // Bu üretimin hedefini dondur — sonraki manuel-soru değişimleri refill'i kaydırmasın.
+    setEffectiveDisplayTarget(displayTargetSafe);
     try {
       const n = sources.length;
       // Toplam 20 üretim + toplam displayTarget gösterim, kaynaklara eşit bölünür.
@@ -396,7 +404,9 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     if (n === 0) return;
     // Kaynak-başına yedek hedefi = genPer - shownPer. Eksik kadar üret.
     const genPer = distributeEven(TOTAL_GENERATE, n);
-    const shownPer = distributeEven(displayTargetSafe, n);
+    // DONDURULMUŞ hedefi kullan — canlı displayTargetSafe değil (üretim sonrası manuel
+    // ekleme refill hedefini kaydırmasın).
+    const shownPer = distributeEven(effectiveDisplayTarget, n);
     const perSourceNeed = sources.map((s, i) => {
       const sourceKey = s.s3Key;
       const target = Math.max(0, (genPer[i] ?? 0) - (shownPer[i] ?? 0));
@@ -432,7 +442,11 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     } finally {
       setReplenishCount((c) => Math.max(0, c - totalNeed));
     }
-  }, [fetchOneToQueue, displayTargetSafe, sources]);
+  }, [fetchOneToQueue, effectiveDisplayTarget, sources]);
+
+  // Yedek üretilebilecek miktar — dondurulmuş hedefe göre (component refill butonu bunu
+  // gösterir; refillQueue ile birebir tutarlı kalır).
+  const refillNeed = Math.max(0, Math.max(0, TOTAL_GENERATE - effectiveDisplayTarget) - queue.length);
 
   const remove = useCallback(
     (clientId: string) => {
@@ -480,5 +494,6 @@ export function useAiQuestionQueue(options: UseAiQuestionQueueOptions): UseAiQue
     refillQueue,
     isGenerating,
     isReplenishing: replenishCount > 0,
+    refillNeed,
   };
 }

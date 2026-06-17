@@ -543,19 +543,18 @@ export default function AiQuestionGenerator({
                       Yeni yedek hazırlanıyor
                     </span>
                   )}
-                  {/* Yedek hedefin altındaysa toplu doldurma butonu. Hedef
-                      dinamik: TOTAL_GENERATE(20) - displayTarget. Manuel 0 ise
-                      hedef 10, manuel 5 ise hedef 15 yedek olur. */}
+                  {/* Yedek doldurma butonu — hook'un DONDURULMUŞ hedefine göre hesapladığı
+                      refillNeed (refillQueue ile birebir tutarlı; üretimden sonra manuel
+                      soru eklense bile kaymaz). */}
                   {(() => {
-                    const queueTargetMax = Math.max(0, 20 - aiCountToGenerate);
-                    const need = queueTargetMax - queue.queue.length;
+                    const need = queue.refillNeed;
                     if (need <= 0 || queue.isReplenishing) return null;
                     return (
                       <button
                         type="button"
                         className="aiq-refill-btn"
                         onClick={() => void queue.refillQueue()}
-                        title={`Yedekleri ${queueTargetMax}'e tamamla`}
+                        title={`${need} yedek daha üret`}
                       >
                         <RefreshCw size={12} strokeWidth={2.5} />
                         +{need} yedek üret
