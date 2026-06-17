@@ -150,3 +150,28 @@ describe('useAiQuestionQueue.generate — kaynak-başına ayrı sorgu', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+// ── refillNeed: dondurulmuş hedefe göre yedek ihtiyacı ──
+describe('useAiQuestionQueue.refillNeed — dondurulmuş hedef', () => {
+  beforeEach(() => {
+    mockSetState.mockReset();
+    mockUseState.mockImplementation((init: unknown) => [init, mockSetState]);
+    mockUseEffect.mockImplementation((cb: () => void) => { cb(); });
+    mockUseCallback.mockImplementation((cb: unknown) => cb);
+    mockUseRef.mockImplementation((init: unknown) => ({ current: init }));
+  });
+
+  it('queue boş + displayTarget 10 → refillNeed = 20-10 = 10', () => {
+    const { refillNeed } = useAiQuestionQueue({
+      sources: [{ s3Key: 'a' }], model: 'm', displayTarget: 10,
+    });
+    expect(refillNeed).toBe(10);
+  });
+
+  it('displayTarget 7 → refillNeed = 20-7 = 13 (yedek hedefi dondurulmuş targete göre)', () => {
+    const { refillNeed } = useAiQuestionQueue({
+      sources: [{ s3Key: 'a' }, { s3Key: 'b' }], model: 'm', displayTarget: 7,
+    });
+    expect(refillNeed).toBe(13);
+  });
+});
