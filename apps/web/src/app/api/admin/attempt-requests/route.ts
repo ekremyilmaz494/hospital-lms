@@ -70,6 +70,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       userIds.length > 0 && trainingIds.length > 0
         ? await prisma.trainingAssignment.findMany({
             where: {
+              organizationId,
               userId: { in: userIds },
               trainingId: { in: trainingIds },
             },

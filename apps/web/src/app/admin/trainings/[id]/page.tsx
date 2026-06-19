@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft, GraduationCap, Users, TrendingUp, Clock, Edit, Play, BarChart3,
@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { StatCard } from '@/components/shared/stat-card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFetch } from '@/hooks/use-fetch';
+import { resolveCategoryMeta } from '@/lib/training-categories';
 import { AssignStaffModal } from './assign-staff-modal';
 import { IncompleteSegmentsModal } from './incomplete-segments-modal';
 import { useToast } from '@/components/shared/toast';
@@ -64,9 +65,25 @@ interface TrainingDetail {
   failedCount: number;
   avgScore: number;
   status: string;
-  assignedStaff: { assignmentId: string; userId: string; name: string; department: string; attempt: number; progress: number; preScore: number | null; postScore: number | null; status: string; completedAt: string }[];
+  statusBreakdown: { passed: number; failed: number; in_progress: number; assigned: number };
   videos: { id: string; title: string; videoUrl: string; duration: string; order: number; contentType: string }[];
   questions: { id: string; text: string; points: number; options: { id: string; text: string; isCorrect: boolean; order: number }[] }[];
+}
+
+// Personel listesi ayrı, sayfalı endpoint'ten (`[id]/staff`) gelir.
+interface StaffRow {
+  assignmentId: string;
+  userId: string;
+  name: string;
+  department: string;
+  attempt: number;
+  progress: number;
+  preScore: number | null;
+  postScore: number | null;
+  status: string;
+  completedAt: string;
+  signedAt: string | null;
+  signatureMethod: string | null;
 }
 
 const statusMap: Record<string, { label: string; bg: string; text: string; icon: typeof CheckCircle2 }> = {
@@ -84,17 +101,14 @@ const STATUS_FILTERS: { value: StaffStatusFilter; label: string }[] = [
   { value: 'incomplete', label: 'Tamamlamadı' },
 ];
 
-// "Tamamladı" sınava giren ve sonuçlanan herkesi kapsar (geçti + kaldı);
-// "Tamamlamadı" hâlâ devam edenler ile hiç başlamayanları birleştirir.
-// Stat kartlarındaki "TAMAMLAYAN" sayısının semantiği ile aynı.
-const COMPLETED_STATUSES = new Set(['passed', 'failed']);
-const INCOMPLETE_STATUSES = new Set(['in_progress', 'assigned']);
-
 export default function TrainingDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = typeof params?.id === 'string' ? params.id : null;
   const { data: training, isLoading, error, refetch } = useFetch<TrainingDetail>(id ? `/api/admin/trainings/${id}` : null);
+  // Kategori slug'ını etiket+renge çöz (silinmiş kategori → "Kategorisiz")
+  const { data: catData } = useFetch<{ value: string; label: string }[]>('/api/admin/training-categories');
+  const dbCategories = catData ?? [];
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('staff');
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
@@ -127,16 +141,23 @@ export default function TrainingDetailPage() {
   // Hooks early return'lerden ÖNCE çağrılmalı (React Rules of Hooks). training
   // henüz yüklenmediğinde boş array üzerinde hesap döner; yüklendiğinde gerçek
   // sayımı verir — render iterasyonları arasında hook sırası sabit kalır.
-  const assignedStaff = training?.assignedStaff ?? [];
-  const statusCounts = useMemo(() => {
-    let completed = 0;
-    let incomplete = 0;
-    for (const s of assignedStaff) {
-      if (COMPLETED_STATUSES.has(s.status)) completed += 1;
-      else if (INCOMPLETE_STATUSES.has(s.status)) incomplete += 1;
-    }
-    return { completed, incomplete };
-  }, [assignedStaff]);
+  // Personel listesi sunucu-taraflı sayfalanır/aranır (büyük org'larda tüm
+  // atamaları çekmek ağırdı). Stat sayaçları ayrı sunucu agregasyonundan
+  // (statusBreakdown) gelir → sayfalamadan etkilenmez.
+  const STAFF_LIMIT = 20;
+  const [staffPage, setStaffPage] = useState(1);
+  const [debouncedStaffSearch, setDebouncedStaffSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedStaffSearch(staffSearch.trim()), 300);
+    return () => clearTimeout(t);
+  }, [staffSearch]);
+
+  const staffQs = new URLSearchParams({ page: String(staffPage), limit: String(STAFF_LIMIT) });
+  if (debouncedStaffSearch) staffQs.set('search', debouncedStaffSearch);
+  if (staffStatusFilter !== 'all') staffQs.set('status', staffStatusFilter);
+  const { data: staffData, isLoading: staffLoading } = useFetch<{
+    assignedStaff: StaffRow[]; total: number; page: number; limit: number;
+  }>(id ? `/api/admin/trainings/${id}/staff?${staffQs.toString()}` : null);
 
   if (!id) {
     return <div className="flex items-center justify-center h-64"><div className="text-sm" style={{ color: K.TEXT_MUTED }}>Eğitim bulunamadı</div></div>;
@@ -156,11 +177,23 @@ export default function TrainingDetailPage() {
 
   const trainingVideos = training.videos ?? [];
   const trainingQuestions = training.questions ?? [];
+  const catMeta = resolveCategoryMeta(training.category, dbCategories);
+
+  // Sayfalama/filtre/arama için türetilenler
+  const statusBreakdown = training.statusBreakdown ?? { passed: 0, failed: 0, in_progress: 0, assigned: 0 };
+  const statusCounts = {
+    completed: statusBreakdown.passed + statusBreakdown.failed,
+    incomplete: statusBreakdown.in_progress + statusBreakdown.assigned,
+  };
+  const totalAssigned = training.assignedCount ?? 0;
+  const staffRows = staffData?.assignedStaff ?? [];
+  const staffTotal = staffData?.total ?? 0;
+  const staffTotalPages = Math.max(1, Math.ceil(staffTotal / STAFF_LIMIT));
   // PDF içerikler son sınava geçişi tetiklemez — atama ancak en az 1 video/ses varsa yapılabilir
   const hasPlayableContent = trainingVideos.some(v => v.contentType === 'video' || v.contentType === 'audio');
 
   const tabs = [
-    { id: 'staff', label: 'Personel Durumu', count: assignedStaff.length },
+    { id: 'staff', label: 'Personel Durumu', count: totalAssigned },
     { id: 'videos', label: 'Videolar', count: training.videoCount ?? 0 },
     { id: 'questions', label: 'Sorular', count: training.questionCount ?? 0 },
   ];
@@ -216,7 +249,7 @@ export default function TrainingDetailPage() {
               {training.category ? (
                 <>
                   <ChevronRight className="h-3 w-3 shrink-0" />
-                  <span className="truncate" style={{ color: K.TEXT_SECONDARY }}>{training.category}</span>
+                  <span className="truncate" style={{ color: K.TEXT_SECONDARY }}>{catMeta.label}</span>
                 </>
               ) : null}
             </nav>
@@ -240,7 +273,7 @@ export default function TrainingDetailPage() {
             {training.title}
           </h1>
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {training.category ? <MetaChip icon={GraduationCap} label={training.category} /> : null}
+            {training.category ? <MetaChip icon={GraduationCap} label={catMeta.label} /> : null}
             <MetaChip icon={Award} label={`Baraj %${training.passingScore}`} />
             <MetaChip icon={RotateCcw} label={`${training.maxAttempts} deneme`} />
             {training.examDuration ? <MetaChip icon={Clock} label={`${training.examDuration} dk sınav`} /> : null}
@@ -543,26 +576,8 @@ export default function TrainingDetailPage() {
             {/* Staff Tab */}
             {activeTab === 'staff' && (
               <motion.div key="staff" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                {assignedStaff.length > 0 ? (() => {
-                  const q = staffSearch.trim().toLocaleLowerCase('tr');
-                  const byStatus = staffStatusFilter === 'all'
-                    ? assignedStaff
-                    : assignedStaff.filter(s =>
-                        staffStatusFilter === 'completed'
-                          ? COMPLETED_STATUSES.has(s.status)
-                          : INCOMPLETE_STATUSES.has(s.status)
-                      );
-                  const filteredStaff = q
-                    ? byStatus.filter(s => {
-                        const statusLabel = (statusMap[s.status] ?? statusMap.assigned).label.toLocaleLowerCase('tr');
-                        return (
-                          s.name.toLocaleLowerCase('tr').includes(q) ||
-                          (s.department ?? '').toLocaleLowerCase('tr').includes(q) ||
-                          statusLabel.includes(q)
-                        );
-                      })
-                    : byStatus;
-                  const filterActive = staffStatusFilter !== 'all' || q.length > 0;
+                {(() => {
+                  const filterActive = staffStatusFilter !== 'all' || debouncedStaffSearch.length > 0;
                   return (
                   <div>
                     {/* Status Filter Chips */}
@@ -570,7 +585,7 @@ export default function TrainingDetailPage() {
                       {STATUS_FILTERS.map(f => {
                         const isActive = staffStatusFilter === f.value;
                         const count = f.value === 'all'
-                          ? assignedStaff.length
+                          ? totalAssigned
                           : f.value === 'completed'
                             ? statusCounts.completed
                             : statusCounts.incomplete;
@@ -583,7 +598,7 @@ export default function TrainingDetailPage() {
                           <button
                             key={f.value}
                             type="button"
-                            onClick={() => setStaffStatusFilter(f.value)}
+                            onClick={() => { setStaffStatusFilter(f.value); setStaffPage(1); }}
                             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
                             style={{
                               background: isActive ? palette.activeBg : palette.bg,
@@ -607,15 +622,15 @@ export default function TrainingDetailPage() {
                         <input
                           type="text"
                           value={staffSearch}
-                          onChange={e => setStaffSearch(e.target.value)}
-                          placeholder="İsim, departman veya durum ara..."
+                          onChange={e => { setStaffSearch(e.target.value); setStaffPage(1); }}
+                          placeholder="İsim veya e-posta ara..."
                           className="w-full rounded-lg pl-9 pr-9 py-2 text-sm outline-none focus:ring-2 focus:ring-offset-0"
                           style={{ border: `1px solid ${K.BORDER}`, background: K.SURFACE, color: K.TEXT_PRIMARY }}
                         />
                         {staffSearch && (
                           <button
                             type="button"
-                            onClick={() => setStaffSearch('')}
+                            onClick={() => { setStaffSearch(''); setStaffPage(1); }}
                             aria-label="Aramayı temizle"
                             className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1"
                             style={{ color: K.TEXT_MUTED }}
@@ -627,11 +642,11 @@ export default function TrainingDetailPage() {
                       {filterActive && (
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>
-                            {filteredStaff.length} / {assignedStaff.length} personel
+                            {staffTotal} personel bulundu
                           </span>
                           <button
                             type="button"
-                            onClick={() => { setStaffStatusFilter('all'); setStaffSearch(''); }}
+                            onClick={() => { setStaffStatusFilter('all'); setStaffSearch(''); setStaffPage(1); }}
                             className="text-xs font-semibold underline"
                             style={{ color: K.PRIMARY }}
                           >
@@ -667,13 +682,19 @@ export default function TrainingDetailPage() {
                     </div>
                     {/* Data Rows */}
                     <div>
-                      {filteredStaff.length === 0 ? (
-                        <div className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>
-                          {staffStatusFilter !== 'all' && !q
-                            ? 'Bu duruma uyan personel yok.'
-                            : 'Aramaya uyan personel bulunamadı.'}
+                      {staffLoading ? (
+                        <div className="flex items-center justify-center gap-2 text-sm py-8" style={{ color: K.TEXT_MUTED }}>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Yükleniyor…
                         </div>
-                      ) : filteredStaff.map((s) => {
+                      ) : staffRows.length === 0 ? (
+                        <div className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>
+                          {totalAssigned === 0
+                            ? 'Bu eğitime henüz personel atanmadı.'
+                            : filterActive
+                              ? 'Aramaya/filtreye uyan personel bulunamadı.'
+                              : 'Personel bulunamadı.'}
+                        </div>
+                      ) : staffRows.map((s) => {
                         const st = statusMap[s.status] || statusMap.assigned;
                         const StatusIcon = st.icon;
                         return (
@@ -739,11 +760,38 @@ export default function TrainingDetailPage() {
                         );
                       })}
                     </div>
+
+                    {/* Sayfalama */}
+                    {staffTotal > STAFF_LIMIT && (
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs" style={{ color: K.TEXT_MUTED, fontFamily: 'var(--font-mono)' }}>
+                          Sayfa {staffPage} / {staffTotalPages} · {staffTotal} personel
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={staffPage <= 1 || staffLoading}
+                            onClick={() => setStaffPage((p) => Math.max(1, p - 1))}
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                            style={{ border: `1px solid ${K.BORDER}`, background: K.SURFACE, color: K.TEXT_SECONDARY }}
+                          >
+                            Önceki
+                          </button>
+                          <button
+                            type="button"
+                            disabled={staffPage >= staffTotalPages || staffLoading}
+                            onClick={() => setStaffPage((p) => Math.min(staffTotalPages, p + 1))}
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                            style={{ border: `1px solid ${K.BORDER}`, background: K.SURFACE, color: K.TEXT_SECONDARY }}
+                          >
+                            Sonraki
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   );
-                })() : (
-                  <div className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Bu eğitime henüz personel atanmadı.</div>
-                )}
+                })()}
               </motion.div>
             )}
 

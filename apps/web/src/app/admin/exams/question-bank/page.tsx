@@ -101,6 +101,9 @@ export default function QuestionBankPage() {
 
   // Import state
   const [importing, setImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState<{ rowNumber: number; reason: string }[]>([]);
+  const [importErrorsTruncated, setImportErrorsTruncated] = useState(false);
+  const [importErrorTotal, setImportErrorTotal] = useState(0);
 
   const queryParams = new URLSearchParams({ limit: '100' });
   if (searchQuery) queryParams.set('search', searchQuery);
@@ -238,6 +241,7 @@ export default function QuestionBankPage() {
 
   const handleImport = async (file: File) => {
     setImporting(true);
+    setImportErrors([]);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -245,9 +249,24 @@ export default function QuestionBankPage() {
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        imported?: number;
+        errors?: number;
+        total?: number;
+        errorRows?: { rowNumber: number; reason: string }[];
+        errorRowsTruncated?: boolean;
+        error?: string;
+      };
       if (!res.ok) throw new Error(data.error || 'İçe aktarma başarısız');
-      toast(`${data.imported} soru içe aktarıldı${data.errors > 0 ? `, ${data.errors} hatalı satır atlandı` : ''}`, 'success');
+      const imported = data.imported ?? 0;
+      const errors = data.errors ?? 0;
+      toast(
+        `${imported} soru içe aktarıldı${errors > 0 ? `, ${errors} hatalı satır atlandı` : ''}`,
+        imported > 0 ? 'success' : 'error',
+      );
+      setImportErrors(data.errorRows ?? []);
+      setImportErrorsTruncated(data.errorRowsTruncated ?? false);
+      setImportErrorTotal(errors);
       refetch();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'İçe aktarma hatası', 'error');
@@ -291,6 +310,39 @@ export default function QuestionBankPage() {
         <StatCard title="En Çok Kategori" value={stats.topCategory} icon={Tag} accentColor={K.ACCENT} />
         <StatCard title="Bu Ay Eklenen" value={stats.thisMonth} icon={Plus} accentColor={K.INFO} />
       </div>
+
+      {/* İçe aktarma hata raporu — hangi satır neden atlandı */}
+      {importErrors.length > 0 && (
+        <div style={{ ...cardStyle, borderColor: K.WARNING, background: K.WARNING_BG }} className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <div style={{ fontSize: 14, fontWeight: 700, color: K.TEXT_PRIMARY, marginBottom: 8 }}>
+                İçe aktarmada {importErrorTotal} satır atlandı
+              </div>
+              <ul className="space-y-1">
+                {importErrors.map((e) => (
+                  <li key={e.rowNumber} style={{ fontSize: 12, color: K.TEXT_SECONDARY }}>
+                    <strong>Satır {e.rowNumber}:</strong> {e.reason}
+                  </li>
+                ))}
+              </ul>
+              {importErrorsTruncated && (
+                <div style={{ fontSize: 12, color: K.TEXT_MUTED, marginTop: 6 }}>
+                  …ve {importErrorTotal - importErrors.length} satır daha
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setImportErrors([])}
+              aria-label="Hata raporunu kapat"
+              style={{ color: K.TEXT_MUTED }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters + Import */}
       <div className="flex flex-wrap items-center gap-2">

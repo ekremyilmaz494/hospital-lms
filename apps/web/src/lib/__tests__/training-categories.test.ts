@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { TRAINING_CATEGORIES } from '../training-categories'
+import { TRAINING_CATEGORIES, resolveCategoryMeta, UNCATEGORIZED_LABEL } from '../training-categories'
 
 describe('TRAINING_CATEGORIES', () => {
   it('tam olarak 8 kategori içerir', () => {
@@ -69,5 +69,49 @@ describe('TRAINING_CATEGORIES', () => {
     type IsReadonly = typeof TRAINING_CATEGORIES extends readonly unknown[] ? true : false
     const check: IsReadonly = true
     expect(check).toBe(true)
+  })
+})
+
+describe('resolveCategoryMeta', () => {
+  it('yerleşik slug → doğru etiket + marka rengi, orphan değil', () => {
+    const meta = resolveCategoryMeta('enfeksiyon')
+    expect(meta.label).toBe('Enfeksiyon')
+    expect(meta.color).toBe('#ef4444') // TRAINING_CATEGORIES'teki marka rengi
+    expect(meta.isOrphan).toBe(false)
+  })
+
+  it('bilinmeyen/silinmiş slug → "Kategorisiz", orphan', () => {
+    const meta = resolveCategoryMeta('silinmis-kategori')
+    expect(meta.label).toBe(UNCATEGORIZED_LABEL)
+    expect(meta.isOrphan).toBe(true)
+  })
+
+  it('null/undefined/boş → "Kategorisiz", orphan', () => {
+    expect(resolveCategoryMeta(null).isOrphan).toBe(true)
+    expect(resolveCategoryMeta(undefined).label).toBe(UNCATEGORIZED_LABEL)
+    expect(resolveCategoryMeta('').isOrphan).toBe(true)
+  })
+
+  it('dbCategories ile özel slug çözülür (slug-hash rengi, orphan değil)', () => {
+    const db = [{ value: 'kardiyoloji', label: 'Kardiyoloji' }]
+    const meta = resolveCategoryMeta('kardiyoloji', db)
+    expect(meta.label).toBe('Kardiyoloji')
+    expect(meta.isOrphan).toBe(false)
+    expect(meta.color).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+
+  it('aynı slug-hash rengi deterministiktir', () => {
+    const db = [{ value: 'kardiyoloji', label: 'Kardiyoloji' }]
+    expect(resolveCategoryMeta('kardiyoloji', db).color).toBe(
+      resolveCategoryMeta('kardiyoloji', db).color,
+    )
+  })
+
+  it('DB etiketi yerleşik etiketi geçersiz kılar (admin yeniden adlandırması)', () => {
+    const db = [{ value: 'enfeksiyon', label: 'Enfeksiyon Kontrolü' }]
+    const meta = resolveCategoryMeta('enfeksiyon', db)
+    expect(meta.label).toBe('Enfeksiyon Kontrolü')
+    expect(meta.color).toBe('#ef4444') // renk yine yerleşik markadan
+    expect(meta.isOrphan).toBe(false)
   })
 })

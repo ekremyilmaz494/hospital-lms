@@ -133,7 +133,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
       files: Array<{
         fileName: string
         contentType: string
-        fileSize?: number
+        fileSize: number
         title?: string
         category?: string
         description?: string
@@ -152,26 +152,37 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
       return errorResponse('Tek seferde en fazla 20 dosya yüklenebilir', 400)
     }
 
+    // fileSize ZORUNLU — depolama kotası her zaman hesaplanabilsin. Eksik/geçersiz
+    // gönderen client'lar kotayı atlayıp DB'ye fileSizeBytes=null yazdırıyordu
+    // (kalıcı yanlış kullanım sayımı). Presign etmeden 400 ile reddet.
+    const invalidSizeFile = body.files.find(
+      (f) => typeof f.fileSize !== 'number' || !Number.isFinite(f.fileSize) || f.fileSize <= 0,
+    )
+    if (invalidSizeFile) {
+      return errorResponse(
+        `Dosya boyutu eksik veya geçersiz: "${invalidSizeFile.fileName ?? 'bilinmeyen dosya'}". Lütfen tekrar deneyin.`,
+        400,
+      )
+    }
+
     // Storage quota — toplam yüklenecek byte'ı önceden hesap et, organizasyonun
-    // limitini aşıyorsa hiç presign etmeden 413 dön. Plana göre maxStorageGb
-    // çekilir; client fileSize göndermezse 0 sayılır (geriye uyumluluk).
-    const totalIncomingBytes = body.files.reduce((s, f) => s + (typeof f.fileSize === 'number' && f.fileSize > 0 ? f.fileSize : 0), 0)
-    if (totalIncomingBytes > 0) {
-      const subscription = await prisma.organizationSubscription.findFirst({
-        where: { organizationId },
-        include: { plan: { select: { maxStorageGb: true } } },
-      })
-      const maxGb = subscription?.plan?.maxStorageGb ?? 10
-      const maxBytes = maxGb * 1024 * 1024 * 1024
-      const usedBytes = await getOrgStorageBytes(organizationId)
-      if (usedBytes + totalIncomingBytes > maxBytes) {
-        const usedGb = (usedBytes / (1024 * 1024 * 1024)).toFixed(1)
-        const incomingGb = (totalIncomingBytes / (1024 * 1024 * 1024)).toFixed(2)
-        return errorResponse(
-          `Depolama limitinizi aşıyor: ${usedGb}GB kullanılıyor + ${incomingGb}GB yüklenmek isteniyor (limit ${maxGb}GB). Planınızı yükseltin veya dosyalarınızı azaltın.`,
-          413,
-        )
-      }
+    // limitini aşıyorsa hiç presign etmeden 413 dön. fileSize artık garanti
+    // olduğundan kota kontrolü her istekte çalışır.
+    const totalIncomingBytes = body.files.reduce((s, f) => s + Math.floor(f.fileSize), 0)
+    const subscription = await prisma.organizationSubscription.findFirst({
+      where: { organizationId },
+      include: { plan: { select: { maxStorageGb: true } } },
+    })
+    const maxGb = subscription?.plan?.maxStorageGb ?? 10
+    const maxBytes = maxGb * 1024 * 1024 * 1024
+    const usedBytes = await getOrgStorageBytes(organizationId)
+    if (usedBytes + totalIncomingBytes > maxBytes) {
+      const usedGb = (usedBytes / (1024 * 1024 * 1024)).toFixed(1)
+      const incomingGb = (totalIncomingBytes / (1024 * 1024 * 1024)).toFixed(2)
+      return errorResponse(
+        `Depolama limitinizi aşıyor: ${usedGb}GB kullanılıyor + ${incomingGb}GB yüklenmek isteniyor (limit ${maxGb}GB). Planınızı yükseltin veya dosyalarınızı azaltın.`,
+        413,
+      )
     }
 
     // Her dosya bağımsız: presign + DB create paralel çalıştır.
@@ -232,7 +243,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
               difficulty: file.difficulty || 'BASIC',
               targetRoles: file.targetRoles && file.targetRoles.length > 0 ? file.targetRoles : ['all'],
               smgPoints: typeof file.smgPoints === 'number' ? file.smgPoints : 0,
-              fileSizeBytes: typeof file.fileSize === 'number' && file.fileSize > 0 ? BigInt(Math.floor(file.fileSize)) : null,
+              fileSizeBytes: BigInt(Math.floor(file.fileSize)),
               isActive: true,
               organizationId,
               createdById: dbUser.id,

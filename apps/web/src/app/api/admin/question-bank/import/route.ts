@@ -11,6 +11,7 @@ export const maxDuration = 300
 
 const CORRECT_MAP: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 }
 const VALID_DIFFICULTIES = ['easy', 'medium', 'hard']
+const MAX_ERROR_ROWS = 50
 
 export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
   const formData = await request.formData()
@@ -42,6 +43,15 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       points: number
     }[] = []
     let errorCount = 0
+    // Hatalı satırların gerekçesini kullanıcıya bildir — yalnız "N satır hatalı"
+    // demek yetersizdi (admin hangi satırı düzelteceğini bilemiyordu). Bellek ve
+    // response boyutunu korumak için ilk MAX_ERROR_ROWS satır detaylandırılır;
+    // errorCount toplam sayacı limitsiz devam eder.
+    const errorRows: { rowNumber: number; reason: string }[] = []
+    const pushError = (rowNumber: number, reason: string) => {
+      errorCount++
+      if (errorRows.length < MAX_ERROR_ROWS) errorRows.push({ rowNumber, reason })
+    }
 
     ws.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return // Header satırı atla
@@ -57,10 +67,10 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       const points = Number(row.getCell(9).value) || 1
 
       // Validasyon
-      if (text.length < 5) { errorCount++; return }
-      if (!optA || !optB || !optC || !optD) { errorCount++; return }
+      if (text.length < 5) { pushError(rowNumber, 'Soru metni çok kısa (en az 5 karakter)'); return }
+      if (!optA || !optB || !optC || !optD) { pushError(rowNumber, 'Tüm şıklar (A-D) doldurulmalı'); return }
       const correctIdx = CORRECT_MAP[correctLetter]
-      if (correctIdx === undefined) { errorCount++; return }
+      if (correctIdx === undefined) { pushError(rowNumber, 'Doğru cevap A, B, C veya D olmalı'); return }
       const diff = VALID_DIFFICULTIES.includes(difficulty) ? difficulty : 'medium'
 
       rows.push({
@@ -116,6 +126,8 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       imported: rows.length,
       errors: errorCount,
       total: rows.length + errorCount,
+      errorRows,
+      errorRowsTruncated: errorCount > errorRows.length,
     })
   } catch {
     return errorResponse(

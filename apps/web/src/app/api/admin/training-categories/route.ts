@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createTrainingCategorySchema } from '@/lib/validations'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
+import { ensureDefaultTrainingCategories } from '@/lib/training-categories-seed'
 
 /** Türkçe karakterleri normalize edip URL-safe slug üretir */
 function toSlug(label: string): string {
@@ -19,31 +20,27 @@ function toSlug(label: string): string {
 }
 
 export const GET = withAdminRoute(async ({ organizationId }) => {
-  let categories = await prisma.trainingCategory.findMany({
+  const categories = await prisma.trainingCategory.findMany({
     where: { organizationId },
     orderBy: { order: 'asc' },
     select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
   })
 
-  // DB'de kayıt yoksa varsayılanları DB'ye seed'le (tek seferlik)
+  // DB boşsa: varsayılanları DB'ye YAZMADAN salt-okunur döndür (CLAUDE.md
+  // "GET'te write YASAK"). id:null = henüz kalıcı değil. Wizard yalnız `value`
+  // kullandığından sorunsuz çalışır; ayar sayfası id:null görünce seed
+  // endpoint'ini tetikler. Kalıcı seed kategori ekleme (POST) ve org-kurulumda
+  // yapılır (yeni org'lar zaten dolu gelir; bu fallback legacy/boş org köprüsü).
   if (categories.length === 0) {
-    await prisma.trainingCategory.createMany({
-      data: TRAINING_CATEGORIES.map((cat, i) => ({
-        organizationId,
-        value: cat.value,
-        label: cat.label,
-        icon: cat.icon,
-        order: i,
-        isDefault: false,
-      })),
-      skipDuplicates: true,
-    })
-
-    categories = await prisma.trainingCategory.findMany({
-      where: { organizationId },
-      orderBy: { order: 'asc' },
-      select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
-    })
+    const defaults = TRAINING_CATEGORIES.map((cat, i) => ({
+      id: null as string | null,
+      value: cat.value,
+      label: cat.label,
+      icon: cat.icon,
+      order: i,
+      isDefault: true,
+    }))
+    return jsonResponse(defaults, 200, { 'Cache-Control': 'no-store' })
   }
 
   // Wizard'ın bu listeyi anlık görmesi gerekiyor (admin kategori ekledikten sonra
@@ -68,6 +65,10 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
   if (!value) {
     return errorResponse('Kategori adından geçerli bir slug üretilemedi', 400)
   }
+
+  // GET artık seed etmiyor — DB boşsa önce varsayılanları kalıcılaştır ki order
+  // hesabı ve sonraki düzenle/sil/sırala işlemleri gerçek id'lerle çalışsın.
+  await ensureDefaultTrainingCategories(organizationId)
 
   // Unique kontrolü
   const existing = await prisma.trainingCategory.findUnique({

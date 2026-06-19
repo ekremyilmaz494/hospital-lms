@@ -31,8 +31,10 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
   const { id } = params
   const orgId = organizationId
 
-  // Paralel: training + assignment istatistikleri + tüm atamalar + imza/skor
-  const [training, assignmentStats, recentAssignments, signedCount, avgScoreResult] = await Promise.all([
+  // Paralel: training + assignment istatistikleri + imza/skor.
+  // Personel listesi artık ayrı, sunucu-taraflı sayfalı endpoint'ten gelir
+  // (`[id]/staff`) — 5000+ atamalı org'larda tüm atamaları çekmek ağırdı.
+  const [training, assignmentStats, signedCount, avgScoreResult] = await Promise.all([
     prisma.training.findFirst({
       where: { id, organizationId: orgId },
       include: {
@@ -45,16 +47,6 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
       by: ['status'],
       where: { trainingId: id },
       _count: true,
-    }),
-    prisma.trainingAssignment.findMany({
-      where: { trainingId: id },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, departmentRel: { select: { name: true } } } },
-        examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1 },
-      },
-      orderBy: { assignedAt: 'desc' },
-      // Tüm atamalar gönderilir; frontend tarafında arama kutusu ile filtreleniyor.
-      // 5000+ atamaya ulaşan org'larda sayfalama eklenir.
     }),
     prisma.examAttempt.count({
       where: { assignment: { trainingId: id }, signedAt: { not: null } },
@@ -81,33 +73,15 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
   const completedCount = passedCount + failedCount
   const avgScore = avgScoreResult._avg.postExamScore ? Math.round(Number(avgScoreResult._avg.postExamScore)) : 0
 
-  // Transform recent assignments for frontend
-  const assignedStaff = recentAssignments.map(a => {
-    const latestAttempt = a.examAttempts[0]
-    const progress = (() => {
-      if (!latestAttempt) return 0
-      const steps = [
-        !!latestAttempt.preExamCompletedAt,
-        !!latestAttempt.videosCompletedAt,
-        !!latestAttempt.postExamCompletedAt,
-      ]
-      return Math.round((steps.filter(Boolean).length / 3) * 100)
-    })()
-    return {
-      assignmentId: a.id,
-      userId: a.user.id,
-      name: `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim() || a.user.email,
-      department: a.user.departmentRel?.name ?? '',
-      attempt: a.currentAttempt,
-      progress,
-      preScore: latestAttempt?.preExamScore ? Number(latestAttempt.preExamScore) : null,
-      postScore: latestAttempt?.postExamScore ? Number(latestAttempt.postExamScore) : null,
-      status: a.status,
-      completedAt: a.completedAt ? a.completedAt.toISOString() : '',
-      signedAt: latestAttempt?.signedAt?.toISOString() ?? null,
-      signatureMethod: latestAttempt?.signatureMethod ?? null,
-    }
-  })
+  // Sekme sayaçları/stat kartları için tam-kapsam durum dağılımı (sayfalamadan
+  // bağımsız). Personel listesi sayfalı geldiğinden client artık bunu kendi
+  // hesaplayamaz — sunucu groupBy'dan beslenir.
+  const statusBreakdown = {
+    passed: passedCount,
+    failed: failedCount,
+    in_progress: statusMap.get('in_progress') ?? 0,
+    assigned: statusMap.get('assigned') ?? 0,
+  }
 
   return jsonResponse({
     id: training.id,
@@ -132,7 +106,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
     signedCount,
     videoCount: training._count.videos,
     questionCount: training._count.questions,
-    assignedStaff,
+    statusBreakdown,
     videos: training.videos.map((v, i) => ({
       id: v.id,
       title: v.title,

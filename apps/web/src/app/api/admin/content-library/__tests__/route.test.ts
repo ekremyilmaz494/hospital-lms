@@ -124,8 +124,8 @@ describe('POST /api/admin/content-library — Storage quota', () => {
     expect(prismaMock.contentLibrary.create).toHaveBeenCalledOnce()
   })
 
-  it('fileSize gönderilmediğinde quota kontrolü atlanır (geriye uyumluluk)', async () => {
-    // totalIncomingBytes = 0 → quota check'e girmemeli
+  it('fileSize gönderilmediğinde 400 döner, presign edilmez, DB\'ye yazılmaz', async () => {
+    // fileSize artık ZORUNLU — eksikse kota hesaplanamaz, istek reddedilir
     const res = await POST(uploadRequest({
       files: [{
         fileName: 'no-size.mp4',
@@ -133,10 +133,29 @@ describe('POST /api/admin/content-library — Storage quota', () => {
       }],
     }))
 
-    expect(res.status).toBe(201)
-    // Subscription lookup quota path'inde yapılır; fileSize yoksa hiç çağrılmamalı
-    expect(prismaMock.organizationSubscription.findFirst).not.toHaveBeenCalled()
-    expect(s3Mock.getOrgStorageBytes).not.toHaveBeenCalled()
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('Dosya boyutu eksik veya geçersiz')
+    expect(s3Mock.getUploadUrl).not.toHaveBeenCalled()
+    expect(prismaMock.contentLibrary.create).not.toHaveBeenCalled()
+  })
+
+  it('fileSize <= 0 olduğunda 400 döner', async () => {
+    const res = await POST(uploadRequest({
+      files: [{ fileName: 'zero.mp4', contentType: 'video/mp4', fileSize: 0 }],
+    }))
+
+    expect(res.status).toBe(400)
+    expect(prismaMock.contentLibrary.create).not.toHaveBeenCalled()
+  })
+
+  it('fileSize number değilse 400 döner', async () => {
+    const res = await POST(uploadRequest({
+      files: [{ fileName: 'bad.mp4', contentType: 'video/mp4', fileSize: 'abc' }],
+    }))
+
+    expect(res.status).toBe(400)
+    expect(s3Mock.getUploadUrl).not.toHaveBeenCalled()
   })
 })
 
@@ -154,6 +173,7 @@ describe('POST /api/admin/content-library — Duplicate detection (P2002)', () =
       files: [{
         fileName: 'dupe.mp4',
         contentType: 'video/mp4',
+        fileSize: 1000,
       }],
     }))
 
@@ -173,6 +193,7 @@ describe('POST /api/admin/content-library — Duplicate detection (P2002)', () =
       files: [{
         fileName: 'other.mp4',
         contentType: 'video/mp4',
+        fileSize: 1000,
       }],
     }))
 
@@ -193,8 +214,8 @@ describe('POST /api/admin/content-library — Duplicate detection (P2002)', () =
 
     const res = await POST(uploadRequest({
       files: [
-        { fileName: 'a.mp4', contentType: 'video/mp4' },
-        { fileName: 'dupe.mp4', contentType: 'video/mp4' },
+        { fileName: 'a.mp4', contentType: 'video/mp4', fileSize: 1000 },
+        { fileName: 'dupe.mp4', contentType: 'video/mp4', fileSize: 1000 },
       ],
     }))
 

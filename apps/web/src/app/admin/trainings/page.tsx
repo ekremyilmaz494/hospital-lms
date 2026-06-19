@@ -15,6 +15,7 @@ const BulkAssignModal = dynamic(
 import { KStatCard } from '@/components/admin/k-stat-card';
 import Link from 'next/link';
 import { useFetch } from '@/hooks/use-fetch';
+import { resolveCategoryMeta, UNCATEGORIZED_LABEL } from '@/lib/training-categories';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
 import {
@@ -48,21 +49,17 @@ const publishStatusConfig: Record<string, { label: string; badgeClass: string; c
 };
 
 
-const categoryColors: Record<string, string> = {
-  'Enfeksiyon': 'var(--k-error)',
-  'İş Güvenliği': 'var(--k-warning)',
-  'Hasta Hakları': 'var(--k-info)',
-  'Radyoloji': 'var(--k-primary)',
-  'Laboratuvar': 'var(--k-success)',
-  'Eczane': 'var(--k-warning)',
-};
-
-const allCategories = Object.keys(categoryColors);
+// Kategori filtresinde "Kategorisiz" (silinmiş/eşleşmeyen kategori) seçeneği için sentinel.
+const UNCATEGORIZED_FILTER = '__uncategorized__';
 
 export default function TrainingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { data, isLoading, error, refetch } = useFetch<{ trainings: Training[]; total: number }>('/api/admin/trainings');
+  // Kategori slug'larını etiket+renge çözmek ve filtre dropdown'unu doldurmak için
+  // org'un güncel kategori listesi (silinmiş kategoriler "Kategorisiz" olur).
+  const { data: catData } = useFetch<{ value: string; label: string }[]>('/api/admin/training-categories');
+  const dbCategories = catData ?? [];
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
@@ -108,9 +105,21 @@ export default function TrainingsPage() {
 
   const filteredTrainings = allTrainings.filter((t) => {
     if (statusFilter && t.publishStatus !== statusFilter) return false;
-    if (categoryFilter && t.category !== categoryFilter) return false;
+    if (categoryFilter) {
+      if (categoryFilter === UNCATEGORIZED_FILTER) {
+        // "Kategorisiz" → yalnız silinmiş/eşleşmeyen kategorideki eğitimler
+        if (!resolveCategoryMeta(t.category, dbCategories).isOrphan) return false;
+      } else if (t.category !== categoryFilter) {
+        return false;
+      }
+    }
     return true;
   });
+
+  // "Kategorisiz" filtre seçeneği yalnız orphan eğitim varken gösterilir
+  const hasOrphanCategory = allTrainings.some(
+    (t) => resolveCategoryMeta(t.category, dbCategories).isOrphan,
+  );
 
   const activeFilters = [statusFilter, categoryFilter].filter(Boolean).length;
 
@@ -180,13 +189,14 @@ export default function TrainingsPage() {
         // Taslak satırları wizard'a, yayınlanmış olanlar detay sayfasına gitsin.
         const href = isDraft ? `/admin/trainings/new/${row.original.id}` : `/admin/trainings/${row.original.id}`;
         const displayTitle = (row.getValue('title') as string)?.trim() || (isDraft ? 'İsimsiz Taslak' : '—');
+        const catMeta = resolveCategoryMeta(row.original.category, dbCategories);
         return (
         <Link href={href} className="flex items-center gap-3 group min-w-0">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: `color-mix(in srgb, ${categoryColors[row.original.category] || 'var(--k-primary)'} 14%, transparent)` }}
+            style={{ background: `color-mix(in srgb, ${catMeta.color} 14%, transparent)` }}
           >
-            <GraduationCap className="h-5 w-5" style={{ color: categoryColors[row.original.category] || 'var(--k-primary)' }} />
+            <GraduationCap className="h-5 w-5" style={{ color: catMeta.color }} />
           </div>
           <div className="min-w-0">
             <p
@@ -200,9 +210,9 @@ export default function TrainingsPage() {
             <div className="flex items-center gap-2 mt-0.5">
               <span
                 className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold"
-                style={{ background: `color-mix(in srgb, ${categoryColors[row.original.category] || 'var(--k-primary)'} 12%, transparent)`, color: categoryColors[row.original.category] || 'var(--k-primary)' }}
+                style={{ background: `color-mix(in srgb, ${catMeta.color} 12%, transparent)`, color: catMeta.color }}
               >
-                {row.original.category}
+                {catMeta.label}
               </span>
               <span className="text-[11px]" style={{ color: 'var(--k-text-muted)' }}>
                 {row.original.createdBy}
@@ -440,9 +450,12 @@ export default function TrainingsPage() {
             aria-label="Kategori filtresi"
           >
             <option value="">Tümü</option>
-            {allCategories.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
+            {dbCategories.map((cat) => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
             ))}
+            {hasOrphanCategory && (
+              <option value={UNCATEGORIZED_FILTER}>{UNCATEGORIZED_LABEL}</option>
+            )}
           </select>
         </label>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, GripVertical, X, Save } from 'lucide-react';
 import {
   Dialog,
@@ -37,7 +37,9 @@ const ICON_COLORS = [
 ];
 
 interface CategoryItem {
-  id: string;
+  // id null = varsayılan kategori henüz DB'ye kalıcılaştırılmadı (GET salt-okunur
+  // fallback). useEffect seed endpoint'ini tetikler → refetch sonrası gerçek id gelir.
+  id: string | null;
   value: string;
   label: string;
   icon: string;
@@ -57,6 +59,26 @@ export default function CategoriesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<CategoryItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // GET salt-okunur (id:null) varsayılanlar döndüyse (legacy/boş org), düzenle/sil/
+  // sırala için gerçek id gerekir → seed endpoint'ini bir kez tetikle, refetch et.
+  // Yeni org'lar kuruluşta seed edildiğinden bu yalnız legacy org'larda çalışır.
+  const seedAttempted = useRef(false);
+  useEffect(() => {
+    if (seedAttempted.current) return;
+    if (!categories || categories.length === 0) return;
+    if (!categories.some((c) => c.id === null)) return;
+    seedAttempted.current = true;
+    void (async () => {
+      try {
+        await fetch('/api/admin/training-categories/seed', { method: 'POST' });
+        invalidateFetchCache('/api/admin/training-categories');
+        refetch();
+      } catch {
+        // sessiz — kategoriler salt-okunur kalır, kullanıcı sayfayı yenileyebilir
+      }
+    })();
+  }, [categories, refetch]);
 
   const sorted = [...(categories ?? [])].sort((a, b) => a.order - b.order);
 
@@ -195,7 +217,7 @@ export default function CategoriesPage() {
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
           {sorted.map((cat, idx) => (
             <CategoryCard
-              key={cat.id}
+              key={cat.value}
               cat={cat}
               index={idx}
               isFirst={idx === 0}

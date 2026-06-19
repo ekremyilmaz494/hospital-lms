@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, Check, ChevronDown, ChevronUp, BookOpen, Users as UsersIcon, AlertCircle } from 'lucide-react';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from './premium-modal';
 import { useToast } from '@/components/shared/toast';
+import { resolveCategoryMeta } from '@/lib/training-categories';
 
 interface Training { id: string; title: string; category: string | null; }
 interface Staff { id: string; name: string; department: string; }
@@ -55,6 +56,16 @@ export function BulkAssignModal({
   const [fetchedTrainings, setFetchedTrainings] = useState<Training[] | null>(null);
   const [fetchedStaff, setFetchedStaff] = useState<Staff[] | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
+  // Kategori slug'larını etiket/orphan'a çözmek için org kategori listesi —
+  // ana effect props verildiğinde erken döndüğünden ayrı, her zaman çalışan fetch.
+  const [categories, setCategories] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    fetch('/api/admin/training-categories')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (Array.isArray(d)) setCategories(d); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (trainingsFromProps.length > 0 && staffFromProps.length > 0) return;
@@ -536,7 +547,7 @@ export function BulkAssignModal({
                                 fontSize: 11.5,
                                 color: K.TEXT_MUTED,
                                 marginTop: 3,
-                              }}>{t.category}</span>
+                              }}>{resolveCategoryMeta(t.category, categories).label}</span>
                             )}
                           </span>
                         </button>
@@ -956,7 +967,7 @@ export function BulkAssignModal({
                             padding: '2px 8px',
                             background: K.SURFACE_HOVER,
                             borderRadius: 999,
-                          }}>{t.category}</em>
+                          }}>{resolveCategoryMeta(t.category, categories).label}</em>
                         )}
                       </li>
                     ))}
