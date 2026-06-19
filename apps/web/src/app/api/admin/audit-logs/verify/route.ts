@@ -11,10 +11,13 @@ import { logger } from '@/lib/logger'
  * Rate limited: 1 request per 5 minutes per organization.
  */
 export const GET = withAdminRoute(async ({ organizationId }) => {
-  // Rate limiting: 1 request per 5 minutes per org
-  const rateLimited = await checkRateLimit(`audit-verify:${organizationId}`, 1, 300)
-  if (rateLimited) {
-    return errorResponse('Bu islem 5 dakikada bir yapilabilir. Lutfen bekleyin.', 429)
+  // Rate limiting: 1 request per 5 minutes per org.
+  // checkRateLimit → true = İZİNLİ, false = limit aşıldı (redis.ts). Diğer tüm
+  // çağrı yerleriyle aynı: `if (!allowed)`. (Eski hali ters olduğu için ilk çağrı
+  // her zaman 429 dönüyordu — doğrulama butonu ilk tıklamada kırıktı.)
+  const allowed = await checkRateLimit(`audit-verify:${organizationId}`, 1, 300)
+  if (!allowed) {
+    return errorResponse('Bu işlem 5 dakikada bir yapılabilir. Lütfen bekleyin.', 429)
   }
 
   try {

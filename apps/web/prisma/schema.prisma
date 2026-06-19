@@ -111,6 +111,15 @@ model Organization {
   emailReplyTo     String? @map("email_reply_to") @db.VarChar(320)
   emailEnabled     Boolean @default(true) @map("email_enabled")
 
+  // Bildirim tercihleri (Ayarlar → Bildirim sekmesi). emailNotifications: org genelinde
+  // hatırlatma e-postası gate'i (reminder cron okur). reminderDaysBefore: eğitim deadline'ından
+  // kaç gün önce hatırlatma (cron okur; default 3 = mevcut davranış korunur). notifyOnComplete/
+  // notifyOnFail: persist edilir; admin'e sınav-olayı bildirimi davranışı ayrı bir iş (henüz yok).
+  emailNotifications Boolean @default(true) @map("email_notifications")
+  reminderDaysBefore Int     @default(3) @map("reminder_days_before")
+  notifyOnComplete   Boolean @default(true) @map("notify_on_complete")
+  notifyOnFail       Boolean @default(true) @map("notify_on_fail")
+
   // Çok-sektörlü SaaS desteği. Faz 1 default'u "healthcare" — Devakent vb.
   // Faz 3 (2026-05-17): String → Sector enum (CAST migration). Default 'healthcare'
   // backward-compat için tutuldu — register form sector picker explicit zorunluyor,

@@ -82,8 +82,9 @@ export const POST = withAdminRoute(async ({ request, organizationId }) => {
     })
     return jsonResponse({ ok: true, message: 'Test e-postası başarıyla gönderildi.' })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
+    // Ham sağlayıcı (SES/Brevo) hata metni kullanıcıya sızdırılmaz — detay log'a,
+    // kullanıcıya generic Türkçe mesaj (CLAUDE.md: iç/dış sistem detayı gösterme).
     logger.error('EmailTest', `SES test başarısız — org=${organizationId}`, err)
-    return errorResponse(`E-posta gönderilemedi: ${msg}`, 400)
+    return errorResponse('E-posta gönderilemedi. Lütfen e-posta adresini ve ayarları kontrol edin.', 400)
   }
 }, { requireOrganization: true, strict: true })

@@ -11,7 +11,8 @@ import { findActivePeriod } from '@/lib/training-periods'
 import { sendExpoPushToUser } from '@/lib/expo-push'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const REMINDER_DAYS = [3, 1] as const
+// Son-gün hatırlatması — org ayarından bağımsız, herkese gider (deadline'a 1 gün kala).
+const URGENT_REMINDER_DAY = 1
 const OVERDUE_MAX_DAYS = 7
 const CERT_REMINDER_DAYS = [30, 14, 7, 3] as const
 const BATCH_SIZE = 200
@@ -42,6 +43,19 @@ export async function GET(request: Request) {
     return !!existing
   }
 
+  // Org bildirim ayarları (Ayarlar → Bildirim sekmesi). emailNotifications: hatırlatma
+  // e-postası gate'i (in-app bildirim + push ETKİLENMEZ). reminderDaysBefore: yaklaşan
+  // deadline hatırlatması kaç gün önce gönderilsin (default 3 = eski davranış).
+  const orgs = await prisma.organization.findMany({
+    select: { id: true, emailNotifications: true, reminderDaysBefore: true },
+  })
+  const orgPrefs = new Map(orgs.map(o => [o.id, o]))
+  const emailAllowed = (orgId: string | null): boolean =>
+    orgId ? orgPrefs.get(orgId)?.emailNotifications !== false : true
+  // Yaklaşan-hatırlatma günleri: her org'un kendi reminderDaysBefore'u + her zaman son-gün (1).
+  // Tüm org'lar default reminderDaysBefore=3 olduğundan set {3,1} olur — eski davranış birebir korunur.
+  const reminderDays = [...new Set<number>([...orgs.map(o => o.reminderDaysBefore), URGENT_REMINDER_DAY])]
+
   let upcomingEmailsSent = 0
   let overdueEmailsSent = 0
   let certEmailsSent = 0
@@ -51,8 +65,8 @@ export async function GET(request: Request) {
   // ilişkisi üzerinden status='active' filtre yeterli (yoksa skip).
   const activePeriodFilter = { period: { status: 'active' as const } }
 
-  // ── 1. YAKLAŞAN EĞİTİM DEADLINE HATIRLATMALARI (3 ve 1 gün kala) ──
-  for (const daysLeft of REMINDER_DAYS) {
+  // ── 1. YAKLAŞAN EĞİTİM DEADLINE HATIRLATMALARI (org'un reminderDaysBefore'u + son gün) ──
+  for (const daysLeft of reminderDays) {
     const targetStart = new Date(now + daysLeft * DAY_MS)
     const targetEnd = new Date(now + (daysLeft + 1) * DAY_MS)
 
@@ -80,21 +94,30 @@ export async function GET(request: Request) {
     })
 
     for (const a of assignments) {
+      // Bu org bu gün için hatırlatma istiyor mu? Kendi reminderDaysBefore'u VEYA son-gün (1).
+      // (Sorgu tüm org'ları çekiyor; org-özel günde olmayanları burada eliyoruz.)
+      const orgId = a.user.organizationId
+      const orgRDB = orgId ? (orgPrefs.get(orgId)?.reminderDaysBefore ?? 3) : 3
+      if (daysLeft !== URGENT_REMINDER_DAY && daysLeft !== orgRDB) continue
+
       const staffName = `${a.user.firstName} ${a.user.lastName}`
       const effective = a.dueDate ?? a.training.endDate
       const dueDate = new Date(effective).toLocaleDateString('tr-TR')
 
-      try {
-        await sendEmail({
-          to: a.user.email,
-          subject: daysLeft <= 1
-            ? `SON GÜN: "${a.training.title}" eğitimi yarın sona eriyor!`
-            : `Hatırlatma: "${a.training.title}" eğitimi için ${daysLeft} gün kaldı`,
-          html: upcomingTrainingReminderEmail(staffName, a.training.title, dueDate, daysLeft),
-        })
-        upcomingEmailsSent++
-      } catch (err) {
-        logger.error('Cron Reminders', `Email gonderilemedi: ${a.user.email}`, (err as Error).message)
+      // emailNotifications=false ise e-posta atlanır; in-app bildirim yine gönderilir.
+      if (emailAllowed(a.user.organizationId)) {
+        try {
+          await sendEmail({
+            to: a.user.email,
+            subject: daysLeft <= 1
+              ? `SON GÜN: "${a.training.title}" eğitimi yarın sona eriyor!`
+              : `Hatırlatma: "${a.training.title}" eğitimi için ${daysLeft} gün kaldı`,
+            html: upcomingTrainingReminderEmail(staffName, a.training.title, dueDate, daysLeft),
+          })
+          upcomingEmailsSent++
+        } catch (err) {
+          logger.error('Cron Reminders', `Email gonderilemedi: ${a.user.email}`, (err as Error).message)
+        }
       }
 
       if (await alreadyNotified(a.user.id, 'reminder', a.training.id)) continue
@@ -150,15 +173,17 @@ export async function GET(request: Request) {
     const dueDate = new Date(effective).toLocaleDateString('tr-TR')
     const daysOverdue = Math.floor((now - new Date(effective).getTime()) / DAY_MS)
 
-    try {
-      await sendEmail({
-        to: a.user.email,
-        subject: `Gecikmiş Eğitim: "${a.training.title}" — ${daysOverdue} gün gecikti`,
-        html: overdueTrainingReminderEmail(staffName, a.training.title, dueDate, daysOverdue),
-      })
-      overdueEmailsSent++
-    } catch (err) {
-      logger.error('Cron Reminders', `Overdue email gonderilemedi: ${a.user.email}`, (err as Error).message)
+    if (emailAllowed(a.user.organizationId)) {
+      try {
+        await sendEmail({
+          to: a.user.email,
+          subject: `Gecikmiş Eğitim: "${a.training.title}" — ${daysOverdue} gün gecikti`,
+          html: overdueTrainingReminderEmail(staffName, a.training.title, dueDate, daysOverdue),
+        })
+        overdueEmailsSent++
+      } catch (err) {
+        logger.error('Cron Reminders', `Overdue email gonderilemedi: ${a.user.email}`, (err as Error).message)
+      }
     }
 
     if (await alreadyNotified(a.user.id, 'warning', a.training.id)) continue
@@ -204,21 +229,23 @@ export async function GET(request: Request) {
       const staffName = `${cert.user.firstName} ${cert.user.lastName}`
       const expiryDate = new Date(cert.expiresAt).toLocaleDateString('tr-TR')
 
-      try {
-        await sendEmail({
-          to: cert.user.email,
-          subject: `Sertifika Yenileme: "${cert.training.title}" — ${daysLeft} gun kaldi`,
-          html: certificateExpiryReminderEmail(
-            staffName,
-            cert.training.title,
-            expiryDate,
-            daysLeft,
-            `${process.env.NEXT_PUBLIC_APP_URL}/staff/my-trainings`,
-          ),
-        })
-        certEmailsSent++
-      } catch (err) {
-        logger.error('Cron Reminders', `Cert email gonderilemedi: ${cert.user.email}`, (err as Error).message)
+      if (emailAllowed(cert.user.organizationId)) {
+        try {
+          await sendEmail({
+            to: cert.user.email,
+            subject: `Sertifika Yenileme: "${cert.training.title}" — ${daysLeft} gun kaldi`,
+            html: certificateExpiryReminderEmail(
+              staffName,
+              cert.training.title,
+              expiryDate,
+              daysLeft,
+              `${process.env.NEXT_PUBLIC_APP_URL}/staff/my-trainings`,
+            ),
+          })
+          certEmailsSent++
+        } catch (err) {
+          logger.error('Cron Reminders', `Cert email gonderilemedi: ${cert.user.email}`, (err as Error).message)
+        }
       }
 
       const certNotifType = daysLeft <= 7 ? 'warning' : 'reminder'

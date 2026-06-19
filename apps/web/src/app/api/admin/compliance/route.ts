@@ -124,10 +124,19 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     // Hangi user hangi eğitime atanmış — unassigned hesabı için
     // Staff listesi dışından (admin/super_admin) atananları filtrele — sadece staff popülasyonu esas
     const staffIdSet = new Set(staffList.map(s => s.id))
-    const assignmentPairs = await prisma.trainingAssignment.findMany({
-      where: { trainingId: { in: trainingIds }, userId: { in: staffList.map(s => s.id) } },
-      select: { trainingId: true, userId: true },
-    })
+    // assignmentPairs + deptAgg birbirinden bağımsız (ikisi de yalnız trainingIds + staffIdSet'e
+    // bağlı) → tek Promise.all ile paralel (CLAUDE.md: bağımsız sorgularda ardışık await yasak).
+    const [assignmentPairs, deptAgg] = await Promise.all([
+      prisma.trainingAssignment.findMany({
+        where: { trainingId: { in: trainingIds }, userId: { in: [...staffIdSet] } },
+        select: { trainingId: true, userId: true },
+      }),
+      prisma.trainingAssignment.groupBy({
+        by: ['userId', 'status'],
+        where: { trainingId: { in: trainingIds }, userId: { in: [...staffIdSet] } },
+        _count: { _all: true },
+      }),
+    ])
     for (const p of assignmentPairs) {
       const set = assignedUsersByTraining.get(p.trainingId) ?? new Set()
       set.add(p.userId)
@@ -257,13 +266,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       userDeptMap.set(s.id, s.departmentRel?.name ?? 'Diğer')
     }
 
-    // Tüm atama status'larını dept için tek sorguda grupla
-    const deptAgg = await prisma.trainingAssignment.groupBy({
-      by: ['userId', 'status'],
-      where: { trainingId: { in: trainingIds }, userId: { in: [...staffIdSet] } },
-      _count: { _all: true },
-    })
-
+    // deptAgg yukarıda assignmentPairs ile birlikte Promise.all içinde paralel çekildi.
     const deptMap = new Map<string, { total: number; passed: number }>()
     for (const row of deptAgg) {
       const dept = userDeptMap.get(row.userId) ?? 'Diğer'
