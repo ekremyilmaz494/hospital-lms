@@ -5,6 +5,18 @@ import { certificateIssuedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 
 /**
+ * Kanonik sertifika kodu üreticisi — tek kaynak.
+ *
+ * 16 byte kriptografik rastgelelik → 128-bit entropi (`CERT-` + 32 hex char, uppercase).
+ * Hem otomatik (sınav geçişi) hem manuel (admin POST) sertifika üretimi BU fonksiyonu çağırır.
+ * `Math.random()` ASLA kullanılmaz — CSPRNG değildir, public doğrulama endpoint'inde tahmin
+ * edilebilir kod sızdırır.
+ */
+export function generateCertificateCode(): string {
+  return `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
+}
+
+/**
  * EY.FR.40 — Sertifika üretimini idempotent şekilde yapan tek nokta.
  *
  * Tek çağrı noktası: /api/exam/[id]/submit — post-exam başarısı sonrası her eğitimde.
@@ -37,7 +49,7 @@ export async function issueCertificateForAttempt(input: {
   })
   if (existing) return { created: false }
 
-  const code = `CERT-${randomBytes(16).toString('hex').toUpperCase()}`
+  const code = generateCertificateCode()
   const expiresAt = input.renewalPeriodMonths ? addMonths(new Date(), input.renewalPeriodMonths) : null
 
   try {

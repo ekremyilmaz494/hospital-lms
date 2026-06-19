@@ -21,7 +21,19 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-import { issueCertificateForAttempt } from '../certificate-helpers'
+import { issueCertificateForAttempt, generateCertificateCode } from '../certificate-helpers'
+
+describe('generateCertificateCode', () => {
+  it('CERT- + 32 uppercase hex char formatında (128-bit kriptografik)', () => {
+    const code = generateCertificateCode()
+    expect(code).toMatch(/^CERT-[0-9A-F]{32}$/)
+  })
+
+  it('her çağrıda benzersiz kod üretir', () => {
+    const codes = new Set(Array.from({ length: 100 }, () => generateCertificateCode()))
+    expect(codes.size).toBe(100)
+  })
+})
 
 const baseInput = {
   attemptId: 'attempt-1',

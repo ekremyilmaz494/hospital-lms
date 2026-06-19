@@ -512,6 +512,7 @@ async function main() {
                     userId,
                     trainingId: training.id,
                     attemptId: attempt.id,
+                    organizationId: org.id,
                     certificateCode: certCode,
                     issuedAt: examDate,
                     expiresAt: new Date(examDate.getTime() + 365 * 24 * 60 * 60 * 1000),

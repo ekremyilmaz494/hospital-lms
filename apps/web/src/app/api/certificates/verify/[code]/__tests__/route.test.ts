@@ -4,8 +4,11 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     certificate: { findUnique: vi.fn() },
-    organization: { findUnique: vi.fn() },
   },
+}))
+
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('@/lib/logger', () => ({
@@ -15,9 +18,10 @@ vi.mock('@/lib/logger', () => ({
 // Must import after mocks are set up
 import { GET } from '../route'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit } from '@/lib/redis'
 
 const mockCertificateFindUnique = vi.mocked(prisma.certificate.findUnique)
-const mockOrganizationFindUnique = vi.mocked(prisma.organization.findUnique)
+const mockCheckRateLimit = vi.mocked(checkRateLimit)
 
 function createRequest(code: string) {
   const request = new NextRequest(`http://localhost/api/certificates/verify/${code}`)
@@ -32,6 +36,19 @@ function callGET(code: string) {
 describe('GET /api/certificates/verify/[code]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockCheckRateLimit.mockResolvedValue(true)
+  })
+
+  it('returns 429 when rate limit exceeded', async () => {
+    mockCheckRateLimit.mockResolvedValue(false)
+
+    const response = await callGET('VALID-CODE-12345678')
+    const data = await response.json()
+
+    expect(response.status).toBe(429)
+    expect(data.error).toContain('Çok fazla istek')
+    // Rate-limit reddedildiğinde DB'ye gidilmez
+    expect(mockCertificateFindUnique).not.toHaveBeenCalled()
   })
 
   it('returns 400 for certificate code with special characters', async () => {
@@ -58,11 +75,15 @@ describe('GET /api/certificates/verify/[code]', () => {
 
     expect(response.status).toBe(404)
     expect(data.error).toBe('Sertifika bulunamadı')
+    // Tek sorgu + nested select (org adı training üzerinden — ayrı organization sorgusu yok)
     expect(mockCertificateFindUnique).toHaveBeenCalledWith({
       where: { certificateCode: 'VALID-CODE-12345678' },
-      include: {
+      select: {
+        issuedAt: true,
+        expiresAt: true,
+        revokedAt: true,
         user: { select: { firstName: true, lastName: true } },
-        training: { select: { title: true, organizationId: true } },
+        training: { select: { title: true, organization: { select: { name: true } } } },
       },
     })
   })
@@ -71,17 +92,11 @@ describe('GET /api/certificates/verify/[code]', () => {
     const futureDate = new Date(Date.now() + 365 * 86400000)
 
     mockCertificateFindUnique.mockResolvedValue({
-      id: 'cert-1',
-      certificateCode: 'VALID-CODE-12345678',
       issuedAt: new Date('2025-06-15T00:00:00Z'),
       expiresAt: futureDate,
+      revokedAt: null,
       user: { firstName: 'Mehmet', lastName: 'Yilmaz' },
-      training: { title: 'Temel Hijyen Egitimi', organizationId: 'org-1' },
-    } as never)
-
-    mockOrganizationFindUnique.mockResolvedValue({
-      id: 'org-1',
-      name: 'Ankara Sehir Hastanesi',
+      training: { title: 'Temel Hijyen Egitimi', organization: { name: 'Ankara Sehir Hastanesi' } },
     } as never)
 
     const response = await callGET('VALID-CODE-12345678')
@@ -100,17 +115,11 @@ describe('GET /api/certificates/verify/[code]', () => {
     const pastDate = new Date('2024-01-01T00:00:00Z')
 
     mockCertificateFindUnique.mockResolvedValue({
-      id: 'cert-2',
-      certificateCode: 'EXPIRED-CODE-1234',
       issuedAt: new Date('2023-01-01T00:00:00Z'),
       expiresAt: pastDate,
+      revokedAt: null,
       user: { firstName: 'Ayse', lastName: 'Demir' },
-      training: { title: 'Yangin Guvenligi', organizationId: 'org-2' },
-    } as never)
-
-    mockOrganizationFindUnique.mockResolvedValue({
-      id: 'org-2',
-      name: 'Istanbul Hastanesi',
+      training: { title: 'Yangin Guvenligi', organization: { name: 'Istanbul Hastanesi' } },
     } as never)
 
     const response = await callGET('EXPIRED-CODE-1234')
@@ -121,21 +130,34 @@ describe('GET /api/certificates/verify/[code]', () => {
     expect(data.holderName).toBe('Ay*** De***')
   })
 
+  it('returns isValid=false and isRevoked=true for revoked certificate', async () => {
+    const futureDate = new Date(Date.now() + 180 * 86400000)
+
+    mockCertificateFindUnique.mockResolvedValue({
+      issuedAt: new Date('2025-09-01T00:00:00Z'),
+      expiresAt: futureDate,
+      revokedAt: new Date('2025-10-01T00:00:00Z'),
+      user: { firstName: 'Ali', lastName: 'Kara' },
+      training: { title: 'Ilk Yardim', organization: { name: 'Izmir Devlet Hastanesi' } },
+    } as never)
+
+    const response = await callGET('REVOKED-CODE-5678')
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.isValid).toBe(false)
+    expect(data.isRevoked).toBe(true)
+  })
+
   it('returns isValid=true for non-expired certificate', async () => {
     const futureDate = new Date(Date.now() + 180 * 86400000)
 
     mockCertificateFindUnique.mockResolvedValue({
-      id: 'cert-3',
-      certificateCode: 'ACTIVE-CODE-5678',
       issuedAt: new Date('2025-09-01T00:00:00Z'),
       expiresAt: futureDate,
+      revokedAt: null,
       user: { firstName: 'Ali', lastName: 'Kara' },
-      training: { title: 'Ilk Yardim', organizationId: 'org-3' },
-    } as never)
-
-    mockOrganizationFindUnique.mockResolvedValue({
-      id: 'org-3',
-      name: 'Izmir Devlet Hastanesi',
+      training: { title: 'Ilk Yardim', organization: { name: 'Izmir Devlet Hastanesi' } },
     } as never)
 
     const response = await callGET('ACTIVE-CODE-5678')

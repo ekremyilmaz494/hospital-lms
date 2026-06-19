@@ -209,9 +209,20 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
     where: { id, organizationId: orgId },
     data: dataToUpdate,
   }).catch(async (err) => {
-    // DB update fail — eğer Auth zaten güncellendiyse drift loglarız
+    // DB update fail — Auth zaten güncellendiyse Auth ↔ DB sapması (drift) oluşur.
+    // Telafi: Auth e-postasını eski değerine geri al (best-effort) → tutarlılık korunur.
     if (emailChanged) {
-      logger.error('staff-update', 'Auth-DB drift: Auth e-posta degisti ama DB update fail', { userId: id, err: err instanceof Error ? err.message : String(err) })
+      try {
+        const supabase = await createServiceClient()
+        const { error: revertErr } = await supabase.auth.admin.updateUserById(id, { email: existing.email })
+        if (revertErr) {
+          logger.error('staff-update', 'Auth-DB drift: DB update fail + Auth e-posta geri alinamadi', { userId: id, message: revertErr.message })
+        } else {
+          logger.warn('staff-update', 'DB update fail — Auth e-postasi eski degere geri alindi (drift onlendi)', { userId: id })
+        }
+      } catch (revertErr) {
+        logger.error('staff-update', 'Auth-DB drift: Auth e-posta geri alma client hatasi', { userId: id, err: revertErr instanceof Error ? revertErr.message : String(revertErr) })
+      }
     }
     throw err
   })

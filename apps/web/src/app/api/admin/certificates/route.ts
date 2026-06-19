@@ -1,7 +1,18 @@
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
+import { generateCertificateCode } from '@/lib/certificate-helpers'
+
+/** Manuel sertifika oluşturma — body doğrulaması (CLAUDE.md: tüm input zod ile). */
+const issueCertSchema = z.object({
+  userId: z.string().uuid('Geçersiz kullanıcı'),
+  trainingId: z.string().uuid('Geçersiz eğitim'),
+  attemptId: z.string().uuid('Geçersiz sınav denemesi'),
+  // ISO datetime veya null (süresiz). Geçmiş tarih kontrolü handler'da yapılır.
+  expiresAt: z.union([z.string().datetime({ message: 'Geçersiz tarih formatı' }), z.null()]).optional(),
+})
 
 export const GET = withAdminRoute(async ({ organizationId }) => {
   try {
@@ -119,13 +130,14 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
 }, { requireOrganization: true })
 
 export const POST = withAdminRoute(async ({ request, organizationId, audit }) => {
-  const body = await request.json().catch(() => null)
-  if (!body) return errorResponse('Invalid body')
+  const body = await parseBody(request)
+  if (!body) return errorResponse('Geçersiz istek verisi', 400)
 
-  const { userId, trainingId, attemptId, expiresAt } = body
-  if (!userId || !trainingId || !attemptId) {
-    return errorResponse('userId, trainingId ve attemptId zorunludur')
+  const parsed = issueCertSchema.safeParse(body)
+  if (!parsed.success) {
+    return errorResponse(parsed.error.issues[0]?.message ?? 'Doğrulama hatası', 400)
   }
+  const { userId, trainingId, attemptId, expiresAt } = parsed.data
 
   if (expiresAt && new Date(expiresAt) < new Date()) {
     return errorResponse('Sertifika son kullanma tarihi geçmişte olamaz', 400)
@@ -165,7 +177,8 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       return errorResponse('Bu deneme başarılı değil — manuel sertifika oluşturulamaz', 409)
     }
 
-    const code = `CERT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+    // Kanonik kriptografik kod üreticisi (otomatik üretimle aynı kaynak) — Math.random() YOK.
+    const code = generateCertificateCode()
 
     let cert
     try {
