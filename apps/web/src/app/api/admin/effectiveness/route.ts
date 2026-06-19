@@ -138,9 +138,11 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     // Trend hesaplama — aylık veya haftalık
     function getGroupKey(date: Date): string {
       if (period === 'weekly') {
-        // ISO hafta: Pazartesi başlangıç
+        // ISO hafta: Pazartesi başlangıç. UTC metotları kullan — toISOString() (UTC) ile
+        // tutarlı olsun; aksi halde UTC-dışı sunucu/dev makinede hafta sınırı kayardı.
+        // (Prod UTC olduğundan davranış değişmez; portability düzelir.)
         const d = new Date(date)
-        d.setDate(d.getDate() - ((d.getDay() + 6) % 7)) // Pazartesiye git
+        d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)) // Pazartesiye git
         return d.toISOString().slice(0, 10) // "YYYY-MM-DD"
       }
       return date.toISOString().slice(0, 7) // "YYYY-MM"

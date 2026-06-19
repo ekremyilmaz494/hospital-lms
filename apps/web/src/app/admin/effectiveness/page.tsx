@@ -26,7 +26,7 @@ const K = {
 interface TrainingEff { id: string; title: string; category: string | null; isCompulsory: boolean; avgPreScore: number | null; avgPostScore: number | null; avgLearningGain: number | null; passRate: number; totalAttempts: number }
 interface EffData {
   summary: { totalTrainingsAnalyzed: number; totalAttempts: number; overallPassRate: number; avgLearningGain: number | null };
-  globalTrend: { month: string; passRate: number; avgPostScore: number }[];
+  globalTrend: { month: string; passRate: number; avgPostScore: number; avgGain: number | null; attemptCount: number }[];
   categoryBreakdown: { category: string; trainingCount: number; totalAttempts: number; passRate: number; avgGain: number | null }[];
   trainingEffectiveness: TrainingEff[];
 }

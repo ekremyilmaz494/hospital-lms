@@ -140,19 +140,28 @@ export default function NotificationsPage() {
   // Departmanları yükle
   useEffect(() => {
     if (showSendModal && departments.length === 0) {
-      fetch('/api/admin/departments').then(r => r.json()).then(d => {
-        const depts = Array.isArray(d) ? d : d.departments ?? d.data ?? [];
-        // API "staff" döndürebilir, frontend "users" bekliyor — normalize et
-        const normalized = depts.map((dept: Record<string, unknown>) => ({
-          ...dept,
-          parentId: (dept.parentId ?? null) as string | null,
-          users: (dept.users ?? dept.staff ?? []) as StaffMember[],
-          _count: (dept._count ?? { users: (dept.count as number) ?? 0 }) as { users: number },
-        }));
-        setDepartments(normalized as Department[]);
-      }).catch(() => {});
+      fetch('/api/admin/departments')
+        .then(r => {
+          if (!r.ok) throw new Error('departments-fetch-failed');
+          return r.json();
+        })
+        .then(d => {
+          const depts = Array.isArray(d) ? d : d.departments ?? d.data ?? [];
+          // API "staff" döndürebilir, frontend "users" bekliyor — normalize et
+          const normalized = depts.map((dept: Record<string, unknown>) => ({
+            ...dept,
+            parentId: (dept.parentId ?? null) as string | null,
+            users: (dept.users ?? dept.staff ?? []) as StaffMember[],
+            _count: (dept._count ?? { users: (dept.count as number) ?? 0 }) as { users: number },
+          }));
+          setDepartments(normalized as Department[]);
+        })
+        .catch(() => {
+          // Sessiz yutma yerine kullanıcıya bildir (boş departman listesi = bozuk modal)
+          toast('Departmanlar yüklenemedi. Lütfen tekrar deneyin.', 'error');
+        });
     }
-  }, [showSendModal, departments.length]);
+  }, [showSendModal, departments.length, toast]);
 
   // Seçili departmanların TÜM personelleri (parent + alt birim üyeleri, deduped).
   // Multi-select: birden fazla parent dept seçilebilir, hepsinin altındaki üyeler birleştirilir.

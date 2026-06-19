@@ -35,6 +35,9 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       assignments = await prisma.trainingAssignment.findMany({
         where: {
           trainingId: parsed.data.trainingId,
+          // Training satır 32'de org-checked olsa da, her sorguda organizationId
+          // filtresi (CLAUDE.md) — assignmentIds path'iyle tutarlı, defense-in-depth.
+          organizationId,
           status: { in: ['assigned', 'in_progress', 'failed'] },
           training: { endDate: { lt: new Date() } },
         },

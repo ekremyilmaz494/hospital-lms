@@ -16,13 +16,18 @@ const settingsSchema = z.object({
   brandColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Geçerli bir hex renk kodu girin').optional(),
   secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Geçerli bir hex renk kodu girin').optional(),
   loginBannerUrl: z.string().url().optional().or(z.literal('')),
+  // Bildirim tercihleri (Bildirim sekmesi) — artık persist edilir
+  emailNotifications: z.boolean().optional(),
+  reminderDaysBefore: z.coerce.number().int().min(1).max(30).optional(),
+  notifyOnComplete: z.boolean().optional(),
+  notifyOnFail: z.boolean().optional(),
 })
 
 // GET /api/admin/settings — Organizasyon ayarlarını getir
 export const GET = withAdminRoute(async ({ organizationId }) => {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true, defaultPassingScore: true, defaultMaxAttempts: true, defaultExamDuration: true, brandColor: true, secondaryColor: true, loginBannerUrl: true, customDomain: true },
+    select: { name: true, logoUrl: true, email: true, phone: true, address: true, sessionTimeout: true, defaultPassingScore: true, defaultMaxAttempts: true, defaultExamDuration: true, brandColor: true, secondaryColor: true, loginBannerUrl: true, customDomain: true, emailNotifications: true, reminderDaysBefore: true, notifyOnComplete: true, notifyOnFail: true },
   })
 
   return jsonResponse({
@@ -39,18 +44,22 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     secondaryColor: org?.secondaryColor ?? '#3B82F6',
     loginBannerUrl: org?.loginBannerUrl ?? '',
     customDomain: org?.customDomain ?? '',
+    emailNotifications: org?.emailNotifications ?? true,
+    reminderDaysBefore: org?.reminderDaysBefore ?? 3,
+    notifyOnComplete: org?.notifyOnComplete ?? true,
+    notifyOnFail: org?.notifyOnFail ?? true,
   }, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' })
 }, { requireOrganization: true, strict: true })
 
 // PUT /api/admin/settings — Organizasyon ayarlarını güncelle
 export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => {
   const body = await request.json().catch(() => null)
-  if (!body) return errorResponse('Invalid body')
+  if (!body) return errorResponse('Geçersiz istek verisi', 400)
 
   const parsed = settingsSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
-  const { organizationName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration, brandColor, secondaryColor, loginBannerUrl } = parsed.data
+  const { organizationName, logoUrl, email, phone, address, sessionTimeout, defaultPassingScore, defaultMaxAttempts, defaultExamDuration, brandColor, secondaryColor, loginBannerUrl, emailNotifications, reminderDaysBefore, notifyOnComplete, notifyOnFail } = parsed.data
 
   const oldOrg = await prisma.organization.findUnique({ where: { id: organizationId } })
 
@@ -69,6 +78,10 @@ export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => 
       ...(brandColor !== undefined && { brandColor }),
       ...(secondaryColor !== undefined && { secondaryColor }),
       ...(loginBannerUrl !== undefined && { loginBannerUrl: loginBannerUrl || null }),
+      ...(emailNotifications !== undefined && { emailNotifications }),
+      ...(reminderDaysBefore !== undefined && { reminderDaysBefore }),
+      ...(notifyOnComplete !== undefined && { notifyOnComplete }),
+      ...(notifyOnFail !== undefined && { notifyOnFail }),
     },
   })
 
@@ -94,5 +107,9 @@ export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => 
     secondaryColor: updated.secondaryColor,
     loginBannerUrl: updated.loginBannerUrl ?? '',
     customDomain: updated.customDomain ?? '',
+    emailNotifications: updated.emailNotifications,
+    reminderDaysBefore: updated.reminderDaysBefore,
+    notifyOnComplete: updated.notifyOnComplete,
+    notifyOnFail: updated.notifyOnFail,
   })
 }, { requireOrganization: true, strict: true })
