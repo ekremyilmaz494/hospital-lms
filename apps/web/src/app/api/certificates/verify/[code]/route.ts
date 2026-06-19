@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { NextRequest } from 'next/server'
 
@@ -9,14 +10,26 @@ function maskName(name: string): string {
   return name.slice(0, 2) + '***'
 }
 
+/** Public endpoint — istemci IP'si (kod enumerasyonuna karşı rate-limit anahtarı). */
+function ipFromRequest(req: NextRequest): string {
+  return req.headers.get('x-vercel-forwarded-for') || req.headers.get('x-forwarded-for') || 'unknown'
+}
+
 /** Valid certificate code: alphanumeric + dashes, 8-64 chars */
 const CERT_CODE_REGEX = /^[A-Za-z0-9\-]{8,64}$/
 
 /** GET /api/certificates/verify/[code] — Public certificate verification */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  // Public + auth'suz → kod enumerasyonunu engellemek için IP-bazlı rate-limit.
+  // 60 istek / 10 dk: meşru toplu doğrulamayı boğmaz, brute-force'u kırar.
+  const ip = ipFromRequest(request)
+  if (!(await checkRateLimit(`cert-verify:ip:${ip}`, 60, 600))) {
+    return errorResponse('Çok fazla istek gönderdiniz. Lütfen biraz sonra tekrar deneyin.', 429)
+  }
+
   const { code } = await params
 
   if (!CERT_CODE_REGEX.test(code)) {
@@ -26,12 +39,16 @@ export async function GET(
   try {
     const certificate = await prisma.certificate.findUnique({
       where: { certificateCode: code },
-      include: {
+      select: {
+        issuedAt: true,
+        expiresAt: true,
+        revokedAt: true,
         user: {
           select: { firstName: true, lastName: true },
         },
         training: {
-          select: { title: true, organizationId: true },
+          // Tek sorguda org adını da çek — ayrı organization.findUnique gereksiz.
+          select: { title: true, organization: { select: { name: true } } },
         },
       },
     })
@@ -39,12 +56,6 @@ export async function GET(
     if (!certificate) {
       return errorResponse('Sertifika bulunamadı', 404)
     }
-
-    // Get organization name
-    const org = await prisma.organization.findUnique({
-      where: { id: certificate.training.organizationId },
-      select: { name: true },
-    })
 
     const isExpired = certificate.expiresAt
       ? new Date(certificate.expiresAt) < new Date()
@@ -62,7 +73,7 @@ export async function GET(
       issuedAt: certificate.issuedAt.toISOString(),
       expiresAt: certificate.expiresAt?.toISOString() ?? null,
       revokedAt: certificate.revokedAt?.toISOString() ?? null,
-      organizationName: org?.name ?? null,
+      organizationName: certificate.training.organization?.name ?? null,
     }, 200, {
       // Public sertifika doğrulama — 1 dk cache, hızlı revoke yansır.
       'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',

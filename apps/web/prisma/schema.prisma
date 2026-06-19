@@ -781,7 +781,10 @@ model Certificate {
   expiresAt        DateTime? @map("expires_at") @db.Timestamptz
   revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
   revocationReason String?   @map("revocation_reason") @db.VarChar(500)
-  organizationId   String?   @map("organization_id") @db.Uuid
+  // Tenant izolasyonu — NOT NULL: her sertifika bir organizasyona ait (training üzerinden
+  // backfill edildi). onDelete Restrict (Training.organization ile aynı): sertifikası olan org
+  // hard-delete edilemez (super_admin askıya alır, silmez).
+  organizationId   String    @map("organization_id") @db.Uuid
   periodId         String?   @map("period_id") @db.Uuid
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -789,7 +792,7 @@ model Certificate {
   training     Training        @relation(fields: [trainingId], references: [id], onDelete: Restrict)
   attempt      ExamAttempt?    @relation(fields: [attemptId], references: [id], onDelete: Restrict)
   scormAttempt ScormAttempt?   @relation(fields: [scormAttemptId], references: [id], onDelete: Restrict)
-  organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   period       TrainingPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_certificates_user")

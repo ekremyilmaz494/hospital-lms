@@ -703,6 +703,7 @@ async function main() {
             userId: assignment.userId,
             trainingId: assignment.trainingId,
             attemptId: attempt.id,
+            organizationId: org.id,
             certificateCode: certCode,
             issuedAt: completedDate,
             expiresAt: new Date(completedDate.getTime() + 365 * 24 * 60 * 60 * 1000),
