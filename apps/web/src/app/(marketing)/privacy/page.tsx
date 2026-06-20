@@ -3,203 +3,308 @@ import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: `Gizlilik Politikasi | ${BRAND.fullName}`,
-  description: `${BRAND.fullName} gizlilik politikasi - KVKK uyumlu kisisel verilerin korunmasi.`,
+  description: `${BRAND.fullName} gizlilik politikasi - KVKK uyumlu, App Store ve Google Play veri beyanlariyla uyumlu kisisel verilerin korunmasi.`,
 };
 
 const KVKK_EMAIL = `kvkk@${BRAND.domain}`;
 
-const LAST_UPDATED = "5 Nisan 2026";
+const LAST_UPDATED = "20 Haziran 2026";
+
+// Veri sorumlusu — gercek kisi (sirket tuzel kisiligi yok).
+const LEGAL_ENTITY = "Ekrem Yilmaz";
+const LEGAL_ADDRESS = "Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu";
+const VERBIS_NUMBER = "Basvuru surecinde";
+
+const headingPrimary = { color: "var(--color-text-primary)" } as const;
 
 export default function PrivacyPage() {
   return (
     <div className="max-w-4xl mx-auto px-6 py-16">
-      <h1
-        className="text-3xl font-bold mb-2"
-        style={{ color: "var(--color-text-primary)" }}
-      >
+      <h1 className="text-3xl font-bold mb-2" style={headingPrimary}>
         Gizlilik Politikasi
       </h1>
-      <p
-        className="text-sm mb-10"
-        style={{ color: "var(--color-text-tertiary)" }}
-      >
-        Son guncelleme: {LAST_UPDATED}
+      <p className="text-sm mb-2" style={{ color: "var(--color-text-tertiary)" }}>
+        Son guncelleme: {LAST_UPDATED} · Yururluk tarihi: {LAST_UPDATED}
+      </p>
+      <p className="text-sm mb-10 max-w-2xl" style={{ color: "var(--color-text-secondary)" }}>
+        Bu gizlilik politikasi, <strong>{BRAND.name}</strong> mobil uygulamasi (iOS ve Android) ile
+        web platformu uzerinden islenen kisisel verilere iliskindir. 6698 sayili Kisisel Verilerin
+        Korunmasi Kanunu (&quot;KVKK&quot;), Apple App Store ve Google Play Store veri aciklama
+        gereksinimleriyle uyumlu olacak sekilde hazirlanmistir.
       </p>
 
-      <div className="space-y-10 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+      <div
+        className="space-y-10 text-sm leading-relaxed"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
         {/* 1. Veri Sorumlusu */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
             1. Veri Sorumlusu
           </h2>
           <p>
-            6698 sayili Kisisel Verilerin Korunmasi Kanunu (&quot;KVKK&quot;) kapsaminda
-            veri sorumlusu sifatiyla hareket eden taraf:
+            6698 sayili Kisisel Verilerin Korunmasi Kanunu (&quot;KVKK&quot;) kapsaminda veri
+            sorumlusu sifatiyla hareket eden taraf:
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>Unvan:</strong> Hastane LMS Yazilim Teknolojileri
+              <strong>Veri Sorumlusu:</strong> {LEGAL_ENTITY} (gercek kisi)
             </li>
             <li>
-              <strong>Adres:</strong> Ankara, Turkiye
+              <strong>Adres:</strong> {LEGAL_ADDRESS}, {BRAND.contact.city}
             </li>
             <li>
               <strong>E-posta:</strong> {KVKK_EMAIL}
             </li>
             <li>
-              <strong>Telefon:</strong> +90 850 000 0000
+              <strong>Genel destek:</strong> {BRAND.supportEmail}
+            </li>
+            <li>
+              <strong>Telefon:</strong> {BRAND.contact.phone}
             </li>
           </ul>
         </section>
 
-        {/* 2. Toplanan Veriler */}
+        {/* 2. Uygulamanin Amaci */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            2. Toplanan Kisisel Veriler
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            2. Uygulamanin Amaci
+          </h2>
+          <p>
+            {BRAND.name}, hastane ve saglik kuruluslarinda calisan personelin (hekim, hemsire,
+            teknisyen vb.) zorunlu mesleki egitim, video izleme, sinav (on ve son test) ve
+            sertifikasyon sureclerini dijital ortamda yoneten bir ogrenme yonetim sistemidir.
+            Uygulama yalnizca yetkili kurum personeli tarafindan, kurumlari tarafindan atanan
+            egitimler kapsaminda kullanilir.
+          </p>
+        </section>
+
+        {/* 3. Toplanan Veriler */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            3. Topladigimiz Kisisel Veriler
           </h2>
           <p>Platform uzerinde asagidaki kisisel veri kategorileri islenmektedir:</p>
           <ul className="list-disc pl-6 mt-3 space-y-2">
             <li>
-              <strong>Kimlik Bilgileri:</strong> Ad, soyad, T.C. kimlik numarasi,
-              unvan, departman bilgisi
+              <strong>Kimlik Bilgileri:</strong> Ad, soyad, T.C. kimlik numarasi, unvan, departman
+              bilgisi
             </li>
             <li>
               <strong>Iletisim Bilgileri:</strong> E-posta adresi, telefon numarasi
             </li>
             <li>
-              <strong>Mesleki Bilgiler:</strong> Gorev tanimi, calisan numarasi,
-              sertifika ve yetkinlik bilgileri
+              <strong>Mesleki Bilgiler:</strong> Gorev tanimi, calisan numarasi (HBYS/HIS
+              entegrasyonu), sertifika ve yetkinlik bilgileri
             </li>
             <li>
-              <strong>Egitim ve Sinav Verileri:</strong> Egitim tamamlama durumlari,
-              sinav sonuclari, video ilerleme kayitlari, sertifika bilgileri
+              <strong>Egitim ve Sinav Verileri:</strong> Egitim tamamlama durumlari, sinav
+              sonuclari, video ilerleme kayitlari, sertifika bilgileri
             </li>
             <li>
-              <strong>Erisim ve Kullanim Verileri:</strong> Oturum acma zamanlari, IP
-              adresi, tarayici bilgisi, platformdaki etkinlik kayitlari
+              <strong>Erisim ve Kullanim Verileri:</strong> Oturum acma zamanlari, IP adresi, cihaz
+              ve tarayici bilgisi, uygulama ici etkinlik kayitlari
+            </li>
+            <li>
+              <strong>Cihaz Tanimlayicisi:</strong> Anlik (push) bildirim gonderebilmek icin cihaz
+              bildirim jetonu (push token)
+            </li>
+            <li>
+              <strong>Teshis Verileri:</strong> Uygulama cokme kayitlari ve performans verileri
+              (kararli calismayi saglamak icin)
             </li>
             <li>
               <strong>Gorsel Veriler:</strong> Profil fotografi (istege bagli)
             </li>
           </ul>
+          <div
+            className="mt-4 rounded-xl p-4 text-sm"
+            style={{
+              backgroundColor: "var(--color-surface-alt, #f8fafc)",
+              borderLeft: "3px solid var(--color-primary)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            {BRAND.name}, kullanicilarinin verilerini <strong>reklam</strong> amaciyla toplamaz,{" "}
+            <strong>satmaz</strong> ve reklam aglariyla paylasmaz. Uygulamada ucuncu taraf reklam
+            veya capraz uygulama/internet sitesi <strong>takibi (tracking) yoktur</strong>.
+          </div>
         </section>
 
-        {/* 3. Isleme Amaclari */}
+        {/* 4. Mobil Uygulama Veri Aciklamasi (App Store & Google Play) */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            3. Kisisel Verilerin Isleme Amaclari
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            4. Mobil Uygulama Veri Aciklamasi (App Store &amp; Google Play)
+          </h2>
+          <p>
+            Apple App Store &quot;App Privacy&quot; ve Google Play &quot;Data Safety&quot;
+            beyanlarimiz asagidaki tabloyla birebir uyumludur. Toplanan tum veriler yalnizca{" "}
+            <strong>uygulama islevselligi</strong> icin kullanilir; hicbiri kullanici takibi
+            (tracking) icin kullanilmaz.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr>
+                  {["Veri turu", "Kullanim amaci", "Kimlige bagli mi?", "Takip icin mi?"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="text-left font-semibold p-2.5"
+                        style={{
+                          border: "1px solid var(--color-border)",
+                          backgroundColor: "var(--color-surface-alt, #f8fafc)",
+                          color: "var(--color-text-primary)",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Ad (Name)", "Uygulama islevselligi", "Evet", "Hayir"],
+                  ["E-posta adresi", "Uygulama islevselligi (kimlik dogrulama)", "Evet", "Hayir"],
+                  ["Kullanici kimligi (User ID)", "Uygulama islevselligi", "Evet", "Hayir"],
+                  ["Cihaz kimligi (Device ID)", "Uygulama islevselligi (push bildirim)", "Evet", "Hayir"],
+                  ["Urun etkilesimi (Product Interaction)", "Uygulama islevselligi (egitim takibi)", "Evet", "Hayir"],
+                  ["Cokme verisi (Crash Data)", "Uygulama islevselligi", "Hayir", "Hayir"],
+                  ["Performans verisi (Performance Data)", "Uygulama islevselligi", "Hayir", "Hayir"],
+                ].map((row) => (
+                  <tr key={row[0]}>
+                    {row.map((cell, i) => (
+                      <td
+                        key={i}
+                        className="p-2.5 align-top"
+                        style={{ border: "1px solid var(--color-border)" }}
+                      >
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* 5. Isleme Amaclari */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            5. Kisisel Verilerin Isleme Amaclari
           </h2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Platform hizmetlerinin sunulmasi ve iyilestirilmesi</li>
             <li>Kullanici kimlik dogrulama ve yetkilendirme islemleri</li>
             <li>Egitim atama, takip ve raporlama sureclerinin yurutulmesi</li>
             <li>Sinav uygulama, degerlendirme ve sertifikasyon islemleri</li>
+            <li>Zorunlu egitim hatirlatmalari icin anlik (push) bildirim gonderilmesi</li>
             <li>Yasal yukumluluklerin yerine getirilmesi (saglik personeli egitim kayitlari)</li>
             <li>Platform guvenliginin saglanmasi ve kotuye kullaniminin onlenmesi</li>
-            <li>Istatistiksel analiz ve raporlama (anonimlestirilmis verilerle)</li>
-            <li>Kullaniciya yonelik bilgilendirme ve destek hizmetleri</li>
+            <li>Uygulama kararliliginin saglanmasi (cokme/performans teshisi)</li>
           </ul>
         </section>
 
-        {/* 4. Hukuki Dayanak */}
+        {/* 6. Hukuki Dayanak */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            4. Kisisel Veri Islemenin Hukuki Dayanaklari
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            6. Kisisel Veri Islemenin Hukuki Dayanaklari
           </h2>
           <p>
-            Kisisel verileriniz, KVKK&apos;nin 5. ve 6. maddelerinde belirtilen asagidaki
-            hukuki dayanaklara istinaden islenmektedir:
+            Kisisel verileriniz, KVKK&apos;nin 5. ve 6. maddelerinde belirtilen asagidaki hukuki
+            dayanaklara istinaden islenmektedir:
           </p>
           <ul className="list-disc pl-6 mt-3 space-y-2">
             <li>
-              <strong>Sozlesmenin ifasi (m.5/2-c):</strong> Platform hizmetlerinin
-              sunulmasi icin gerekli veri isleme faaliyetleri
+              <strong>Sozlesmenin ifasi (m.5/2-c):</strong> Platform hizmetlerinin sunulmasi icin
+              gerekli veri isleme faaliyetleri
             </li>
             <li>
-              <strong>Hukuki yukumluluk (m.5/2-c):</strong> Saglik mevzuati geregi
-              personel egitim kayitlarinin tutulmasi
+              <strong>Hukuki yukumluluk (m.5/2-c):</strong> Saglik mevzuati geregi personel egitim
+              kayitlarinin tutulmasi
             </li>
             <li>
-              <strong>Mesru menfaat (m.5/2-f):</strong> Platform guvenliginin saglanmasi,
-              hizmet kalitesinin arttirilmasi
+              <strong>Mesru menfaat (m.5/2-f):</strong> Platform guvenliginin saglanmasi, hizmet
+              kalitesinin arttirilmasi
             </li>
             <li>
-              <strong>Acik riza (m.5/1):</strong> Zorunlu olmayan veri isleme
-              faaliyetleri (ornegin pazarlama iletisimleri)
+              <strong>Acik riza (m.5/1):</strong> Zorunlu olmayan veri isleme faaliyetleri (varsa)
             </li>
           </ul>
         </section>
 
-        {/* 5. Veri Aktarimi */}
+        {/* 7. Veri Aktarimi */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            5. Kisisel Verilerin Aktarimi
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            7. Kisisel Verilerin Aktarimi
           </h2>
           <p>Kisisel verileriniz asagidaki durumlarda ucuncu taraflarla paylasilabilir:</p>
           <ul className="list-disc pl-6 mt-3 space-y-2">
             <li>
-              <strong>Altyapi Saglayicilari:</strong> Sunucu barindirma (Vercel, Supabase),
-              dosya depolama (AWS), onbellek (Upstash Redis) hizmetleri icin teknik
-              altyapi saglayicilariyla. Bu saglayicilar GDPR ve/veya esdeger veri
-              koruma standartlarina uymaktadir.
+              <strong>Altyapi Saglayicilari:</strong> Sunucu barindirma, kimlik dogrulama ve
+              veritabani (Supabase), dosya/video depolama (Amazon Web Services S3), hosting ve CDN
+              (Vercel / CloudFront), anlik bildirim iletimi (Apple Push Notification service /
+              Firebase Cloud Messaging — Expo Push araciligiyla). Bu saglayicilar GDPR ve/veya
+              esdeger veri koruma standartlarina uymaktadir.
             </li>
             <li>
-              <strong>Organizasyonunuz:</strong> Bagli oldugunuz saglik kurulusu
-              yoneticileri, yetkileri dahilinde egitim ve sinav verilerinize
-              erisebilir.
+              <strong>Organizasyonunuz:</strong> Bagli oldugunuz saglik kurulusunun yetkili
+              yoneticileri, yetkileri dahilinde egitim ve sinav verilerinize erisebilir.
             </li>
             <li>
-              <strong>Yasal Zorunluluklar:</strong> Yetkili kamu kurum ve kuruluslarina,
-              mevzuatin gerektirdigi hallerde veri aktarimi yapilabilir.
+              <strong>Yasal Zorunluluklar:</strong> Yetkili kamu kurum ve kuruluslarina, mevzuatin
+              gerektirdigi hallerde veri aktarimi yapilabilir.
             </li>
           </ul>
           <p className="mt-3">
-            Kisisel verileriniz yurt disindaki sunucularda islenmektedir. Bu aktarim,
-            KVKK&apos;nin 9. maddesi kapsaminda yeterli koruma bulunan ulkelere veya
-            yeterli korumayi taahhut eden veri isleyenlerine yapilmaktadir.
+            Verileriniz yurt disindaki sunucularda islenebilir; bu aktarim KVKK&apos;nin 9. maddesi
+            kapsaminda yeterli guvenceler saglanarak yapilir. Veriler iletimde TLS/SSL ile
+            sifrelenir.
           </p>
         </section>
 
-        {/* 6. Saklama Sureleri */}
+        {/* 8. Saklama Sureleri */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            6. Veri Saklama Sureleri
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            8. Veri Saklama Sureleri
           </h2>
           <ul className="list-disc pl-6 space-y-2">
             <li>
-              <strong>Hesap Bilgileri:</strong> Hesap aktif oldugu surece ve hesap
-              kapatildiktan sonra 1 yil
+              <strong>Hesap Bilgileri:</strong> Hesap aktif oldugu surece ve hesap kapatildiktan
+              sonra 1 yil
             </li>
             <li>
-              <strong>Egitim ve Sinav Kayitlari:</strong> Saglik mevzuati geregi en az
-              10 yil (yasal zorunluluk)
+              <strong>Egitim ve Sinav Kayitlari:</strong> Saglik mevzuati geregi en az 10 yil (yasal
+              zorunluluk)
             </li>
             <li>
-              <strong>Sertifika Bilgileri:</strong> Sertifikanin gecerlilik suresi
-              boyunca ve sonrasinda 5 yil
+              <strong>Sertifika Bilgileri:</strong> Gecerlilik suresi boyunca ve sonrasinda 5 yil
             </li>
             <li>
               <strong>Erisim Kayitlari (Log):</strong> 2 yil
             </li>
             <li>
-              <strong>Cerez Verileri:</strong> Oturum cerezleri tarayici
-              kapatildiginda, kalici cerezler en fazla 1 yil
+              <strong>Cokme/Performans Verileri:</strong> En fazla 90 gun
+            </li>
+            <li>
+              <strong>Cerez Verileri:</strong> Oturum cerezleri tarayici kapatildiginda, kalici
+              cerezler en fazla 1 yil
             </li>
           </ul>
           <p className="mt-3">
-            Saklama suresi dolan veriler, periyodik imha sureci kapsaminda otomatik olarak
-            silinir veya anonimlestirilir.
+            Saklama suresi dolan veriler, periyodik imha sureci kapsaminda otomatik olarak silinir
+            veya anonimlestirilir.
           </p>
         </section>
 
-        {/* 7. KVKK Madde 11 Haklari */}
+        {/* 9. KVKK Madde 11 Haklari */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            7. KVKK Kapsamindaki Haklariniz (Madde 11)
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            9. KVKK Kapsamindaki Haklariniz (Madde 11)
           </h2>
-          <p>
-            KVKK&apos;nin 11. maddesi uyarinca asagidaki haklara sahipsiniz:
-          </p>
+          <p>KVKK&apos;nin 11. maddesi uyarinca asagidaki haklara sahipsiniz:</p>
           <ul className="list-disc pl-6 mt-3 space-y-2">
             <li>Kisisel verilerinizin islenip islenmedigini ogrenme</li>
             <li>Kisisel verileriniz islenmisse buna iliskin bilgi talep etme</li>
@@ -208,28 +313,27 @@ export default function PrivacyPage() {
               kullanilmadigini ogrenme
             </li>
             <li>
-              Yurt icinde veya yurt disinda kisisel verilerinizin aktarildigi ucuncu
-              kisileri bilme
+              Yurt icinde veya yurt disinda kisisel verilerinizin aktarildigi ucuncu kisileri bilme
             </li>
             <li>
               Kisisel verilerinizin eksik veya yanlis islenmis olmasi halinde bunlarin
               duzeltilmesini isteme
             </li>
             <li>
-              KVKK&apos;nin 7. maddesinde ongornulen sartlar cercevesinde kisisel
-              verilerinizin silinmesini veya yok edilmesini isteme
+              KVKK&apos;nin 7. maddesinde ongorulen sartlar cercevesinde kisisel verilerinizin
+              silinmesini veya yok edilmesini isteme
             </li>
             <li>
-              Duzeltme ve silme islemlerinin, kisisel verilerin aktarildigi ucuncu
-              kisilere bildirilmesini isteme
+              Duzeltme ve silme islemlerinin, kisisel verilerin aktarildigi ucuncu kisilere
+              bildirilmesini isteme
             </li>
             <li>
-              Islenen verilerin munhasiran otomatik sistemler vasitasiyla analiz
-              edilmesi suretiyle aleyhinize bir sonucun ortaya cikmasina itiraz etme
+              Islenen verilerin munhasiran otomatik sistemler vasitasiyla analiz edilmesi suretiyle
+              aleyhinize bir sonucun ortaya cikmasina itiraz etme
             </li>
             <li>
-              Kisisel verilerinizin kanuna aykiri olarak islenmesi sebebiyle zarara
-              ugramaniz halinde zararin giderilmesini talep etme
+              Kisisel verilerinizin kanuna aykiri olarak islenmesi sebebiyle zarara ugramaniz
+              halinde zararin giderilmesini talep etme
             </li>
           </ul>
           <p className="mt-3">
@@ -237,58 +341,92 @@ export default function PrivacyPage() {
             <a href={`mailto:${KVKK_EMAIL}`} className="underline" style={{ color: "#0d9668" }}>
               {KVKK_EMAIL}
             </a>{" "}
-            adresine yazili basvuruda bulunabilir veya platform uzerindeki KVKK basvuru
-            formunu kullanabilirsiniz. Basvurulariniz en gec 30 gun icerisinde
-            sonuclandirilacaktir.
+            adresine yazili basvuruda bulunabilir veya platform uzerindeki KVKK basvuru formunu
+            kullanabilirsiniz. Basvurulariniz en gec 30 gun icerisinde sonuclandirilacaktir.
           </p>
         </section>
 
-        {/* 8. Cerez Politikasi */}
+        {/* 10. Hesap ve Veri Silme Talebi (Google Play zorunlu) */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            8. Cerez Politikasi
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            10. Hesap ve Veri Silme Talebi
+          </h2>
+          <p>
+            Hesabinizin ve iliskili kisisel verilerinizin silinmesini talep etmek icin{" "}
+            <a href={`mailto:${KVKK_EMAIL}`} className="underline" style={{ color: "#0d9668" }}>
+              {KVKK_EMAIL}
+            </a>{" "}
+            adresine basvurabilir veya bagli oldugunuz kurumun sistem yoneticisiyle iletisime
+            gecebilirsiniz. Yasal saklama yukumlulugune tabi kayitlar (orn. zorunlu egitim
+            kayitlari), ilgili mevzuatta ongorulen sure boyunca saklanmaya devam eder; bu sure
+            sonunda silinir veya anonimlestirilir.
+          </p>
+        </section>
+
+        {/* 11. Veri Guvenligi */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            11. Veri Guvenligi
+          </h2>
+          <p>
+            Verileriniz, endustri standardi teknik ve idari tedbirlerle korunur: iletimde TLS/SSL
+            sifreleme, kimlik dogrulamada guvenli jeton saklama (iOS Keychain / Android Keystore
+            tabanli guvenli depolama), yetki bazli erisim kontrolu ve duzenli denetim kayitlari.
+          </p>
+        </section>
+
+        {/* 12. Cocuklarin Gizliligi */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            12. Cocuklarin Gizliligi
+          </h2>
+          <p>
+            {BRAND.name} yalnizca yetiskin saglik kurulusu personeline yoneliktir; 18 yas alti
+            kisilerden bilerek kisisel veri toplanmaz.
+          </p>
+        </section>
+
+        {/* 13. Cerez Politikasi */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            13. Cerez Politikasi
           </h2>
           <p>Platform asagidaki cerez turlerini kullanmaktadir:</p>
           <ul className="list-disc pl-6 mt-3 space-y-2">
             <li>
-              <strong>Zorunlu Cerezler:</strong> Oturum yonetimi, kimlik dogrulama ve
-              guvenlik icin gerekli cerezler. Bu cerezler olmadan platform islevlerini
-              yerine getiremez.
+              <strong>Zorunlu Cerezler:</strong> Oturum yonetimi, kimlik dogrulama ve guvenlik icin
+              gerekli cerezler. Bu cerezler olmadan platform islevlerini yerine getiremez.
             </li>
             <li>
-              <strong>Islevsel Cerezler:</strong> Kullanici tercihlerinin (dil, tema
-              secimi) hatirlanmasi icin kullanilir.
+              <strong>Islevsel Cerezler:</strong> Kullanici tercihlerinin (dil, tema secimi)
+              hatirlanmasi icin kullanilir.
             </li>
             <li>
-              <strong>Analitik Cerezler:</strong> Platform kullaniminin
-              iyilestirilmesi icin anonimlestirilmis istatistik verileri toplar.
+              <strong>Analitik Cerezler:</strong> Platform kullaniminin iyilestirilmesi icin
+              anonimlestirilmis istatistik verileri toplar.
             </li>
           </ul>
           <p className="mt-3">
-            Tarayicinizin cerez ayarlarini degistirerek zorunlu olmayan cerezleri
-            reddedebilirsiniz. Ancak bu durum, platformun bazi ozelliklerinin duzgun
-            calismamasina neden olabilir.
+            Tarayicinizin cerez ayarlarini degistirerek zorunlu olmayan cerezleri reddedebilirsiniz.
+            Ancak bu durum, platformun bazi ozelliklerinin duzgun calismamasina neden olabilir.
           </p>
         </section>
 
-        {/* 9. VERBIS Kayit Bilgileri */}
+        {/* 14. VERBIS Kayit Bilgileri */}
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            9. VERBIS Kayit Bilgileri
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            14. VERBIS Kayit Bilgileri
           </h2>
           <p>
-            6698 sayili Kanun&apos;un 16. maddesi uyarinca, {BRAND.fullName} Veri Sorumlusu olarak
-            Veri Sorumlulari Sicil Bilgi Sistemi&apos;ne (VERBIS) kayitlidir.
+            6698 sayili Kanun&apos;un 16. maddesi uyarinca veri sorumlusu olarak Veri Sorumlulari
+            Sicil Bilgi Sistemi&apos;ne (VERBIS) kayit durumumuz:
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>Veri Sorumlusu:</strong> Hastane LMS Yazilim Teknolojileri
+              <strong>Veri Sorumlusu:</strong> {LEGAL_ENTITY}
             </li>
             <li>
-              <strong>VERBIS Kayit Numarasi:</strong> [Kayit tamamlaninca eklenecektir]
-            </li>
-            <li>
-              <strong>Kayit Tarihi:</strong> [Kayit tamamlaninca eklenecektir]
+              <strong>VERBIS Kayit Numarasi:</strong> {VERBIS_NUMBER}
             </li>
           </ul>
           <p className="mt-3 text-sm" style={{ color: "var(--color-text-muted)" }}>
@@ -305,30 +443,44 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* 10. Iletisim */}
-        <section
-          className="rounded-2xl p-6"
-          style={{ backgroundColor: "var(--color-surface-alt, #f8fafc)", border: "1px solid var(--color-border)" }}
-        >
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            10. Iletisim
+        {/* 15. Degisiklikler */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            15. Degisiklikler
           </h2>
           <p>
-            Gizlilik politikamiz ve kisisel verilerinizin korunmasi hakkindaki tum soru
-            ve talepleriniz icin:
+            Bu gizlilik politikasi gerektiginde guncellenebilir. Onemli degisiklikler uygulama
+            ve/veya e-posta yoluyla bildirilir. Guncel surum her zaman bu sayfada yayimlanir.
+          </p>
+        </section>
+
+        {/* 16. Iletisim */}
+        <section
+          className="rounded-2xl p-6"
+          style={{
+            backgroundColor: "var(--color-surface-alt, #f8fafc)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <h2 className="text-lg font-semibold mb-3" style={headingPrimary}>
+            16. Iletisim
+          </h2>
+          <p>
+            Gizlilik politikamiz ve kisisel verilerinizin korunmasi hakkindaki tum soru ve
+            talepleriniz icin:
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>Veri Sorumlusu Irtibat Kisisi:</strong> {KVKK_EMAIL}
+              <strong>Veri Sorumlusu Irtibat:</strong> {KVKK_EMAIL}
             </li>
             <li>
               <strong>Genel Destek:</strong> {BRAND.supportEmail}
             </li>
             <li>
-              <strong>Telefon:</strong> +90 850 000 0000
+              <strong>Telefon:</strong> {BRAND.contact.phone}
             </li>
             <li>
-              <strong>Adres:</strong> Ankara, Turkiye
+              <strong>Adres:</strong> {LEGAL_ADDRESS}, {BRAND.contact.city}
             </li>
           </ul>
         </section>
