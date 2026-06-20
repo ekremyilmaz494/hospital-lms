@@ -6,7 +6,8 @@ export const metadata: Metadata = {
   description: `${BRAND.fullName} gizlilik politikasi - KVKK uyumlu, App Store ve Google Play veri beyanlariyla uyumlu kisisel verilerin korunmasi.`,
 };
 
-const KVKK_EMAIL = `kvkk@${BRAND.domain}`;
+// Tüm yasal/iletişim e-postaları tek çalışan kutuya yönlendiriliyor.
+const CONTACT_EMAIL = "ekremyilmaz@klinovax.info";
 
 const LAST_UPDATED = "20 Haziran 2026";
 
@@ -54,10 +55,10 @@ export default function PrivacyPage() {
               <strong>Adres:</strong> {LEGAL_ADDRESS}, {BRAND.contact.city}
             </li>
             <li>
-              <strong>E-posta:</strong> {KVKK_EMAIL}
+              <strong>E-posta:</strong> {CONTACT_EMAIL}
             </li>
             <li>
-              <strong>Genel destek:</strong> {BRAND.supportEmail}
+              <strong>Genel destek:</strong> {CONTACT_EMAIL}
             </li>
             <li>
               <strong>Telefon:</strong> {BRAND.contact.phone}
@@ -338,8 +339,8 @@ export default function PrivacyPage() {
           </ul>
           <p className="mt-3">
             Haklarinizi kullanmak icin{" "}
-            <a href={`mailto:${KVKK_EMAIL}`} className="underline" style={{ color: "#0d9668" }}>
-              {KVKK_EMAIL}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="underline" style={{ color: "#0d9668" }}>
+              {CONTACT_EMAIL}
             </a>{" "}
             adresine yazili basvuruda bulunabilir veya platform uzerindeki KVKK basvuru formunu
             kullanabilirsiniz. Basvurulariniz en gec 30 gun icerisinde sonuclandirilacaktir.
@@ -353,8 +354,8 @@ export default function PrivacyPage() {
           </h2>
           <p>
             Hesabinizin ve iliskili kisisel verilerinizin silinmesini talep etmek icin{" "}
-            <a href={`mailto:${KVKK_EMAIL}`} className="underline" style={{ color: "#0d9668" }}>
-              {KVKK_EMAIL}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="underline" style={{ color: "#0d9668" }}>
+              {CONTACT_EMAIL}
             </a>{" "}
             adresine basvurabilir veya bagli oldugunuz kurumun sistem yoneticisiyle iletisime
             gecebilirsiniz. Yasal saklama yukumlulugune tabi kayitlar (orn. zorunlu egitim
@@ -471,10 +472,10 @@ export default function PrivacyPage() {
           </p>
           <ul className="mt-3 space-y-1">
             <li>
-              <strong>Veri Sorumlusu Irtibat:</strong> {KVKK_EMAIL}
+              <strong>Veri Sorumlusu Irtibat:</strong> {CONTACT_EMAIL}
             </li>
             <li>
-              <strong>Genel Destek:</strong> {BRAND.supportEmail}
+              <strong>Genel Destek:</strong> {CONTACT_EMAIL}
             </li>
             <li>
               <strong>Telefon:</strong> {BRAND.contact.phone}
