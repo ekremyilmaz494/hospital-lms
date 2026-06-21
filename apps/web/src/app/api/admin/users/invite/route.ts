@@ -76,9 +76,10 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       },
     }),
     data.email ? prisma.user.findUnique({ where: { email: data.email }, select: { id: true } }) : Promise.resolve(null),
+    // TEK-ORG: TC global aranır — başka kuruma kayıtlıysa da reddedilir.
     prisma.user.findFirst({
-      where: { organizationId: orgId, tcHash },
-      select: { id: true },
+      where: { tcHash },
+      select: { id: true, organizationId: true },
     }),
   ])
 
@@ -87,7 +88,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   }
 
   if (existingTcUser) {
-    return errorResponse('Bu TC Kimlik No ile bu kurumda zaten kayıtlı bir kullanıcı var', 409)
+    return errorResponse(
+      existingTcUser.organizationId === orgId
+        ? 'Bu TC Kimlik No ile bu kurumda zaten kayıtlı bir kullanıcı var'
+        : 'Bu TC Kimlik No başka bir kuruma kayıtlı. Bir kişi yalnızca bir kuruma bağlı olabilir.',
+      409,
+    )
   }
 
   if (adminCount + pendingInvites >= org.maxAdmins) {

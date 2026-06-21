@@ -315,16 +315,22 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     )
   }
 
-  // TC Kimlik No duplicate kontrolü — composite (org + tcHash) unique
-  // Aynı TC farklı org'da olabilir (doktor 2 hastanede), o yüzden orgId scope'lu arıyoruz.
+  // TC Kimlik No duplicate kontrolü — TEK-ORG politikası: bir kişi yalnızca BİR kuruma
+  // bağlı olabilir. Bu yüzden GLOBAL ararız (org-scope DEĞİL): TC başka bir kurumda da
+  // kayıtlıysa eklemeyi reddet (cross-org duplikat engeli).
   if (data.tcKimlik) {
     const tcHash = hashTcKimlik(data.tcKimlik)
     const existingTc = await prisma.user.findFirst({
-      where: { organizationId: orgId, tcHash },
-      select: { id: true },
+      where: { tcHash },
+      select: { id: true, organizationId: true },
     })
     if (existingTc) {
-      return errorResponse('Bu TC Kimlik No ile kayıtlı bir personel bu kurumda zaten mevcut', 409)
+      return errorResponse(
+        existingTc.organizationId === orgId
+          ? 'Bu TC Kimlik No ile bu kurumda zaten kayıtlı bir personel var'
+          : 'Bu TC Kimlik No başka bir kuruma kayıtlı. Bir kişi yalnızca bir kuruma bağlı olabilir.',
+        409,
+      )
     }
   }
 
