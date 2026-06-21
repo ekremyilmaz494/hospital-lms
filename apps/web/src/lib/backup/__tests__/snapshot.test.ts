@@ -83,6 +83,21 @@ const INTENTIONALLY_EXCLUDED = new Set([
   'SmgCategory',
   'SmgTarget',
 
+  // Oyunlaştırma Faz 1 (Günün Soruları) — yeni modül, henüz backup scope'unda değil.
+  // DailyReview cron ile geçilen sınavlardan yeniden seed edilir (regenerable);
+  // DailySubmission Faz 1'de puan/idempotency snapshot'ıdır. Faz 2'de puan kullanıcıya
+  // görünür olunca INCLUDED_MODELS'a taşı + BACKUP_SCHEMA_VERSION artır.
+  'DailyReview',
+  'DailySubmission',
+
+  // Oyunlaştırma Faz 2 (Puan/Streak/Rozet) — yeni modül, henüz backup scope'unda değil.
+  // Badge global katalog (org-bağımsız, migration seed'i). PointLedger/UserStreak/UserBadge
+  // per-org engagement verisi; puan kullanıcıya görünür olunca INCLUDED'a taşı + schemaVersion artır.
+  'PointLedger',
+  'UserStreak',
+  'Badge',
+  'UserBadge',
+
   // İçerik kütüphanesi link tablosu — global tabloya bağlı
   'OrganizationContentLibrary',
 

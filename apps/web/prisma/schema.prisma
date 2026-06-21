@@ -360,6 +360,13 @@ model User {
   // Davet token'ları (gönderdiği + kabul ettiği)
   invitationsSent               Invitation[]                 @relation("InvitationsInvitedBy")
   invitationsAccepted           Invitation[]                 @relation("InvitationsAcceptedBy")
+  // Oyunlaştırma Faz 1 — Günün Soruları (spaced-repetition). SMG'den AYRI sistem.
+  dailyReviews                  DailyReview[]
+  dailySubmissions              DailySubmission[]
+  // Oyunlaştırma Faz 2 — Puan / Streak / Rozet
+  pointLedger                   PointLedger[]
+  streak                        UserStreak?
+  userBadges                    UserBadge[]
 
   // TC ile login lookup (subdomain → orgId → tcHash) için composite unique.
   // Aynı TC farklı kurumlarda olabilir (doktor 2 hastanede çalışabilir),
@@ -492,9 +499,10 @@ model Question {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  training    Training         @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  options     QuestionOption[]
-  examAnswers ExamAnswer[]
+  training     Training         @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  options      QuestionOption[]
+  examAnswers  ExamAnswer[]
+  dailyReviews DailyReview[]
 
   @@index([trainingId], map: "idx_questions_training")
   @@map("questions")
@@ -1515,4 +1523,122 @@ model Invitation {
   @@index([expiresAt], map: "idx_invitations_expires")
   @@index([email, organizationId], map: "idx_invitations_email_org")
   @@map("invitations")
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// OYUNLAŞTIRMA — Faz 1: Günün Soruları (spaced-repetition / Leitner)
+// SMG (mesleki gelişim / onay) sisteminden TAMAMEN AYRIDIR. Karıştırma.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Personel başına Leitner spaced-repetition durumu. Kutu 0..5, due seçimi
+// nextReviewAt üstünden yapılır. Havuza yalnız GEÇİLEN eğitimlerin soruları girer.
+model DailyReview {
+  userId         String    @map("user_id") @db.Uuid
+  questionId     String    @map("question_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  box            Int       @default(0) // 0..5
+  nextReviewAt   DateTime  @map("next_review_at") @db.Timestamptz
+  lastResult     Boolean?  @map("last_result")
+  lastReviewedAt DateTime? @map("last_reviewed_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, questionId])
+  @@index([userId, nextReviewAt], map: "idx_daily_review_user_due")
+  @@index([organizationId], map: "idx_daily_review_org")
+  @@map("daily_reviews")
+}
+
+// /daily/submit idempotency + replay snapshot + Faz 1 puan kaydı.
+// submissionId = client-uuid (dedup anahtarı). Aynı submissionId tekrar gelirse
+// kredi BİR kez verilir, snapshot'tan birebir aynı sonuç döner.
+model DailySubmission {
+  submissionId   String   @id @map("submission_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  correctCount   Int      @map("correct_count")
+  pointsAwarded  Int      @map("points_awarded")
+  resultsJson    Json     @map("results_json") // [{ questionId, correct, newBox, nextReviewAt }]
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_daily_submission_user")
+  @@map("daily_submissions")
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// OYUNLAŞTIRMA — Faz 2: Puan / Streak / Rozet. SMG'den TAMAMEN AYRIDIR.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Append-only puan defteri. Toplam puan = SUM(points). dedupKey ile idempotency
+// (daily_review:<submissionId>, exam_pass:<eventId> ...). points asla negatif olmaz.
+model PointLedger {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  eventType      String   @map("event_type") @db.VarChar(30) // daily_review | exam_pass | training_complete | feedback_submit
+  refId          String?  @map("ref_id") @db.Uuid            // submissionId / attemptId / assignmentId / responseId
+  points         Int                                          // >= 0 (monoton artan)
+  dedupKey       String   @unique @map("dedup_key") @db.VarChar(120)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_point_ledger_user")
+  @@index([userId, eventType], map: "idx_point_ledger_user_event")
+  @@index([organizationId], map: "idx_point_ledger_org")
+  @@map("point_ledger")
+}
+
+// Kullanıcı başına günlük seri. Server-clock (Europe/Istanbul). lastActiveDate
+// günlük review submit'inde ilerletilir; gece cron freeze/reset uygular.
+model UserStreak {
+  userId         String    @id @map("user_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  current        Int       @default(0)
+  longest        Int       @default(0)
+  lastActiveDate DateTime? @map("last_active_date") @db.Date
+  freezesLeft    Int       @default(2) @map("freezes_left")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId], map: "idx_user_streak_org")
+  @@map("user_streaks")
+}
+
+// Rozet katalog — GLOBAL seed (organizationId YOK). thresholdJson kazanım koşulu.
+model Badge {
+  id            String   @id @default(uuid()) @db.Uuid
+  code          String   @unique @db.VarChar(40)
+  tier          String   @db.VarChar(10) // bronze | silver | gold
+  icon          String   @db.VarChar(40) // izinli mobil ikon seti
+  title         String   @db.VarChar(120)
+  thresholdJson Json     @map("threshold_json") // { type, value, eventType? }
+  isActive      Boolean  @default(true) @map("is_active")
+  sortOrder     Int      @default(0) @map("sort_order")
+
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+// Kazanılan rozet. PK [userId, badgeId] → idempotent earn (skipDuplicates).
+model UserBadge {
+  userId         String   @map("user_id") @db.Uuid
+  badgeId        String   @map("badge_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  earnedAt       DateTime @default(now()) @map("earned_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, badgeId])
+  @@index([userId], map: "idx_user_badge_user")
+  @@index([organizationId], map: "idx_user_badge_org")
+  @@map("user_badges")
 }
