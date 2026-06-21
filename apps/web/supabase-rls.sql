@@ -463,3 +463,47 @@ CREATE POLICY "admin_invitations_all" ON invitations
     AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
   );
 
+-- ── OYUNLAŞTIRMA Faz 1 — Günün Soruları RLS ──
+-- Yazımlar server/service_role ile yapılır (RLS bypass); aşağıdaki staff SELECT
+-- policy'leri defense-in-depth. Personel yalnız KENDİ satırlarını okuyabilir.
+ALTER TABLE daily_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_submissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_daily_reviews_all" ON daily_reviews
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "staff_daily_reviews_select" ON daily_reviews
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "super_admin_daily_submissions_all" ON daily_submissions
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "staff_daily_submissions_select" ON daily_submissions
+  FOR SELECT USING (user_id = auth.uid());
+
+-- ── OYUNLAŞTIRMA Faz 2 — Puan / Streak / Rozet RLS ──
+-- Yazımlar server/service_role ile (RLS bypass); staff SELECT defense-in-depth.
+-- badges = global katalog → tüm authenticated kullanıcılar okuyabilir.
+ALTER TABLE point_ledger ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_streaks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE badges ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_badges ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_point_ledger_all" ON point_ledger
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "staff_point_ledger_select" ON point_ledger
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "super_admin_user_streaks_all" ON user_streaks
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "staff_user_streaks_select" ON user_streaks
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "super_admin_user_badges_all" ON user_badges
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "staff_user_badges_select" ON user_badges
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "all_badges_select" ON badges
+  FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "super_admin_badges_all" ON badges
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+

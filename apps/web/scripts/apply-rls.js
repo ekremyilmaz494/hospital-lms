@@ -30,6 +30,10 @@ async function run() {
     // Training Feedback (EY.FR.40)
     'training_feedback_forms','training_feedback_categories','training_feedback_items',
     'training_feedback_responses','training_feedback_answers',
+    // Oyunlaştırma Faz 1 — Günün Soruları
+    'daily_reviews','daily_submissions',
+    // Oyunlaştırma Faz 2 — Puan / Streak / Rozet
+    'point_ledger','user_streaks','badges','user_badges',
   ];
 
   for (const t of tables) {
@@ -103,6 +107,23 @@ async function run() {
     [`CREATE POLICY "admin_notifications_all" ON notifications FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
     [`CREATE POLICY "staff_notifications_select" ON notifications FOR SELECT USING (user_id = auth.uid())`],
     [`CREATE POLICY "staff_notifications_update" ON notifications FOR UPDATE USING (user_id = auth.uid())`],
+
+    // OYUNLAŞTIRMA Faz 1 — Günün Soruları (yazımlar service_role; staff yalnız kendi satırını okur)
+    [`CREATE POLICY "super_admin_daily_reviews_all" ON daily_reviews FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "staff_daily_reviews_select" ON daily_reviews FOR SELECT USING (user_id = auth.uid())`],
+    [`CREATE POLICY "super_admin_daily_submissions_all" ON daily_submissions FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "staff_daily_submissions_select" ON daily_submissions FOR SELECT USING (user_id = auth.uid())`],
+
+    // OYUNLAŞTIRMA Faz 2 — Puan / Streak / Rozet (yazımlar service_role; staff yalnız kendi satırı)
+    [`CREATE POLICY "super_admin_point_ledger_all" ON point_ledger FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "staff_point_ledger_select" ON point_ledger FOR SELECT USING (user_id = auth.uid())`],
+    [`CREATE POLICY "super_admin_user_streaks_all" ON user_streaks FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "staff_user_streaks_select" ON user_streaks FOR SELECT USING (user_id = auth.uid())`],
+    [`CREATE POLICY "super_admin_user_badges_all" ON user_badges FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "staff_user_badges_select" ON user_badges FOR SELECT USING (user_id = auth.uid())`],
+    // badges = global katalog → tüm authenticated okuyabilir
+    [`CREATE POLICY "all_badges_select" ON badges FOR SELECT USING (auth.uid() IS NOT NULL)`],
+    [`CREATE POLICY "super_admin_badges_all" ON badges FOR ALL USING (public.get_user_role() = 'super_admin')`],
     // AUDIT LOGS
     [`CREATE POLICY "super_admin_audit_all" ON audit_logs FOR ALL USING (public.get_user_role() = 'super_admin')`],
     [`CREATE POLICY "admin_audit_select" ON audit_logs FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
