@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail, Award, BellRing, CalendarClock, Target } from 'lucide-react';
+import { Mail, CalendarClock, Target } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -121,20 +121,6 @@ export default function NotificationTab({ settings, setSettings }: Props) {
             label: 'E-posta Bildirimleri',
             desc: 'Önemli olaylarda personele otomatik e-posta gönderilir',
             color: 'var(--k-info)',
-          },
-          {
-            key: 'notifyOnComplete' as const,
-            icon: Award,
-            label: 'Tamamlanma Bildirimi',
-            desc: 'Personel bir eğitimi başarıyla tamamladığında bildirim alın',
-            color: 'var(--k-success)',
-          },
-          {
-            key: 'notifyOnFail' as const,
-            icon: BellRing,
-            label: 'Başarısızlık Bildirimi',
-            desc: 'Personel sınavda başarısız olduğunda bildirim alın',
-            color: 'var(--k-error)',
           },
         ].map((item) => (
           <div

@@ -94,6 +94,9 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     const period = await getOrCreateActivePeriodForAssignment(organizationId)
     activePeriodId = period.status === 'closed' ? null : period.id
   }
+  // Publish anında YENİ atanan personeli yakala → transaction sonrası "Yeni Eğitim Atandı"
+  // bildirimi (publish-auto-assign yolu daha önce hiç bildirim göndermiyordu).
+  let newlyAssignedUserIds: string[] = []
 
   try {
     const training = await prisma.$transaction(async (tx) => {
@@ -274,6 +277,15 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
           )
         }
 
+        // Yalnız GERÇEKTEN yeni atananları bildir (yeniden yayında çift bildirim olmasın).
+        const targetUserIds = assignments.map(a => a.userId)
+        const alreadyAssigned = await tx.trainingAssignment.findMany({
+          where: { trainingId: t.id, userId: { in: targetUserIds }, periodId: activePeriodId },
+          select: { userId: true },
+        })
+        const alreadySet = new Set(alreadyAssigned.map(a => a.userId))
+        newlyAssignedUserIds = targetUserIds.filter(uid => !alreadySet.has(uid))
+
         await tx.trainingAssignment.createMany({
           data: assignments,
           skipDuplicates: true,
@@ -292,6 +304,25 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
 
     revalidatePath('/staff/my-trainings')
     revalidatePath('/admin/trainings')
+
+    // Yeni atanan personele "kendi panelinde" bildirim (publish-auto-assign boşluğu kapatıldı).
+    // Non-critical: hata yayını bloklamaz.
+    if (newlyAssignedUserIds.length > 0) {
+      try {
+        await prisma.notification.createMany({
+          data: newlyAssignedUserIds.map(userId => ({
+            userId,
+            organizationId,
+            title: 'Yeni Eğitim Atandı',
+            message: `"${training.title}" eğitimi size atandı.`,
+            type: 'assignment',
+            relatedTrainingId: training.id,
+          })),
+        })
+      } catch (err) {
+        logger.error('training-publish', 'Atama bildirimi oluşturulamadı', err instanceof Error ? err.message : err)
+      }
+    }
 
     try { await invalidateDashboardCache(organizationId) } catch {}
     try { await invalidateOrgCache(organizationId, 'trainings') } catch {}
