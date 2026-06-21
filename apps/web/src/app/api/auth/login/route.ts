@@ -110,18 +110,15 @@ export async function POST(request: NextRequest) {
         return errorResponse('TC Kimlik No veya şifre hatalı.', 401)
       }
 
-      // Aynı TC birden fazla aktif org'da → kullanıcı seçim yapmalı.
-      // 200 + orgPickRequired flag (401 değil — şifre denemesi sayılmasın).
+      // Tek-org politikası: bir kişi yalnızca BİR kuruma bağlı olmalı. Aynı TC birden
+      // fazla aktif kurumda eşleşiyorsa (eski/hatalı veri) org SEÇİMİ SUNULMAZ — giriş
+      // reddedilir ve yöneticinin fazladan kaydı temizlemesi gerekir. (401 değil; şifre
+      // denemesi sayılmasın — veri sorunu, kimlik bilgisi sorunu değil.)
       if (matches.length > 1) {
-        return jsonResponse({
-          orgPickRequired: true,
-          orgs: matches
-            .filter((m): m is typeof m & { organization: NonNullable<typeof m.organization> } => m.organization !== null)
-            .map(m => ({
-              slug: m.organization.slug,
-              name: m.organization.name,
-            })),
-        })
+        return errorResponse(
+          'Hesabınız birden fazla kuruma bağlı görünüyor. Lütfen kurum yöneticinizle iletişime geçin.',
+          409,
+        )
       }
 
       normalizedEmail = matches[0].email.trim().toLowerCase()

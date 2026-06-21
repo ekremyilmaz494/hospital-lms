@@ -283,7 +283,8 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
     .map(r => hashTcKimlik(r.tcKimlik))
   const existingTc = tcHashList.length > 0
     ? await prisma.user.findMany({
-        where: { tcHash: { in: tcHashList }, organizationId: orgId },
+        // TEK-ORG: GLOBAL ara (org-scope DEĞİL) — TC başka bir kuruma kayıtlıysa da reddet.
+        where: { tcHash: { in: tcHashList } },
         select: { tcHash: true },
       })
     : []
@@ -378,7 +379,7 @@ async function validateRows(rows: ParsedRow[], orgId: string) {
     seenTcHashes.set(tcHash, row.rowIndex)
 
     if (existingTcSet.has(tcHash)) {
-      rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu TC Kimlik No bu kurumda zaten kayıtlı' })
+      rowResults.push({ rowIndex: row.rowIndex, email: row.email, status: 'error', reason: 'Bu TC Kimlik No sistemde zaten kayıtlı (bir kişi yalnızca bir kuruma bağlı olabilir)' })
       continue
     }
 

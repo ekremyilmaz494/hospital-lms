@@ -3,7 +3,7 @@
 import React, { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Clock, ArrowRight, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { KvkkNoticeModal } from '@/components/shared/kvkk-notice-modal';
@@ -75,12 +75,11 @@ function LoginForm() {
 
   const [showPassword, setShowPassword] = useState(false);
   // Tek alan UX: kullanıcı email veya 11 haneli TC girer, sistem otomatik tip tespiti yapar.
-  // Subdomain'de orgSlug auto-set olur (TC çakışması daralır), apex'te null
-  // — TC birden fazla aktif org'da varsa server orgPickRequired döner.
+  // Subdomain'de orgSlug auto-set olur (TC çakışması o kuruma daralır), apex'te null.
+  // Tek-org politikası: TC birden fazla aktif kurumda eşleşirse server 409 ile reddeder
+  // (org seçimi sunulmaz — veri düzeltilmeli).
   const [identifier, setIdentifier] = useState('');
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
-  const [orgPickList, setOrgPickList] = useState<{ slug: string; name: string }[] | null>(null);
-  const [pickedOrg, setPickedOrg] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
@@ -95,7 +94,7 @@ function LoginForm() {
   }, []);
 
   // Subdomain'den orgSlug çıkar — TC çakışması bu org'a daraltılır.
-  // Apex'te orgSlug null kalır, server gerekirse orgPickRequired döner.
+  // Apex'te orgSlug null kalır; çakışma varsa server 409 reddeder (seçim yok).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
@@ -171,8 +170,8 @@ function LoginForm() {
         identifier: looksLikeTc ? normalizeTcKimlik(trimmed) : trimmed,
         password,
         rememberMe,
-        // pickedOrg: kullanıcı dropdown'dan hastanesini seçti; orgSlug: subdomain auto-detect
-        orgSlug: pickedOrg ?? orgSlug ?? undefined,
+        // orgSlug: subdomain auto-detect — TC çakışmasını o kuruma daraltır.
+        orgSlug: orgSlug ?? undefined,
       };
 
       const res = await fetch('/api/auth/login', {
@@ -191,13 +190,6 @@ function LoginForm() {
       if (!res.ok) {
         const fallback = looksLikeTc ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.';
         setError(data.error ?? fallback);
-        setLoading(false);
-        return;
-      }
-
-      // TC çakışması: aynı TC birden fazla aktif hastanede → kullanıcı seçim yapmalı
-      if (data.orgPickRequired) {
-        setOrgPickList(data.orgs);
         setLoading(false);
         return;
       }
@@ -454,8 +446,6 @@ function LoginForm() {
                       // Sayı + nokta + @ + harf izinli — TC yazılırken sayıya kısıtlama yok,
                       // kullanıcı ister TC ister email yazsın aynı kutuda devam etsin.
                       setIdentifier(e.target.value);
-                      // Org pick dropdown gösteriliyorsa identifier değişince temizle
-                      if (orgPickList) { setOrgPickList(null); setPickedOrg(null); }
                     }}
                     autoComplete="username"
                     className="ed-input"
@@ -463,36 +453,6 @@ function LoginForm() {
                     data-testid="login-identifier-input"
                   />
                 </div>
-
-                {/* Çakışma çözücü: aynı TC birden fazla aktif hastanede kayıtlı — hangi hastane? */}
-                {orgPickList && orgPickList.length > 0 && (
-                  <div className="rounded-lg p-3" style={{ background: K.WARNING_BG, border: `1px solid ${K.WARNING}` }}>
-                    <div className="flex items-start gap-2 mb-3">
-                      <Building2 className="h-4 w-4 shrink-0 mt-0.5" style={{ color: K.WARNING }} />
-                      <div className="text-[12px] leading-relaxed" style={{ color: K.TEXT_PRIMARY }}>
-                        <strong>Bu TC birden fazla organizasyonda kayıtlı.</strong> Hangi organizasyona giriş yapmak istiyorsunuz?
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {orgPickList.map((o) => (
-                        <button
-                          key={o.slug}
-                          type="button"
-                          onClick={() => { setPickedOrg(o.slug); setError(''); }}
-                          className="w-full text-left px-3 py-2 rounded-md transition-colors"
-                          style={{
-                            background: pickedOrg === o.slug ? K.PRIMARY : K.SURFACE,
-                            color: pickedOrg === o.slug ? '#fff' : K.TEXT_PRIMARY,
-                            border: `1px solid ${pickedOrg === o.slug ? K.PRIMARY : K.BORDER_LIGHT}`,
-                          }}
-                          data-testid={`login-org-pick-${o.slug}`}
-                        >
-                          {o.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Password */}
                 <div>
