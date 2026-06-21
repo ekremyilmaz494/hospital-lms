@@ -327,20 +327,30 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   const tabSwitchCount = parsed.data.tabSwitchCount ?? 0
   const suspicious = tabSwitchCount >= 3
 
+  // Sınav sonucu bildirimi (karar 2026-06): "Sınavı Geçtiniz!" SELF-bildirimi KALDIRILDI —
+  // sonuç ekranı zaten kutlama + skor gösteriyor (kendi geçtiğin sınavın bildirimi gereksiz).
+  // Sınavda kalınca YALNIZCA tekrar hakkı varsa personele "tekrar dene" hatırlatması gider.
+  // Yöneticiye olay-bazlı bildirim YOK (kullanıcı kararı).
+  const attemptsRemaining = isPassed ? 0 : Math.max(0, effectiveMaxAttempts - attempt.attemptNumber)
+  const retryDueDate = attempt.assignment.dueDate ?? attempt.training.endDate
+  const retryDueText = retryDueDate
+    ? `, son tarih ${new Date(retryDueDate).toLocaleDateString('tr-TR')}`
+    : ''
+
   // Non-critical: bildirim, sertifika, SMG, audit — response'u bloklamaz
   void Promise.allSettled([
-    prisma.notification.create({
-      data: {
-        userId: dbUser.id,
-        organizationId: attempt.training.organizationId,
-        title: isPassed ? 'Sınavı Geçtiniz!' : 'Sınav Sonucu',
-        message: isPassed
-          ? `"${attempt.training.title}" eğitimini ${score} puanla başarıyla tamamladınız.`
-          : `"${attempt.training.title}" sınavından ${score} puan aldınız. Geçme notu: ${attempt.training.passingScore}.`,
-        type: isPassed ? 'exam_passed' : 'exam_failed',
-        relatedTrainingId: attempt.trainingId,
-      },
-    }),
+    !isPassed && attemptsRemaining > 0
+      ? prisma.notification.create({
+          data: {
+            userId: dbUser.id,
+            organizationId: attempt.training.organizationId,
+            title: 'Tekrar Deneme Hakkınız Var',
+            message: `"${attempt.training.title}" sınavından ${score} puan aldınız (geçme: ${attempt.training.passingScore}). ${attemptsRemaining} deneme hakkınız kaldı${retryDueText}. Hazır olduğunuzda tekrar deneyebilirsiniz.`,
+            type: 'exam_failed',
+            relatedTrainingId: attempt.trainingId,
+          },
+        })
+      : Promise.resolve(),
     isPassed
       ? issueCertificateForAttempt({
           attemptId: attempt.id,
@@ -429,8 +439,6 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       logger.warn('ExamSubmit', 'feedbackRequired check failed', { err: (err as Error).message })
     }
   }
-
-  const attemptsRemaining = isPassed ? 0 : Math.max(0, effectiveMaxAttempts - attempt.attemptNumber)
 
   return jsonResponse({
     phase: 'post',
