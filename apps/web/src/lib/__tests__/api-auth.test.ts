@@ -18,6 +18,15 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
+// getAuthUser artık session.access_token'ı kriptografik doğruluyor (K1). Testte gerçek JWKS
+// olmadığından verifyAccessToken'ı mock'la: token'ı sub olarak yansıtır. Testler session'a
+// access_token = user.id koyduğunda verified.sub === session.user.id eşleşir.
+vi.mock('@/lib/supabase/verify-jwt', () => ({
+  verifyAccessToken: vi.fn(async (token?: string) =>
+    token ? { sub: token, role: 'staff', payload: {} } : null,
+  ),
+}))
+
 const mockCookiesGetAll = vi.fn(() => [] as { name: string; value: string }[])
 
 vi.mock('next/headers', () => ({
@@ -66,11 +75,13 @@ import { prisma } from '@/lib/prisma'
 
 const { POST } = await import('@/app/api/auth/login/route')
 const { requireRole, getAuthUser } = await import('@/lib/api-helpers')
+const { verifyAccessToken } = await import('@/lib/supabase/verify-jwt')
 
 type AnyMock = ReturnType<typeof vi.fn<(...args: any[]) => any>>
 const mockGetRateLimitCount = getRateLimitCount as AnyMock
 const mockUserFindUnique = prisma.user.findUnique as AnyMock
 const mockOrgFindUnique = prisma.organization.findUnique as AnyMock
+const mockVerifyAccessToken = verifyAccessToken as AnyMock
 
 function makeRequest(body: Record<string, unknown>, headers?: Record<string, string>) {
   return new Request('http://localhost:3000/api/auth/login', {
@@ -266,7 +277,7 @@ describe('getAuthUser - oturum kontrolleri', () => {
   it('aktif olmayan kullanici 403 doner', async () => {
     mockCookiesGetAll.mockReturnValue([{ name: 'sb-xxx-auth-token', value: 'x' }])
     mockGetSession.mockResolvedValue({
-      data: { session: { user: { id: 'user-inactive' } } },
+      data: { session: { user: { id: 'user-inactive' }, access_token: 'user-inactive' } },
       error: null,
     })
     mockUserFindUnique.mockResolvedValue({ id: 'user-inactive', isActive: false, role: 'staff' })
@@ -281,7 +292,7 @@ describe('getAuthUser - oturum kontrolleri', () => {
   it('askiya alinmis organizasyon 403 doner', async () => {
     mockCookiesGetAll.mockReturnValue([{ name: 'sb-xxx-auth-token', value: 'x' }])
     mockGetSession.mockResolvedValue({
-      data: { session: { user: { id: 'user-suspended-org' } } },
+      data: { session: { user: { id: 'user-suspended-org' }, access_token: 'user-suspended-org' } },
       error: null,
     })
     mockUserFindUnique.mockResolvedValue({
@@ -297,5 +308,39 @@ describe('getAuthUser - oturum kontrolleri', () => {
     expect(error).not.toBeNull()
     const body = await error!.json()
     expect(body.error).toContain('askıya alınmıştır')
+  })
+
+  // ── K1 regresyon: getSession imzayı doğrulamaz; getAuthUser access_token'ı kriptografik doğrular ──
+  it('imza doğrulanamayan token (verifyAccessToken null) → 401, dbUser null', async () => {
+    mockCookiesGetAll.mockReturnValue([{ name: 'sb-xxx-auth-token', value: 'x' }])
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: 'user-1' }, access_token: 'forged-unsigned-jwt' } },
+      error: null,
+    })
+    mockVerifyAccessToken.mockResolvedValueOnce(null) // sahte/imzasız token reddedilir
+
+    const { error, dbUser } = await getAuthUser()
+
+    expect(dbUser).toBeNull()
+    expect(error).not.toBeNull()
+    const body = await error!.json()
+    expect(body.error).toBe('Unauthorized')
+    expect(mockUserFindUnique).not.toHaveBeenCalled() // DB'ye hiç gidilmemeli
+  })
+
+  it('token sub ≠ session.user.id (impersonation) → 401', async () => {
+    mockCookiesGetAll.mockReturnValue([{ name: 'sb-xxx-auth-token', value: 'x' }])
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: 'victim-uuid' }, access_token: 'attacker-token' } },
+      error: null,
+    })
+    // İmza geçerli ama BAŞKA kullanıcıya ait — sub uyuşmazlığında reddedilmeli.
+    mockVerifyAccessToken.mockResolvedValueOnce({ sub: 'attacker-uuid', role: 'staff', payload: {} })
+
+    const { error, dbUser } = await getAuthUser()
+
+    expect(dbUser).toBeNull()
+    expect(error).not.toBeNull()
+    expect(mockUserFindUnique).not.toHaveBeenCalled()
   })
 })

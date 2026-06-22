@@ -134,6 +134,8 @@ describe('PATCH /scorm/tracking — tamamlanma → assignment passed (D1a)', () 
     prismaMock.scormAttempt.findFirst.mockResolvedValue({
       id: 'scorm-1', lessonStatus: 'incomplete', suspendData: null, score: null,
       totalTime: null, completionStatus: null, successStatus: null,
+      // O6 anti-cheat: attempt 60sn önce başladı (>= MIN_SCORM_ENGAGEMENT_SECONDS=30) → geçiş izinli.
+      createdAt: new Date(Date.now() - 60_000),
     })
   })
 
@@ -196,6 +198,8 @@ describe('PATCH /scorm/tracking — sertifika üretimi (D1b)', () => {
     prismaMock.scormAttempt.findFirst.mockResolvedValue({
       id: 'scorm-1', lessonStatus: 'incomplete', suspendData: null, score: null,
       totalTime: null, completionStatus: null, successStatus: null,
+      // O6 anti-cheat: attempt 60sn önce başladı (>= MIN_SCORM_ENGAGEMENT_SECONDS=30) → geçiş izinli.
+      createdAt: new Date(Date.now() - 60_000),
     })
     prismaMock.trainingAssignment.findFirst.mockResolvedValue({ id: 'asg-1', status: 'in_progress' })
     prismaMock.certificate.create.mockResolvedValue({ id: 'cert-1' })

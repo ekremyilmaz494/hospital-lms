@@ -82,7 +82,7 @@ CREATE POLICY "anyone_plans_select" ON subscription_plans FOR SELECT USING (is_a
 
 -- ORGANIZATION SUBSCRIPTIONS
 CREATE POLICY "super_admin_subs_all" ON organization_subscriptions FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_subs_select" ON organization_subscriptions FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "admin_subs_select" ON organization_subscriptions FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- TRAININGS
 CREATE POLICY "super_admin_trainings_all" ON trainings FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
@@ -90,30 +90,36 @@ CREATE POLICY "admin_trainings_all" ON trainings FOR ALL USING ((SELECT auth.jwt
 CREATE POLICY "staff_trainings_select" ON trainings FOR SELECT USING (id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid()));
 
 -- TRAINING VIDEOS
-CREATE POLICY "admin_videos_all" ON training_videos FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)));
+CREATE POLICY "super_admin_videos_all" ON training_videos FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_videos_all" ON training_videos FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)));
 CREATE POLICY "staff_videos_select" ON training_videos FOR SELECT USING (training_id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid()));
 
 -- QUESTIONS + OPTIONS
-CREATE POLICY "admin_questions_all" ON questions FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)));
+CREATE POLICY "super_admin_questions_all" ON questions FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_questions_all" ON questions FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)));
 CREATE POLICY "staff_questions_select" ON questions FOR SELECT USING (training_id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid()));
-CREATE POLICY "admin_options_all" ON question_options FOR ALL USING (question_id IN (SELECT id FROM questions WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid))));
+CREATE POLICY "super_admin_options_all" ON question_options FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_options_all" ON question_options FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND question_id IN (SELECT id FROM questions WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid))));
 CREATE POLICY "staff_options_select" ON question_options FOR SELECT USING (question_id IN (SELECT id FROM questions WHERE training_id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid())));
 
 -- TRAINING ASSIGNMENTS
 CREATE POLICY "super_admin_assignments_all" ON training_assignments FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_assignments_all" ON training_assignments FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)));
+CREATE POLICY "admin_assignments_all" ON training_assignments FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)));
 CREATE POLICY "staff_assignments_select" ON training_assignments FOR SELECT USING (user_id = auth.uid());
 
 -- EXAM ATTEMPTS (organization_id eklendi — direkt filtre, subquery gereksiz)
-CREATE POLICY "admin_attempts_select" ON exam_attempts FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "super_admin_attempts_all" ON exam_attempts FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_attempts_select" ON exam_attempts FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_attempts_all" ON exam_attempts FOR ALL USING (user_id = auth.uid());
 
 -- EXAM ANSWERS
-CREATE POLICY "admin_answers_select" ON exam_answers FOR SELECT USING (attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid))));
+CREATE POLICY "super_admin_answers_all" ON exam_answers FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_answers_select" ON exam_answers FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid))));
 CREATE POLICY "staff_answers_all" ON exam_answers FOR ALL USING (attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid()));
 
 -- VIDEO PROGRESS
-CREATE POLICY "admin_progress_select" ON video_progress FOR SELECT USING (attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid))));
+CREATE POLICY "super_admin_progress_all" ON video_progress FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_progress_select" ON video_progress FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid))));
 CREATE POLICY "staff_progress_all" ON video_progress FOR ALL USING (user_id = auth.uid());
 
 -- NOTIFICATIONS
@@ -135,8 +141,10 @@ CREATE POLICY "admin_departments_all" ON departments FOR ALL USING ((SELECT auth
 CREATE POLICY "staff_departments_select" ON departments FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- CERTIFICATES
+-- GÜVENLİK: admin politikasında role='admin' kontrolü ŞART — staff JWT'si de organization_id
+-- taşır; rol predikatı olmadan personel Supabase client ile org-geneli sertifika basıp/silebilirdi.
 CREATE POLICY "super_admin_certificates_all" ON certificates FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_certificates_all" ON certificates FOR ALL USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "admin_certificates_all" ON certificates FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_certificates_select" ON certificates FOR SELECT USING (user_id = auth.uid());
 
 -- KVKK REQUESTS
@@ -145,7 +153,10 @@ CREATE POLICY "staff_kvkk_own" ON kvkk_requests FOR SELECT USING (user_id = auth
 CREATE POLICY "staff_kvkk_insert" ON kvkk_requests FOR INSERT WITH CHECK (user_id = auth.uid());
 
 -- SCORM ATTEMPTS
-CREATE POLICY "admin_scorm_all" ON scorm_attempts FOR ALL USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+-- GÜVENLİK: admin politikasında role='admin' kontrolü ŞART (aksi halde staff org-geneli scorm
+-- kaydını okuyup/değiştirebilir) + super_admin cross-org destek politikası.
+CREATE POLICY "super_admin_scorm_all" ON scorm_attempts FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_scorm_all" ON scorm_attempts FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_scorm_own" ON scorm_attempts FOR ALL USING (user_id = auth.uid());
 
 -- DEPARTMENT TRAINING RULES
@@ -154,11 +165,11 @@ CREATE POLICY "staff_dept_rules_select" ON department_training_rules FOR SELECT 
 
 -- PAYMENTS
 CREATE POLICY "super_admin_payments_all" ON payments FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_payments_select" ON payments FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "admin_payments_select" ON payments FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- INVOICES
 CREATE POLICY "super_admin_invoices_all" ON invoices FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_invoices_select" ON invoices FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "admin_invoices_select" ON invoices FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- Enable realtime for notifications
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
@@ -224,8 +235,9 @@ CREATE POLICY "admin_question_bank_all" ON question_bank FOR ALL
     AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- QUESTION BANK OPTIONS
+CREATE POLICY "super_admin_question_bank_options_all" ON question_bank_options FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_question_bank_options_all" ON question_bank_options FOR ALL
-  USING (question_bank_id IN (
+  USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND question_bank_id IN (
     SELECT id FROM question_bank
     WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
   ));
@@ -238,8 +250,11 @@ CREATE POLICY "super_admin_accreditation_standards_all" ON accreditation_standar
 
 CREATE POLICY "admin_accreditation_standards_select" ON accreditation_standards
   FOR SELECT USING (
-    organization_id IS NULL
-    OR organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND (
+      organization_id IS NULL
+      OR organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+    )
   );
 
 CREATE POLICY "admin_accreditation_standards_insert" ON accreditation_standards
@@ -303,9 +318,11 @@ CREATE POLICY "staff_tfb_forms_select" ON training_feedback_forms
   );
 
 -- TRAINING FEEDBACK CATEGORIES: form uzerinden org filtreli
+CREATE POLICY "super_admin_tfb_categories_all" ON training_feedback_categories FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_tfb_categories_all" ON training_feedback_categories
   FOR ALL USING (
-    form_id IN (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND form_id IN (
       SELECT id FROM training_feedback_forms
       WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
     )
@@ -320,9 +337,11 @@ CREATE POLICY "staff_tfb_categories_select" ON training_feedback_categories
   );
 
 -- TRAINING FEEDBACK ITEMS: kategori uzerinden org filtreli
+CREATE POLICY "super_admin_tfb_items_all" ON training_feedback_items FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_tfb_items_all" ON training_feedback_items
   FOR ALL USING (
-    category_id IN (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND category_id IN (
       SELECT c.id FROM training_feedback_categories c
       JOIN training_feedback_forms f ON c.form_id = f.id
       WHERE f.organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
@@ -358,9 +377,11 @@ CREATE POLICY "staff_tfb_responses_insert_own" ON training_feedback_responses
   );
 
 -- TRAINING FEEDBACK ANSWERS: response uzerinden filtreli
+CREATE POLICY "super_admin_tfb_answers_all" ON training_feedback_answers FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_tfb_answers_select" ON training_feedback_answers
   FOR SELECT USING (
-    response_id IN (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND response_id IN (
       SELECT id FROM training_feedback_responses
       WHERE organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
     )

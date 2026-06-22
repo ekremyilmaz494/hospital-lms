@@ -144,6 +144,15 @@ async function parseImportFile(
     }
   }
 
+  // DoS koruması: satır başına map/validate maliyeti var; aşırı büyük dosyada
+  // sunucuyu yormamak için sert üst sınır. Başlık satırı dahil rowCount.
+  if (sheet.rowCount > 2000) {
+    return {
+      rows: [],
+      parseError: 'Tek seferde en fazla 2000 satır işlenebilir. Lütfen dosyayı bölerek yükleyin.',
+    }
+  }
+
   const normalizeHeader = (raw: unknown): string =>
     cellToString(raw).replace(/\*+$/, '').trim().toLowerCase()
 
@@ -403,6 +412,17 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     const allowed = await checkRateLimit(`bulk-import:org:${orgId}`, 500, 3600)
     if (!allowed) {
       return new Response(JSON.stringify({ error: 'Saatte en fazla 500 personel yüklenebilir. Lütfen biraz sonra tekrar deneyin.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
+      })
+    }
+  } else {
+    // Preview de tam .xlsx parse ediyor (ExcelJS workbook.xlsx.load) — rate limit
+    // olmadan tekrarlı upload ile DoS açığı oluşur. Import'tan daha gevşek ama
+    // mevcut bir limit uyguluyoruz (org bazlı, saatte 30 preview).
+    const previewAllowed = await checkRateLimit(`bulk-import-preview:org:${orgId}`, 30, 3600)
+    if (!previewAllowed) {
+      return new Response(JSON.stringify({ error: 'Saatte en fazla 30 önizleme yapılabilir. Lütfen biraz sonra tekrar deneyin.' }), {
         status: 429,
         headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' },
       })

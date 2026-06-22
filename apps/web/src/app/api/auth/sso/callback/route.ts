@@ -7,8 +7,7 @@ import { logger } from '@/lib/logger'
 import { safeDecrypt } from '@/lib/crypto'
 import {
   verifySsoState,
-  verifySamlSignature,
-  extractSamlIdentity,
+  validateSamlResponse,
   verifyOidcToken,
 } from '@/lib/sso'
 
@@ -39,6 +38,7 @@ export async function POST(request: NextRequest) {
     select: {
       id: true,
       samlCert: true,
+      samlIssuer: true,
       ssoAutoProvision: true,
       ssoDefaultRole: true,
     },
@@ -48,29 +48,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login?error=sso_org_not_found', request.url))
   }
 
-  // Decode SAML response (Base64)
-  let samlXml: string
-  try {
-    samlXml = Buffer.from(samlResponse, 'base64').toString('utf-8')
-  } catch {
-    return NextResponse.redirect(new URL('/auth/login?error=sso_invalid_response', request.url))
-  }
-
   // SAML imza dogrulamasi (KRITIK guvenlik kontrolu)
   if (!org.samlCert) {
     logger.error('sso:callback', 'SAML sertifikasi yapilandirilmamis', { orgId: org.id })
     return NextResponse.redirect(new URL('/auth/login?error=sso_config_error', request.url))
   }
 
-  const signatureValid = verifySamlSignature(samlXml, org.samlCert)
-  if (!signatureValid) {
-    logger.warn('sso:callback', 'SAML imza dogrulanamadi — olasi sahte response', { orgId: org.id })
+  // node-saml: imza + Conditions/NotOnOrAfter + Audience doğrulanır; kimlik YALNIZCA imzalı
+  // assertion'dan okunur (XSW kapalı). Base64 SAMLResponse doğrudan kütüphaneye verilir.
+  const identity = await validateSamlResponse(samlResponse, {
+    samlCert: org.samlCert,
+    samlIssuer: org.samlIssuer,
+  })
+  if (!identity) {
+    logger.warn('sso:callback', 'SAML doğrulanamadı — olası sahte/wrapping response', { orgId: org.id })
     return NextResponse.redirect(new URL('/auth/login?error=sso_signature_invalid', request.url))
   }
 
-  // Imza dogrulandi — kimlik bilgilerini extract et
-  const identity = extractSamlIdentity(samlXml)
-  const email = identity.email || state.email
+  const email = identity.email
   const firstName = identity.firstName || email.split('@')[0]
   const lastName = identity.lastName || ''
 
@@ -170,7 +165,20 @@ export async function GET(request: NextRequest) {
     }
 
     const payload = verification.payload
-    const email = (payload.email as string) || state.email
+
+    // GÜVENLİK: Doğrulanmamış e-posta ile hesap ele geçirmeyi önle. Email YALNIZCA
+    // imzalı id_token payload'ından alınır (state.email'e fallback YOK) ve email_verified
+    // claim'i true olmalıdır — aksi halde IdP'de sahibi doğrulanmamış bir adresle giriş yapılabilir.
+    const email = typeof payload.email === 'string' ? payload.email : null
+    if (!email) {
+      logger.warn('sso:callback', 'OIDC id_token email claim eksik', { orgId: org.id })
+      return NextResponse.redirect(new URL('/auth/login?error=sso_no_email', request.url))
+    }
+    if (payload.email_verified !== true) {
+      logger.warn('sso:callback', 'OIDC email_verified=false — giriş reddedildi', { orgId: org.id })
+      return NextResponse.redirect(new URL('/auth/login?error=sso_email_unverified', request.url))
+    }
+
     const firstName = (payload.given_name as string) || (payload.name as string)?.split(' ')[0] || ''
     const lastName = (payload.family_name as string) || (payload.name as string)?.split(' ').slice(1).join(' ') || ''
 

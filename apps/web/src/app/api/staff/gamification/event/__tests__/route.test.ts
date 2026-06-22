@@ -86,7 +86,7 @@ describe('POST /api/staff/gamification/event', () => {
     expect(mockVerify).toHaveBeenCalledWith('exam_pass', REF_ID, 'staff-1', 'org-1')
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ eventType: 'exam_pass', refId: REF_ID, points: 50, dedupKey: `exam_pass:${EVENT_ID}` }),
+        data: expect.objectContaining({ eventType: 'exam_pass', refId: REF_ID, points: 50, dedupKey: `exam_pass:${REF_ID}` }),
       }),
     )
     expect(mockSeed).toHaveBeenCalledWith('staff-1', 'org-1', 't1')
@@ -108,6 +108,20 @@ describe('POST /api/staff/gamification/event', () => {
     expect(data.pointsAwarded).toBe(0)
     expect(mockVerify).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it('O4 anti-cheat: aynı refId FARKLI eventId ile tekrar → idempotent (puan şişirme önlendi)', async () => {
+    // refId zaten kredilendi → dedupKey artık type:refId üzerinden bulunur (istemci eventId DEĞİL).
+    mockFindUnique.mockResolvedValue({ id: 'pl-existing' } as never)
+    const FRESH_EVENT_ID = 'aaaaaaaa-0000-4000-8000-000000000099'
+    const res = await POST(body({ eventId: FRESH_EVENT_ID, type: 'exam_pass', refId: REF_ID }))
+    const data = await res.json()
+    expect(res.status).toBe(200)
+    expect(data.pointsAwarded).toBe(0)
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dedupKey: `exam_pass:${REF_ID}` } }),
+    )
   })
 
   it('eşzamanlı aynı eventId (P2002) → idempotent 0 puan', async () => {

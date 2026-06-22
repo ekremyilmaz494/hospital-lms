@@ -25,6 +25,8 @@ describe('backup-crypto', () => {
     } else {
       process.env.BACKUP_ENCRYPTION_KEY_OLD = originalOldKey
     }
+    // Güvenlik denetimi: plaintext fallback artık opt-in (ALLOW_PLAINTEXT_BACKUP) — testler arası temizle.
+    delete process.env.ALLOW_PLAINTEXT_BACKUP
   })
 
   describe('encryptBackup / decryptBackup round-trip', () => {
@@ -42,8 +44,9 @@ describe('backup-crypto', () => {
       expect(decrypted).toBe(plaintext)
     })
 
-    it('anahtar yokken plaintext döner ve decrypt no-op olur', () => {
+    it('anahtar yok + ALLOW_PLAINTEXT_BACKUP=true → plaintext (opt-in) ve decrypt no-op', () => {
       delete process.env.BACKUP_ENCRYPTION_KEY
+      process.env.ALLOW_PLAINTEXT_BACKUP = 'true' // O8: düz metin artık yalnız açık opt-in ile
 
       const plaintext = '{"users":[]}'
       const { data, isEncrypted } = encryptBackup(plaintext)
@@ -53,8 +56,15 @@ describe('backup-crypto', () => {
       expect(decryptBackup(data)).toBe(plaintext)
     })
 
-    it('geçersiz anahtar uzunluğunda plaintext döner', () => {
+    it('anahtar yok + opt-in YOK → THROW (KVKK: düz metin PII yazma)', () => {
+      delete process.env.BACKUP_ENCRYPTION_KEY
+      delete process.env.ALLOW_PLAINTEXT_BACKUP
+      expect(() => encryptBackup('{"users":[]}')).toThrow(/BACKUP_ENCRYPTION_KEY/)
+    })
+
+    it('geçersiz anahtar uzunluğu + opt-in → plaintext', () => {
       process.env.BACKUP_ENCRYPTION_KEY = 'kisa'
+      process.env.ALLOW_PLAINTEXT_BACKUP = 'true'
       const { data, isEncrypted } = encryptBackup('test')
       expect(isEncrypted).toBe(false)
       expect(data).toBe('test')

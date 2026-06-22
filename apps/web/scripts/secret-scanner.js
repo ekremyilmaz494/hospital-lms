@@ -35,9 +35,21 @@ for (const file of files) {
       if (line.includes('secret-scanner-disable-line')) continue;
 
       for (const pattern of SECRET_PATTERNS) {
-        if (pattern.regex.test(line)) {
-          // Eğer pattern bulursa ama bu bir environment variable kullanımı ise (process.env) atla
-          if (line.includes('process.env.')) continue;
+        const match = line.match(pattern.regex);
+        if (match) {
+          // Eski davranış: satırda herhangi bir yerde 'process.env.' geçiyorsa atlanıyordu.
+          // Bu bir bypass açığıydı — gerçek bir secret, aynı satırda process.env'e atıfta
+          // bulunan bir fallback ifadesiyle ('AKIA...' || process.env.X) gizlenebiliyordu.
+          // Düzeltme: yalnızca EŞLEŞEN secret değerinin kendisi bir process.env referansıysa
+          // (env değişkeninden okuma) atla. Salt substring kontrolü artık yapılmıyor.
+          const matchedValue = match[0];
+          if (matchedValue.includes('process.env.')) continue;
+
+          // env(VAR) referansları (Supabase config.toml / dotenvx) gerçek secret değildir —
+          // değer bir ortam değişkeninden okunur. process.env.X ile aynı muafiyet. Yalnızca
+          // değerin TAMAMI env(VAR) ise atlanır (kapanış tırnağı hemen ')' sonrası) — gerçek
+          // bir secret bu kalıba sığamaz, yani bypass açığı oluşturmaz.
+          if (/=\s*['"]env\([A-Za-z0-9_]+\)['"]/.test(matchedValue)) continue;
 
           // localhost/127.0.0.1 bağlantı string'leri secret değildir — yerel
           // geliştirme varsayılanı (local Supabase, docs örnekleri). Yanlış pozitif.

@@ -1,6 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody, ApiError } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, ApiError, invalidateAuthCache } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
@@ -251,6 +251,9 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
     }
   }
 
+  // L21: rol/isActive/profil değişimi sonrası bayat-yetki penceresini kapat.
+  invalidateAuthCache(id)
+
   revalidatePath('/admin/staff')
 
   try { await invalidateDashboardCache(orgId) } catch { /* best-effort */ }
@@ -306,6 +309,9 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
     entityType: 'user',
     entityId: id,
   })
+
+  // L21: deaktivasyon sonrası auth cache'ini hemen geçersiz kıl (30s erişim penceresini kapat).
+  invalidateAuthCache(id)
 
   revalidatePath('/admin/staff')
 

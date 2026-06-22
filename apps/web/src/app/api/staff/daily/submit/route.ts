@@ -12,7 +12,7 @@ import {
   POINT_EVENT,
 } from '@/lib/gamification/constants'
 import { nextBox, dueDateForBox } from '@/lib/gamification/leitner'
-import { istanbulDateString } from '@/lib/gamification/timezone'
+import { istanbulDateString, istanbulEndOfDayUTC } from '@/lib/gamification/timezone'
 import { touchStreak } from '@/lib/gamification/streak'
 import { evaluateBadges } from '@/lib/gamification/badges'
 
@@ -84,9 +84,15 @@ export const POST = withStaffRoute(
     const submittedIds = [...answerByQuestion.keys()]
 
     // 2) Havuz durumu + doğru cevaplar (paralel — perf kuralı). isCorrect yalnız sunucuda.
+    // GÜVENLİK (anti-cheat): Yalnız BUGÜN VADESİ GELEN (nextReviewAt <= günsonu) sorular çekilir.
+    // Vadesi gelmemiş sorular boxByQuestion'a girmez → aşağıdaki `oldBox === undefined` skip'i
+    // onları no-op yapar. Aksi halde kullanıcı, cevapladıktan sonra (nextReviewAt ileri atılmış)
+    // aynı soruları yeni bir submissionId ile tekrar gönderip puan çiftçiliği yapabiliyordu.
+    const now = new Date()
+    const dueUntil = istanbulEndOfDayUTC(now)
     const [reviews, correctOptions] = await Promise.all([
       prisma.dailyReview.findMany({
-        where: { userId: dbUser.id, questionId: { in: submittedIds } },
+        where: { userId: dbUser.id, questionId: { in: submittedIds }, nextReviewAt: { lte: dueUntil } },
         select: { questionId: true, box: true },
       }),
       prisma.questionOption.findMany({
@@ -103,8 +109,7 @@ export const POST = withStaffRoute(
       correctByQuestion.set(o.questionId, set)
     }
 
-    // Yalnız personelin havuzunda OLAN soruları işle (anti-abuse: rastgele soru kabul edilmez).
-    const now = new Date()
+    // Yalnız personelin havuzunda OLAN ve vadesi gelmiş soruları işle (yukarıda filtrelendi).
     const results: ReviewResult[] = []
     let correctCount = 0
 

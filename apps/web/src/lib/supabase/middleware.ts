@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { extractSubdomain } from '@/lib/organization-utils';
 import { getCookieDomain } from './cookie-domain';
+import { verifyAccessToken } from './verify-jwt';
 
 const PUBLIC_ROUTES = [
   '/',
@@ -174,11 +175,13 @@ export async function updateSession(request: NextRequest) {
     }
     try {
       const sessionResult = await withTimeout(supabase.auth.getSession(), 2500);
-      const sessionUser = sessionResult?.data?.session?.user;
+      const session = sessionResult?.data?.session;
+      // getSession() imzayı doğrulamaz — token'ı kriptografik doğrula, rolü buradan al.
+      const verified = session ? await verifyAccessToken(session.access_token) : null;
+      const sessionUser =
+        session && verified && verified.sub === session.user.id ? session.user : undefined;
       if (sessionUser) {
-        const role = sanitizeRole(
-          sessionUser.app_metadata?.role ?? sessionUser.user_metadata?.role
-        );
+        const role = sanitizeRole(verified?.role);
         const kvkkAck = sessionUser.user_metadata?.kvkk_notice_acknowledged_at ?? null;
 
         // KVKK onaylanmamış authenticated kullanıcı — /auth/login'de kalması gerek ki modal açılsın.
@@ -225,16 +228,20 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // ── Protected route'lar: getSession() = local JWT parse (HTTP yok) ──
-  // getUser() her istekte Supabase'e HTTP call yapıyordu (~100-200ms per request).
-  // Dev modda HMR + concurrent requests sunucuyu dondurabiliyor.
-  // getSession() local JWT parse ile çalışır — token refresh cookie handler'da olur.
-  // Güvenlik notu: JWT zaten Supabase tarafından imzalanmış, manipüle edilemez.
+  // ── Protected route'lar: getSession() + yerel imza doğrulaması ──
+  // getSession() local JWT parse (HTTP yok) ile token'ı çerezden okur — token refresh
+  // cookie handler'da olur. ANCAK getSession() imzayı doğrulamaz; bu yüzden access_token
+  // verifyAccessToken (jose/JWKS, yerel ES256 doğrulaması) ile kriptografik kontrol edilir.
+  // getUser()'a göre HTTP round-trip yok ama imza güvenliği korunur.
   try {
     const sessionResult = await withTimeout(supabase.auth.getSession(), 2500);
-    const user = sessionResult?.data?.session?.user ?? null;
+    const session = sessionResult?.data?.session ?? null;
+    // ⚠️ KRİTİK: getSession() imzayı doğrulamaz. Token'ı kriptografik doğrula ve rol
+    // kararını DOĞRULANMIŞ payload'tan ver — sahte çerezle rol yükseltmeyi engelle.
+    const verified = session ? await verifyAccessToken(session.access_token) : null;
+    const user = session && verified && verified.sub === session.user.id ? session.user : null;
 
-    // Unauthenticated veya timeout → login'e yönlendir
+    // Unauthenticated veya timeout veya geçersiz imza → login'e yönlendir
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/login';
@@ -287,8 +294,8 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Role-based access control — app_metadata tercih edilir (kullanıcı değiştiremez)
-    const role = sanitizeRole(user.app_metadata?.role ?? user.user_metadata?.role);
+    // Role-based access control — DOĞRULANMIŞ JWT payload'ından (imza kontrol edildi)
+    const role = sanitizeRole(verified?.role);
 
     // /super-admin/* → sadece super_admin
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {

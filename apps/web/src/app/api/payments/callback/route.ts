@@ -39,6 +39,21 @@ export async function POST(request: Request) {
     }
 
     if (result.paymentStatus === 'SUCCESS' && result.status === 'success') {
+      // L28: iyzico'nun GERÇEKTEN TAHSİL ETTİĞİ tutarı, checkout'ta sunucunun kaydettiği
+      // payment.amount ile doğrula. Önceki kod SUCCESS bayrağına güvenip tutarı hiç
+      // karşılaştırmıyordu — kısmi/taksit/yanlış-basket veya manipüle tutar SUCCESS dönse
+      // bile abonelik tam dönem aktive ediliyordu. Uyuşmazlıkta aktive ETME.
+      const charged = typeof result.price === 'number' ? result.price : null
+      const expected = Number(payment.amount)
+      if (charged === null || !Number.isFinite(expected) || Math.abs(charged - expected) > 0.01) {
+        logger.error('Payment Callback', 'Tahsil edilen tutar beklenenle uyuşmuyor — abonelik aktive edilmedi', {
+          paymentId: payment.id,
+          charged,
+          expected,
+        })
+        return NextResponse.redirect(new URL('/admin/settings?payment=error&msg=amount_mismatch', process.env.NEXT_PUBLIC_APP_URL!))
+      }
+
       // Ödeme başarılı
       const now = new Date()
       const billingCycle = payment.subscription.billingCycle

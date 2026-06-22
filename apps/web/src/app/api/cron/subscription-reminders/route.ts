@@ -8,6 +8,7 @@ import {
 } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import type { SubscriptionStatus } from '@/types/database'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 const REMINDER_DAYS = [7, 3, 1] as const
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -18,14 +19,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
  * 7, 3, 1 gun kala uyari; suresi doldugunda bildirim gonderir.
  */
 export async function POST(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   const now = Date.now()
   let sentCount = 0

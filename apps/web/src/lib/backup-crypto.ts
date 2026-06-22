@@ -19,18 +19,25 @@ export interface EncryptResult {
 
 /**
  * AES-256-GCM ile plaintext şifreler.
- * Production'da BACKUP_ENCRYPTION_KEY zorunlu — yoksa throw.
- * Dev'de plaintext fallback var (lokal test akışını bozmamak için).
+ *
+ * GÜVENLİK (KVKK): Plaintext fallback artık NODE_ENV'e değil, AÇIK opt-in'e bağlı.
+ * Önceki davranışta NODE_ENV !== 'production' olan HER ortamda (staging, preview, CI,
+ * yanlış yapılandırılmış prod) anahtar yoksa yedek DÜZ METİN PII olarak yazılıyordu.
+ * Staging/preview çoğu zaman prod benzeri gerçek veriyle çalıştığından bu doğrudan
+ * KVKK ihlaliydi. Artık anahtar yoksa varsayılan DAVRANIŞ throw'dur; düz metin yalnızca
+ * ALLOW_PLAINTEXT_BACKUP=true (yalnız sentetik veriyle) açıkça set edilirse mümkündür.
  */
 export function encryptBackup(plaintext: string): EncryptResult {
   const key = process.env.BACKUP_ENCRYPTION_KEY
   if (!key || key.length !== 64) {
-    if (process.env.NODE_ENV === 'production') {
+    const plaintextAllowed = process.env.ALLOW_PLAINTEXT_BACKUP === 'true'
+    if (!plaintextAllowed) {
       throw new Error(
-        'BACKUP_ENCRYPTION_KEY production ortamında zorunludur (64 karakter hex). Yedek oluşturulamadı.'
+        'BACKUP_ENCRYPTION_KEY zorunlu (64 karakter hex). Yedek PII içerebileceğinden ' +
+        'düz metin yazılmaz. (Yalnızca sentetik veriyle ALLOW_PLAINTEXT_BACKUP=true ile geçilebilir.)'
       )
     }
-    logger.warn('Backup', 'BACKUP_ENCRYPTION_KEY tanımlı değil veya geçersiz — yedek şifrelenmeden kaydedilecek (dev only)')
+    logger.warn('Backup', 'ALLOW_PLAINTEXT_BACKUP=true — yedek ŞİFRELENMEDEN kaydediliyor (yalnız sentetik veri için güvenli)')
     return { data: plaintext, isEncrypted: false }
   }
 

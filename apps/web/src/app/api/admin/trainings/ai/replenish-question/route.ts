@@ -13,6 +13,7 @@ import { jsonResponse, ApiError, parseBody } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit } from '@/lib/redis'
 import { decrypt } from '@/lib/crypto'
+import { isValidS3KeyForOrg } from '@/lib/s3'
 import { generateQuestions, OpenRouterError } from '@/lib/openrouter'
 import { isValidModelId } from '@/lib/openrouter-models'
 import { logger } from '@/lib/logger'
@@ -50,6 +51,16 @@ export const POST = withAdminRoute(
     const normalizedSources = sources && sources.length > 0
       ? sources
       : (sourceS3Keys ?? []).map((s3Key) => ({ s3Key }))
+
+    // GÜVENLİK (IDOR): kaynak anahtarları yalnızca çağıranın org'una ait olabilir (bkz. generate-questions).
+    const invalidKey = normalizedSources.find((s) => !isValidS3KeyForOrg(s.s3Key, organizationId))
+    if (invalidKey) {
+      logger.warn('ai.replenish-question', 'Cross-tenant S3 anahtarı reddedildi', {
+        organizationId,
+        s3Key: invalidKey.s3Key,
+      })
+      throw new ApiError('Geçersiz kaynak anahtarı', 400)
+    }
 
     const allowed = await checkRateLimit(`ai-replenish:${organizationId}`, 100, 3600)
     if (!allowed) {
