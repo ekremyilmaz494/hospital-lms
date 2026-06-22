@@ -64,6 +64,7 @@
     "@getbrevo/brevo": "^5.0.4",
     "@gsap/react": "^2.1.2",
     "@hookform/resolvers": "^5.2.2",
+    "@node-saml/node-saml": "^5.1.0",
     "@paper-design/shaders-react": "^0.0.76",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",

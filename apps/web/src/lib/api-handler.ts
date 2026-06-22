@@ -168,6 +168,28 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
       const { user, dbUser } = auth
       if (!user || !dbUser) return errorResponse('Unauthorized', 401)
 
+      // ── O1: First-login (şifre değiştirme) zorunluluğunu API katmanında da zorla ──
+      // Middleware /api/*'ı tamamen atlar; mustChangePassword yalnız sayfa middleware'inde +
+      // client cookie'sinde (hlms-must-change-pw) enforce ediliyordu → kullanıcı doğrudan API
+      // çağırarak (veya sentinel cookie'yi silerek) geçici parolayı değiştirmeden uygulamayı
+      // kullanabiliyordu. dbUser.mustChangePassword DB-authoritative'dir (change-password rotası
+      // false yapar). /api/auth/* (change-password dahil bu akışı çözen endpoint'ler) ve
+      // super_admin hariç.
+      //
+      // NOT: KVKK onayı ve SMS MFA pending kapıları BİLİNÇLİ olarak burada zorlanmıyor:
+      //  • KVKK bir ONAM kaydıdır (güvenlik sınırı değil) ve onay durumu hem JWT user_metadata
+      //    hem DB'de tutulur — DB tabanlı API guard'ı, yalnız JWT'de onaylı (DB'de null) eski
+      //    kullanıcıları kilitleyip middleware ile tutarsızlık/incident yaratabilirdi. KVKK
+      //    sayfa middleware'inde enforce edilmeye devam eder.
+      //  • SMS MFA pending cookie/oturum-durumu tabanlıdır; sağlam API enforcement'ı sunucu-tarafı
+      //    oturum-MFA bayrağı gerektirir (ayrı iş).
+      if (dbUser.role !== 'super_admin' && dbUser.mustChangePassword) {
+        const pathname = (() => { try { return new URL(request.url).pathname } catch { return '' } })()
+        if (!pathname.startsWith('/api/auth/')) {
+          return errorResponse('Devam etmeden önce şifrenizi değiştirmeniz gerekiyor', 403)
+        }
+      }
+
       if (roles && roles.length > 0) {
         const roleErr = requireRole(dbUser.role, roles)
         if (roleErr) return roleErr

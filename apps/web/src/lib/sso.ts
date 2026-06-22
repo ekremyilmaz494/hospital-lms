@@ -1,8 +1,9 @@
 import crypto from 'crypto'
-import { SignedXml } from 'xml-crypto'
+import { SAML, ValidateInResponseTo } from '@node-saml/node-saml'
 import * as jose from 'jose'
 import { getRedis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { getAppUrl } from '@/lib/api-helpers'
 
 // ── SSO State (Nonce) Management ──
 
@@ -74,74 +75,91 @@ export async function verifySsoState(nonce: string): Promise<SsoStatePayload | n
   }
 }
 
-// ── SAML Signature Verification ──
+// ── SAML Response Validation (node-saml) ──
+//
+// GÜVENLİK: Önceki implementasyon imzayı regex ile bulup checkSignature ile doğruluyor,
+// ardından kimliği TÜM belgeden regex ile çıkarıyordu. İmza okunan düğüme bağlanmadığı için
+// bu klasik XML Signature Wrapping (XSW) saldırısına açıktı (saldırgan imzalı bir assertion +
+// imzasız sahte NameID enjekte edip herhangi biri olarak giriş yapabiliyordu). Artık vetlenmiş
+// @node-saml/node-saml kullanılıyor: kimlik YALNIZCA imzalı assertion'dan okunur ve
+// Conditions/NotBefore/NotOnOrAfter + AudienceRestriction otomatik doğrulanır.
+//
+// Replay/CSRF: Akış IdP-initiated (initiate AuthnRequest üretmez) olduğundan InResponseTo
+// doğrulanmaz; bunun yerine RelayState nonce'u (createSsoState/verifySsoState) tek kullanımlık
+// olarak tüketilir ve assertion'ın kısa NotOnOrAfter penceresi replay'i sınırlar.
 
-/**
- * SAML Response XML'indeki imzayi dogrular.
- * IdP'nin X.509 sertifikasi ile XML-DSIG imzasi kontrol edilir.
- */
-export function verifySamlSignature(samlXml: string, idpCert: string): boolean {
-  try {
-    // Sertifikayi PEM formatina cevir (gerekiyorsa)
-    const pemCert = idpCert.includes('BEGIN CERTIFICATE')
-      ? idpCert
-      : `-----BEGIN CERTIFICATE-----\n${idpCert}\n-----END CERTIFICATE-----`
-
-    // XML icerisindeki Signature elementini bul
-    const signatureMatch = samlXml.match(/<(?:ds:)?Signature[^>]*xmlns[^>]*>[\s\S]*?<\/(?:ds:)?Signature>/i)
-    if (!signatureMatch) {
-      logger.warn('SSO:SAML', 'SAML response icinde imza bulunamadi')
-      return false
-    }
-
-    const sig = new SignedXml()
-    sig.publicCert = pemCert
-    sig.loadSignature(signatureMatch[0])
-    const isValid = sig.checkSignature(samlXml)
-
-    if (!isValid) {
-      logger.warn('SSO:SAML', 'SAML imza dogrulanamadi')
-    }
-
-    return isValid
-  } catch (err) {
-    logger.error('SSO:SAML', 'SAML imza dogrulama hatasi', err)
-    return false
-  }
-}
-
-/**
- * SAML XML'den temel kimlik bilgilerini extract eder.
- * Imza dogrulamasi SONRASI cagrilmalidir.
- */
-export function extractSamlIdentity(samlXml: string): {
-  email: string | null
+export interface SamlIdentity {
+  email: string
   firstName: string | null
   lastName: string | null
-} {
-  return {
-    email: extractFromXml(samlXml, 'NameID'),
-    firstName: extractFromXml(samlXml, 'FirstName') || extractFromXml(samlXml, 'givenName'),
-    lastName: extractFromXml(samlXml, 'LastName') || extractFromXml(samlXml, 'surname'),
-  }
 }
 
-/** XML'den attribute veya tag degeri extract eder */
-function extractFromXml(xml: string, tag: string): string | null {
-  // Attribute-based: <Attribute Name="FirstName"><AttributeValue>John</AttributeValue></Attribute>
-  const attrRegex = new RegExp(
-    `Name=["'](?:[^"']*:)?${tag}["'][^>]*>\\s*<[^>]*AttributeValue[^>]*>([^<]+)`,
-    'i'
-  )
-  const attrMatch = xml.match(attrRegex)
-  if (attrMatch) return attrMatch[1].trim()
-
-  // Direct tag: <NameID>john@example.com</NameID>
-  const tagRegex = new RegExp(`<(?:[^:]+:)?${tag}[^>]*>([^<]+)`, 'i')
-  const tagMatch = xml.match(tagRegex)
-  if (tagMatch) return tagMatch[1].trim()
-
+/** node-saml Profile'ından bilinen claim adlarından ilk dolu string değeri seçer. */
+function pickAttr(profile: Record<string, unknown>, names: string[]): string | null {
+  for (const name of names) {
+    const v = profile[name]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (Array.isArray(v) && typeof v[0] === 'string' && v[0].trim()) return v[0].trim()
+  }
   return null
+}
+
+/**
+ * SAML POST yanıtını (base64 SAMLResponse) kriptografik olarak doğrular ve kimliği
+ * YALNIZCA imzalı assertion'dan döndürür. Geçersiz imza / wrapping / süresi geçmiş /
+ * yanlış audience durumunda null döner.
+ */
+export async function validateSamlResponse(
+  samlResponseB64: string,
+  org: { samlCert: string; samlIssuer: string | null },
+): Promise<SamlIdentity | null> {
+  try {
+    const callbackUrl = `${getAppUrl()}/api/auth/sso/callback`
+    // issuer = SP entityID (org.samlIssuer); audience = beklenen AudienceRestriction.
+    // samlIssuer yoksa audience kontrolünü kapat (false) ama issuer için callbackUrl'e düş.
+    const spIssuer = org.samlIssuer || callbackUrl
+    const saml = new SAML({
+      idpCert: org.samlCert,
+      issuer: spIssuer,
+      callbackUrl,
+      audience: org.samlIssuer ? org.samlIssuer : false,
+      wantAssertionsSigned: true,
+      wantAuthnResponseSigned: false,
+      validateInResponseTo: ValidateInResponseTo.never,
+      acceptedClockSkewMs: 30_000,
+    })
+
+    const { profile } = await saml.validatePostResponseAsync({ SAMLResponse: samlResponseB64 })
+    if (!profile || !profile.nameID) {
+      logger.warn('SSO:SAML', 'SAML profile/nameID bulunamadı')
+      return null
+    }
+
+    const p = profile as unknown as Record<string, unknown>
+    const email =
+      (typeof profile.email === 'string' && profile.email) ||
+      (typeof profile.mail === 'string' && profile.mail) ||
+      pickAttr(p, [
+        'urn:oid:0.9.2342.19200300.100.1.3',
+        'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+      ]) ||
+      profile.nameID
+    const firstName = pickAttr(p, [
+      'FirstName', 'givenName', 'first_name',
+      'urn:oid:2.5.4.42',
+      'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname',
+    ])
+    const lastName = pickAttr(p, [
+      'LastName', 'surname', 'sn', 'last_name',
+      'urn:oid:2.5.4.4',
+      'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname',
+    ])
+
+    return { email, firstName, lastName }
+  } catch (err) {
+    logger.warn('SSO:SAML', 'SAML doğrulama başarısız — olası sahte/wrapping response', err instanceof Error ? err.message : err)
+    return null
+  }
 }
 
 // ── OIDC JWT Verification ──

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies, headers } from 'next/headers'
 import { createHash } from 'crypto'
 import { createClient, createBearerClient } from '@/lib/supabase/server'
+import { verifyAccessToken } from '@/lib/supabase/verify-jwt'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
 
@@ -122,6 +123,29 @@ export function safePagination(params: URLSearchParams, maxLimit = 100) {
 // In-memory auth cache — keyed by user ID, 30s TTL
 const authCache = new Map<string, { dbUser: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>; orgOk: boolean; expiresAt: number }>()
 
+/**
+ * Bir kullanıcının auth cache girdisini ANINDA geçersiz kılar.
+ * Rol değişimi, deaktivasyon (isActive=false), organizationId değişimi veya org askıya alınması
+ * sonrası ÇAĞRILMALI — aksi halde etkilenen kullanıcı 30s'e kadar eski rol/erişimini korur
+ * (bayat-yetki penceresi). NOT: Cache pod-başına (in-memory); bu çağrı yalnız ÇALIŞTIĞI pod'u
+ * temizler — çok-pod tutarlılığı için ileride paylaşımlı (Redis) invalidation gerekir, ama
+ * mutasyonu yapan pod en az kendi cache'ini düzeltir ve diğer pod'larda 30s TTL zaten sınırlar.
+ */
+export function invalidateAuthCache(userId: string): void {
+  authCache.delete(userId)
+}
+
+/**
+ * Bir organizasyona ait TÜM kullanıcıların auth cache girdilerini geçersiz kılar.
+ * Org askıya alma/aktifleştirme (orgOk değişimi) sonrası çağrılmalı. Aynı pod-içi sınır
+ * geçerlidir (bkz. [[invalidateAuthCache]]).
+ */
+export function invalidateOrgAuthCache(organizationId: string): void {
+  for (const [uid, entry] of authCache) {
+    if (entry.dbUser.organizationId === organizationId) authCache.delete(uid)
+  }
+}
+
 /** Org active/suspended kontrolü — super_admin muaf. Askıya alınmışsa 403 Response döner, OK ise null. */
 async function checkOrgActive(dbUser: { role: string; organizationId: string | null }): Promise<Response | null> {
   if (dbUser.role === 'super_admin' || !dbUser.organizationId) return null
@@ -215,8 +239,16 @@ export async function getAuthUser() {
     return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
   }
 
+  // ⚠️ KRİTİK: getSession() access_token'ı çerezden okur ama İMZAYI DOĞRULAMAZ.
+  // Yetkilendirme kararı vermeden önce token'ı kriptografik doğrula ve kimliği
+  // DOĞRULANMIŞ sub'tan al — aksi halde sahte çerezle keyfi kullanıcı taklidi mümkün.
+  const verified = await verifyAccessToken(session.access_token)
+  if (!verified || verified.sub !== session.user.id) {
+    return { user: null, dbUser: null, error: errorResponse('Unauthorized', 401) }
+  }
+
   const user = session.user
-  const { dbUser, error: dbErr } = await resolveDbUserWithCache(user)
+  const { dbUser, error: dbErr } = await resolveDbUserWithCache({ id: verified.sub })
   if (dbErr) return { user: null, dbUser: null, error: dbErr }
   return { user, dbUser: dbUser!, error: null, organizationId: dbUser!.organizationId }
 }

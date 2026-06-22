@@ -6,11 +6,17 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: {
       getSession: vi.fn(async () => ({
-        data: { session: { user: { id: 'admin-user-1' } } },
+        data: { session: { user: { id: 'admin-user-1' }, access_token: 'admin-user-1' } },
         error: null,
       })),
     },
   })),
+}))
+
+// K1: getAuthUser access_token imzasını verifyAccessToken ile doğruluyor. Testte JWKS yok →
+// mock'la; sub session.user.id ('admin-user-1') ile eşleşir.
+vi.mock('@/lib/supabase/verify-jwt', () => ({
+  verifyAccessToken: vi.fn(async (token?: string) => ({ sub: token || 'admin-user-1', role: 'admin', payload: {} })),
 }))
 
 vi.mock('next/headers', () => ({
