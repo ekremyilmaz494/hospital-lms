@@ -6,6 +6,13 @@ import { checkRateLimit } from '@/lib/redis'
 import { assignmentNextStatus, ASSIGNMENT_TERMINAL_STATUSES, type AssignmentStatus } from '@/lib/exam-state-machine'
 import { logger } from '@/lib/logger'
 
+// GÜVENLİK (anti-cheat): SCORM tamamlama tamamen istemci-raporludur (SCORM runtime,
+// cmi.core.lesson_status'u iframe içinden gönderir). İçeriği hiç açmadan tek bir
+// {lessonStatus:'passed'} PATCH'i ile sahte zorunlu-eğitim sertifikası alınmasını
+// engellemek için, attempt başlangıcı (ScormAttempt.createdAt) ile geçiş anı arasında
+// minimum oturum süresi şartı uygulanır. Süre dolmadan passed/completed → geçiş + sertifika ATLANIR.
+const MIN_SCORM_ENGAGEMENT_SECONDS = 30
+
 /** GET /api/exam/[id]/scorm/tracking — Get latest SCORM attempt */
 export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: trainingId } = params
@@ -142,7 +149,21 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
 
     // Auto-create certificate if passed or completed
     const status = body.lessonStatus ?? existing.lessonStatus
-    if (status === 'passed' || status === 'completed') {
+    const elapsedSeconds = (Date.now() - new Date(existing.createdAt).getTime()) / 1000
+    const engaged = elapsedSeconds >= MIN_SCORM_ENGAGEMENT_SECONDS
+
+    if ((status === 'passed' || status === 'completed') && !engaged) {
+      // Şüpheli hızlı tamamlama — attempt verisi yine kaydedildi (yukarıda) ama geçiş +
+      // sertifika ÜRETİLMEZ. İz bırak ki sahte instant-complete tespit edilebilsin.
+      logger.warn('SCORM Tracking', 'Şüpheli hızlı SCORM tamamlama — geçiş/sertifika atlandı', {
+        userId: dbUser.id,
+        trainingId,
+        elapsedSeconds: Math.round(elapsedSeconds),
+        minRequired: MIN_SCORM_ENGAGEMENT_SECONDS,
+      })
+    }
+
+    if ((status === 'passed' || status === 'completed') && engaged) {
       // D1a — SCORM tamamlandı/geçti → assignment'ı 'passed' yap. Eskiden SCORM
       // tamamlanması assignment durumunu HİÇ güncellemiyordu (rapor/dashboard'da
       // personel "atandı"da kalıyordu). State machine üzerinden: assigned ise önce
@@ -170,7 +191,7 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
               action: 'scorm.assignment_passed',
               entityType: 'training_assignment',
               entityId: assignment.id,
-              newData: { trainingId, from: assignment.status, to: t2.next },
+              newData: { trainingId, from: assignment.status, to: t2.next, elapsedSeconds: Math.round(elapsedSeconds) },
             })
           }
         }

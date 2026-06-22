@@ -65,10 +65,14 @@ export const PUT = withAdminRoute<{ id: string }>(async ({ request, params, orga
   if (!body?.questions) return errorResponse('Invalid body')
 
   try {
+    // GÜVENLİK (IDOR): Question modelinde organizationId yok; tek tenant bağı trainingId'dir.
+    // where:{id} ile güncelleme, başka org'un sorularının sortOrder'ını değiştirmeye izin
+    // veriyordu. updateMany + trainingId scope'u güncellemeyi doğrulanmış (org'a ait) training'e
+    // kilitler — yabancı id'ler 0 satır etkiler (no-op).
     await prisma.$transaction(
       body.questions.map(q =>
-        prisma.question.update({
-          where: { id: q.id },
+        prisma.question.updateMany({
+          where: { id: q.id, trainingId: id },
           data: { sortOrder: q.sortOrder },
         })
       )

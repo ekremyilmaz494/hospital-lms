@@ -33,7 +33,7 @@ function alreadyProcessed() {
 /**
  * POST /api/staff/gamification/event — Puan kazandıran olay bildirimi.
  *
- * - **Idempotent:** Aynı `eventId` tekrar gelirse kredi BİR kez (`PointLedger.dedupKey` unique).
+ * - **Idempotent:** Aynı achievement (`type:refId`) tekrar gelirse kredi BİR kez (`PointLedger.dedupKey` unique).
  * - **Anti-cheat:** Olay SUNUCUDA kendi kaydından doğrulanır (`verifyEvent`); doğrulanamazsa 422,
  *   ledger'a YAZILMAZ. refId+userId cross-check → başka kullanıcının kaydı sayılamaz.
  * - Doğrulanan `exam_pass`/`training_complete` o eğitimin sorularını Leitner havuzuna seed eder.
@@ -51,10 +51,14 @@ export const POST = withStaffRoute(
     if (!body) return errorResponse('Geçersiz istek gövdesi')
     const parsed = eventSchema.safeParse(body)
     if (!parsed.success) return errorResponse(parsed.error.message)
-    const { eventId, type, refId } = parsed.data
-    const dedupKey = `${type}:${eventId}`
+    const { type, refId } = parsed.data
+    // GÜVENLİK (anti-cheat): Idempotency anahtarı SUNUCU-DOĞRULAMALI refId'den türetilir,
+    // istemcinin verdiği eventId'den DEĞİL. Aksi halde kullanıcı tek bir geçilmiş sınavı
+    // (aynı refId) her seferinde yeni bir eventId ile tekrar göndererek puan/rozet şişirebiliyordu.
+    // refId achievement kaydının (attemptId/assignmentId/responseId) doğal anahtarıdır → 1 kredi.
+    const dedupKey = `${type}:${refId}`
 
-    // 1) Idempotency — bu eventId daha önce işlendiyse yeni kredi yok.
+    // 1) Idempotency — bu achievement (type:refId) daha önce kredilendiyse yeni kredi yok.
     const existing = await prisma.pointLedger.findUnique({ where: { dedupKey }, select: { id: true } })
     if (existing) return alreadyProcessed()
 

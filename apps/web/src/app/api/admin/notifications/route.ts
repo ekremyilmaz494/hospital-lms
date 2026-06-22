@@ -107,9 +107,28 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
   const parsed = createNotificationSchema.safeParse(body)
   if (!parsed.success) return errorResponse(parsed.error.message)
 
+  const { userId, title, message, type, relatedTrainingId } = parsed.data
+
+  // GÜVENLİK (IDOR/mass-assignment): Alıcı ve ilişkili eğitim çağıranın org'una ait olmalı.
+  // Önceki `...parsed.data` spread'i, yabancı bir userId ile başka org'un kullanıcısına
+  // bağlı Notification satırı yaratılmasına izin veriyordu. (notifications/send rotasındaki
+  // recipient doğrulamasının aynısı.)
+  const [recipient, relatedTraining] = await Promise.all([
+    prisma.user.findFirst({ where: { id: userId, organizationId, isActive: true }, select: { id: true } }),
+    relatedTrainingId
+      ? prisma.training.findFirst({ where: { id: relatedTrainingId, organizationId }, select: { id: true } })
+      : Promise.resolve(null),
+  ])
+  if (!recipient) return errorResponse('Geçerli alıcı bulunamadı', 400)
+  if (relatedTrainingId && !relatedTraining) return errorResponse('Geçersiz eğitim', 400)
+
   const notification = await prisma.notification.create({
     data: {
-      ...parsed.data,
+      userId,
+      title,
+      message,
+      type,
+      ...(relatedTrainingId ? { relatedTrainingId } : {}),
       organizationId,
       senderId: dbUser.id,
       batchId: crypto.randomUUID(),
