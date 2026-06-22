@@ -43,8 +43,10 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser }) => 
       return errorResponse('Fatura bulunamadi', 404)
     }
 
-    // Organizasyon izolasyonu — admin sadece kendi faturalarini gorebilir
-    if (dbUser.role === 'admin' && invoice.organizationId !== dbUser.organizationId) {
+    // Organizasyon izolasyonu — YAPISAL: yalnız super_admin tüm org'ları görür (allowlist),
+    // diğer TÜM roller (admin + gelecekte eklenebilecek herhangi bir rol) org eşleşmesi şart.
+    // (Önceki `role === 'admin'` denylist'i yeni bir privileged rol eklenince fail-open olurdu.)
+    if (dbUser.role !== 'super_admin' && invoice.organizationId !== dbUser.organizationId) {
       return errorResponse('Bu faturaya erisim yetkiniz yok', 403)
     }
 

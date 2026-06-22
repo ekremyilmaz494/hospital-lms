@@ -4,17 +4,12 @@ import { sendEmail, complianceReportEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
 import { findActivePeriod } from '@/lib/training-periods'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 /** Monthly compliance report cron — runs at 08:00 UTC on the 1st of every month (11:00 Istanbul) */
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   let emailsSent = 0
   let emailsFailed = 0

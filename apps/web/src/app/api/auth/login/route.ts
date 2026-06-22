@@ -81,11 +81,21 @@ export async function POST(request: NextRequest) {
       return errorResponse('Geçerli bir e-posta veya 11 haneli TC Kimlik No girin.', 400)
     }
 
+    // L25: TC enumeration'ı sınırla — IP rate-limit kontrolü TC→email çözümünden ÖNCE.
+    // Önceden rate-limit yalnız çözümden SONRA çalıştığından, TC tarama (DB lookup +
+    // differential 401/409 yanıtları) hız limitsizdi. Artık her TC denemesi bütçe tüketir.
+    const ip = getTrustedIp(request)
+    if ((await getRateLimitCount(`login-ip:${ip}`)) >= 100) {
+      logger.warn('auth:login', 'IP rate limit aşıldı (lookup öncesi)', { ip })
+      return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
+    }
+
     // KVKK: TC plaintext sadece bu request lifetime'ı içinde; hash'lenir, atılır.
     let normalizedEmail: string
     if (looksLikeTc) {
       const tc = normalizeTcKimlik(rawIdentifier)
       if (!isValidTcKimlik(tc)) {
+        void incrementRateLimit(`login-ip:${ip}`, 300).catch(() => {})
         return errorResponse('TC Kimlik No veya şifre hatalı.', 401)
       }
 
@@ -107,6 +117,8 @@ export async function POST(request: NextRequest) {
       })
 
       if (matches.length === 0) {
+        // L25: eşleşme yok da bütçe tüketsin — aksi halde "TC kayıtlı mı?" oracle'ı bedava taranır.
+        void incrementRateLimit(`login-ip:${ip}`, 300).catch(() => {})
         return errorResponse('TC Kimlik No veya şifre hatalı.', 401)
       }
 
@@ -115,6 +127,9 @@ export async function POST(request: NextRequest) {
       // reddedilir ve yöneticinin fazladan kaydı temizlemesi gerekir. (401 değil; şifre
       // denemesi sayılmasın — veri sorunu, kimlik bilgisi sorunu değil.)
       if (matches.length > 1) {
+        // L25: çok-org 409 ürün kararı gereği korunur (#205 tek-org politikası) ama enumeration
+        // oracle'ı olmaması için bütçe tüketir.
+        void incrementRateLimit(`login-ip:${ip}`, 300).catch(() => {})
         return errorResponse(
           'Hesabınız birden fazla kuruma bağlı görünüyor. Lütfen kurum yöneticinizle iletişime geçin.',
           409,
@@ -125,8 +140,6 @@ export async function POST(request: NextRequest) {
     } else {
       normalizedEmail = rawIdentifier.toLowerCase()
     }
-
-    const ip = getTrustedIp(request)
 
     // ── Supabase client önce oluştur — cookies() async context'i Promise.all içinde
     // kaybolursa session cookie'leri response'a yazılmaz (Next.js 15+ AsyncLocalStorage bug).

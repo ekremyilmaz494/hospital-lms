@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { istanbulDateString, addDaysToDateString, dateStringToUTCDate } from '@/lib/gamification/timezone'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
@@ -16,14 +17,8 @@ const NO_STORE = { 'Cache-Control': 'no-store' }
  * `atRisk` ayrı kolon değildir — `summary` GET'inde `lastActiveDate`'ten türetilir.
  */
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   const now = new Date()
   const yesterday = dateStringToUTCDate(addDaysToDateString(istanbulDateString(now), -1))

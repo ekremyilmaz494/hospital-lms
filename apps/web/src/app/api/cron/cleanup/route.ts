@@ -7,6 +7,7 @@ import { decryptBackup } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
 import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
 import { toEndOfDayUTC } from '@/lib/date-helpers'
+import { assertCronAuth } from '@/lib/cron-auth'
 import type { UserRole } from '@/types/database'
 
 // State machine ile uyumlu: EXPIRE event'inin toplu (updateMany) hali.
@@ -18,14 +19,8 @@ const ATTEMPT_NON_TERMINAL_STATUSES: AttemptStatus[] = (
 
 /** Daily cleanup cron job (Vercel Cron) */
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } })
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   // 1. Delete old read notifications (older than 90 days)
   const deletedNotifications = await prisma.notification.deleteMany({

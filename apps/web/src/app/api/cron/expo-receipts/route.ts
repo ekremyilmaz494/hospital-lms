@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 /**
  * Expo Push Receipt poll cron — günde bir kez (07:15 Istanbul) çalışır.
@@ -41,17 +42,8 @@ interface ReceiptsResponse {
 }
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: { 'Cache-Control': 'no-store' } },
-    )
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   const now = Date.now()
   const windowStart = new Date(now - PENDING_WINDOW_MS)

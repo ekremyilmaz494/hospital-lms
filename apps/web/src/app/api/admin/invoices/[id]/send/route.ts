@@ -216,8 +216,9 @@ export const POST = withAdminRoute<{ id: string }>(async ({ params, dbUser, audi
       return errorResponse('Fatura bulunamadi', 404)
     }
 
-    // Organizasyon izolasyonu
-    if (dbUser.role === 'admin' && invoice.organizationId !== dbUser.organizationId) {
+    // Organizasyon izolasyonu — YAPISAL: super_admin allowlist; diğer tüm roller org eşleşmesi şart
+    // (denylist `role === 'admin'` yeni privileged rol eklenince fail-open olurdu).
+    if (dbUser.role !== 'super_admin' && invoice.organizationId !== dbUser.organizationId) {
       return errorResponse('Bu faturaya erisim yetkiniz yok', 403)
     }
 

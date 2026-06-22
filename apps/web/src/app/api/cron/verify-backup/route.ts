@@ -4,6 +4,7 @@ import { downloadBuffer } from '@/lib/s3'
 import { decryptBackup } from '@/lib/backup-crypto'
 import { sendEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 /**
  * Haftalık yedek sağlık doğrulaması.
@@ -16,12 +17,8 @@ import { logger } from '@/lib/logger'
  * Schedule: `vercel.json` → Pazar 04:00 UTC.
  */
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) throw new Error('CRON_SECRET environment variable is required')
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   const organizations = await prisma.organization.findMany({
     where: { isActive: true, isSuspended: false },

@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { rolloverIfNeeded } from '@/lib/training-periods'
 import { logger } from '@/lib/logger'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 interface RolloverResult {
   orgId: string
@@ -19,17 +20,8 @@ interface RolloverResult {
 }
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: { 'Cache-Control': 'no-store' } },
-    )
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   // Sadece aktif + askıya alınmamış organizasyonlar için rollover yap.
   const orgs = await prisma.organization.findMany({

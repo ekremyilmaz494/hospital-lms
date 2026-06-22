@@ -20,8 +20,10 @@ export function buildRawMime(opts: {
   const boundary = `----=_HLMS_${crypto.randomBytes(12).toString('hex')}`
   const lines: string[] = []
 
-  lines.push(`From: ${opts.from}`)
-  lines.push(`To: ${opts.to}`)
+  // GÜVENLİK: Header injection guard — from/to/filename'deki CR/LF, ek başlık/alıcı
+  // enjeksiyonuna yol açabilir. (Bu helper şu an kullanılmıyor ama yeniden bağlanırsa güvenli olsun.)
+  lines.push(`From: ${stripHeader(opts.from)}`)
+  lines.push(`To: ${stripHeader(opts.to)}`)
   lines.push(`Subject: =?UTF-8?B?${Buffer.from(opts.subject, 'utf-8').toString('base64')}?=`)
   lines.push('MIME-Version: 1.0')
   lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`)
@@ -35,10 +37,11 @@ export function buildRawMime(opts: {
   lines.push('')
 
   for (const att of opts.attachments) {
+    const safeName = stripHeader(att.filename).replace(/"/g, '')
     lines.push(`--${boundary}`)
-    lines.push(`Content-Type: ${att.contentType}; name="${att.filename}"`)
+    lines.push(`Content-Type: ${att.contentType}; name="${safeName}"`)
     lines.push('Content-Transfer-Encoding: base64')
-    lines.push(`Content-Disposition: attachment; filename="${att.filename}"`)
+    lines.push(`Content-Disposition: attachment; filename="${safeName}"`)
     lines.push('')
     lines.push(wrapBase64(att.content.toString('base64')))
     lines.push('')
@@ -51,4 +54,9 @@ export function buildRawMime(opts: {
 
 function wrapBase64(b64: string): string {
   return b64.match(/.{1,76}/g)?.join('\r\n') ?? b64
+}
+
+/** E-posta header değerinden CR/LF'i temizler (RFC 5322 header injection guard). */
+function stripHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').trim()
 }

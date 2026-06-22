@@ -9,6 +9,7 @@ import {
 import { logger } from '@/lib/logger'
 import { findActivePeriod } from '@/lib/training-periods'
 import { sendExpoPushToUser } from '@/lib/expo-push'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 // Son-gün hatırlatması — org ayarından bağımsız, herkese gider (deadline'a 1 gün kala).
@@ -19,14 +20,8 @@ const BATCH_SIZE = 200
 
 /** Automated reminder cron — runs daily at 07:00 UTC (10:00 Istanbul) */
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } })
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   const now = Date.now()
 

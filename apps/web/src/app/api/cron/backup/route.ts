@@ -4,6 +4,7 @@ import { uploadBuffer, backupKey, verifyS3Object, downloadBuffer } from '@/lib/s
 import { sendEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import { encryptBackup, decryptBackup } from '@/lib/backup-crypto'
+import { assertCronAuth } from '@/lib/cron-auth'
 
 /**
  * Yedek dosyasını S3'ten indir, çöz, JSON'ı parse et ve içerdeki
@@ -26,14 +27,8 @@ async function deepVerifyBackup(key: string, expectedOrgId: string): Promise<{ o
 
 /** Daily auto-backup cron job — runs at 03:15 UTC (after cleanup at 03:00) */
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET environment variable is required')
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authErr = assertCronAuth(request)
+  if (authErr) return authErr
 
   const organizations = await prisma.organization.findMany({
     where: { isActive: true, isSuspended: false },
