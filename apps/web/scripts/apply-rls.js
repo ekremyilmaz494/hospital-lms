@@ -76,32 +76,32 @@ async function run() {
     [`CREATE POLICY "anyone_plans_select" ON subscription_plans FOR SELECT USING (is_active = true)`],
     // ORGANIZATION SUBSCRIPTIONS
     [`CREATE POLICY "super_admin_subs_all" ON organization_subscriptions FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_subs_select" ON organization_subscriptions FOR SELECT USING (organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "admin_subs_select" ON organization_subscriptions FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
     // TRAININGS
     [`CREATE POLICY "super_admin_trainings_all" ON trainings FOR ALL USING (public.get_user_role() = 'super_admin')`],
     [`CREATE POLICY "admin_trainings_all" ON trainings FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
     [`CREATE POLICY "staff_trainings_select" ON trainings FOR SELECT USING (id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid()))`],
     // TRAINING VIDEOS
-    [`CREATE POLICY "admin_videos_all" ON training_videos FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_videos_all" ON training_videos FOR ALL USING (public.get_user_role() = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_videos_select" ON training_videos FOR SELECT USING (training_id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid()))`],
     // QUESTIONS
-    [`CREATE POLICY "admin_questions_all" ON questions FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_questions_all" ON questions FOR ALL USING (public.get_user_role() = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_questions_select" ON questions FOR SELECT USING (training_id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid()))`],
     // QUESTION OPTIONS
-    [`CREATE POLICY "admin_options_all" ON question_options FOR ALL USING (question_id IN (SELECT id FROM questions WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
+    [`CREATE POLICY "admin_options_all" ON question_options FOR ALL USING (public.get_user_role() = 'admin' AND question_id IN (SELECT id FROM questions WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
     [`CREATE POLICY "staff_options_select" ON question_options FOR SELECT USING (question_id IN (SELECT id FROM questions WHERE training_id IN (SELECT training_id FROM training_assignments WHERE user_id = auth.uid())))`],
     // TRAINING ASSIGNMENTS
     [`CREATE POLICY "super_admin_assignments_all" ON training_assignments FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_assignments_all" ON training_assignments FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_assignments_all" ON training_assignments FOR ALL USING (public.get_user_role() = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_assignments_select" ON training_assignments FOR SELECT USING (user_id = auth.uid())`],
     // EXAM ATTEMPTS
-    [`CREATE POLICY "admin_attempts_select" ON exam_attempts FOR SELECT USING (training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_attempts_select" ON exam_attempts FOR SELECT USING (public.get_user_role() = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_attempts_all" ON exam_attempts FOR ALL USING (user_id = auth.uid())`],
     // EXAM ANSWERS
-    [`CREATE POLICY "admin_answers_select" ON exam_answers FOR SELECT USING (attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
+    [`CREATE POLICY "admin_answers_select" ON exam_answers FOR SELECT USING (public.get_user_role() = 'admin' AND attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
     [`CREATE POLICY "staff_answers_all" ON exam_answers FOR ALL USING (attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid()))`],
     // VIDEO PROGRESS
-    [`CREATE POLICY "admin_progress_select" ON video_progress FOR SELECT USING (attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
+    [`CREATE POLICY "admin_progress_select" ON video_progress FOR SELECT USING (public.get_user_role() = 'admin' AND attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
     [`CREATE POLICY "staff_progress_all" ON video_progress FOR ALL USING (user_id = auth.uid())`],
     // NOTIFICATIONS
     [`CREATE POLICY "admin_notifications_all" ON notifications FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
@@ -145,12 +145,14 @@ async function run() {
 
     // --- CERTIFICATES ---
     [`CREATE POLICY "super_admin_certificates_all" ON certificates FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_certificates_all" ON certificates FOR ALL USING (training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
+    // GÜVENLİK: role='admin' kontrolü ŞART — staff JWT'si de organization_id taşır, rol
+    // predikatı olmadan personel Supabase client ile org-geneli sertifika basıp/silebilir.
+    [`CREATE POLICY "admin_certificates_all" ON certificates FOR ALL USING (public.get_user_role() = 'admin' AND training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_certificates_select" ON certificates FOR SELECT USING (user_id = auth.uid())`],
 
     // --- CONTENT LIBRARY ---
     [`CREATE POLICY "super_admin_content_library_all" ON content_library FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_content_library_select" ON content_library FOR SELECT USING (organization_id IS NULL OR organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "admin_content_library_select" ON content_library FOR SELECT USING (public.get_user_role() = 'admin' AND (organization_id IS NULL OR organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "admin_content_library_write" ON content_library FOR INSERT WITH CHECK (public.get_user_role() = 'admin' AND (organization_id IS NULL OR organization_id = public.get_user_org_id()))`],
 
     // --- ORGANIZATION CONTENT LIBRARY (install tracking) ---
@@ -159,7 +161,7 @@ async function run() {
 
     // --- ACCREDITATION STANDARDS ---
     [`CREATE POLICY "super_admin_accred_standards_all" ON accreditation_standards FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_accred_standards_select" ON accreditation_standards FOR SELECT USING (true)`],
+    [`CREATE POLICY "admin_accred_standards_select" ON accreditation_standards FOR SELECT USING (public.get_user_role() = 'admin' AND (organization_id IS NULL OR organization_id = public.get_user_org_id()))`],
 
     // --- ACCREDITATION REPORTS ---
     [`CREATE POLICY "super_admin_accred_reports_all" ON accreditation_reports FOR ALL USING (public.get_user_role() = 'super_admin')`],
@@ -172,22 +174,22 @@ async function run() {
 
     // --- COMPETENCY CATEGORIES ---
     [`CREATE POLICY "super_admin_comp_cats_all" ON competency_categories FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_comp_cats_all" ON competency_categories FOR ALL USING (form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_comp_cats_all" ON competency_categories FOR ALL USING (public.get_user_role() = 'admin' AND form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_comp_cats_select" ON competency_categories FOR SELECT USING (form_id IN (SELECT form_id FROM competency_evaluations WHERE subject_id = auth.uid() OR evaluator_id = auth.uid()))`],
 
     // --- COMPETENCY ITEMS ---
     [`CREATE POLICY "super_admin_comp_items_all" ON competency_items FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_comp_items_all" ON competency_items FOR ALL USING (category_id IN (SELECT id FROM competency_categories WHERE form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id())))`],
+    [`CREATE POLICY "admin_comp_items_all" ON competency_items FOR ALL USING (public.get_user_role() = 'admin' AND category_id IN (SELECT id FROM competency_categories WHERE form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id())))`],
     [`CREATE POLICY "staff_comp_items_select" ON competency_items FOR SELECT USING (category_id IN (SELECT id FROM competency_categories WHERE form_id IN (SELECT form_id FROM competency_evaluations WHERE subject_id = auth.uid() OR evaluator_id = auth.uid())))`],
 
     // --- COMPETENCY EVALUATIONS ---
     [`CREATE POLICY "super_admin_comp_evals_all" ON competency_evaluations FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_comp_evals_all" ON competency_evaluations FOR ALL USING (form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_comp_evals_all" ON competency_evaluations FOR ALL USING (public.get_user_role() = 'admin' AND form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_comp_evals_own" ON competency_evaluations FOR ALL USING (subject_id = auth.uid() OR evaluator_id = auth.uid())`],
 
     // --- COMPETENCY ANSWERS ---
     [`CREATE POLICY "super_admin_comp_answers_all" ON competency_answers FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_comp_answers_all" ON competency_answers FOR ALL USING (evaluation_id IN (SELECT id FROM competency_evaluations WHERE form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id())))`],
+    [`CREATE POLICY "admin_comp_answers_all" ON competency_answers FOR ALL USING (public.get_user_role() = 'admin' AND evaluation_id IN (SELECT id FROM competency_evaluations WHERE form_id IN (SELECT id FROM competency_forms WHERE organization_id = public.get_user_org_id())))`],
     [`CREATE POLICY "staff_comp_answers_own" ON competency_answers FOR ALL USING (evaluation_id IN (SELECT id FROM competency_evaluations WHERE subject_id = auth.uid() OR evaluator_id = auth.uid()))`],
 
     // --- TRAINING CATEGORIES ---
@@ -200,7 +202,7 @@ async function run() {
 
     // --- QUESTION BANK OPTIONS ---
     [`CREATE POLICY "super_admin_qbank_opts_all" ON question_bank_options FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_qbank_opts_all" ON question_bank_options FOR ALL USING (question_id IN (SELECT id FROM question_bank WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_qbank_opts_all" ON question_bank_options FOR ALL USING (public.get_user_role() = 'admin' AND question_id IN (SELECT id FROM question_bank WHERE organization_id = public.get_user_org_id()))`],
 
     // --- SMG PERIODS ---
     [`CREATE POLICY "super_admin_smg_periods_all" ON smg_periods FOR ALL USING (public.get_user_role() = 'super_admin')`],
@@ -209,7 +211,7 @@ async function run() {
 
     // --- SMG ACTIVITIES ---
     [`CREATE POLICY "super_admin_smg_activities_all" ON smg_activities FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_smg_activities_all" ON smg_activities FOR ALL USING (period_id IN (SELECT id FROM smg_periods WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_smg_activities_all" ON smg_activities FOR ALL USING (public.get_user_role() = 'admin' AND period_id IN (SELECT id FROM smg_periods WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_smg_activities_own" ON smg_activities FOR ALL USING (user_id = auth.uid())`],
 
     // --- HIS INTEGRATIONS ---
@@ -218,7 +220,7 @@ async function run() {
 
     // --- SYNC LOGS ---
     [`CREATE POLICY "super_admin_sync_logs_all" ON sync_logs FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_sync_logs_select" ON sync_logs FOR SELECT USING (organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "admin_sync_logs_select" ON sync_logs FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
 
     // --- KVKK REQUESTS ---
     [`CREATE POLICY "super_admin_kvkk_all" ON kvkk_requests FOR ALL USING (public.get_user_role() = 'super_admin')`],
@@ -230,10 +232,13 @@ async function run() {
 
     // --- DEPARTMENT TRAINING RULES ---
     [`CREATE POLICY "super_admin_dept_rules_all" ON department_training_rules FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_dept_rules_all" ON department_training_rules FOR ALL USING (department_id IN (SELECT id FROM departments WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_dept_rules_all" ON department_training_rules FOR ALL USING (public.get_user_role() = 'admin' AND department_id IN (SELECT id FROM departments WHERE organization_id = public.get_user_org_id()))`],
 
     // --- SCORM ATTEMPTS ---
-    [`CREATE POLICY "admin_scorm_attempts_select" ON scorm_attempts FOR SELECT USING (attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
+    // GÜVENLİK: super_admin (cross-org destek) + admin (yalnız org, role kontrollü) okur.
+    // Rol kontrolü olmadan staff JWT'si org-geneli scorm okuyabiliyordu.
+    [`CREATE POLICY "super_admin_scorm_attempts_all" ON scorm_attempts FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_scorm_attempts_select" ON scorm_attempts FOR SELECT USING (public.get_user_role() = 'admin' AND attempt_id IN (SELECT id FROM exam_attempts WHERE training_id IN (SELECT id FROM trainings WHERE organization_id = public.get_user_org_id())))`],
     [`CREATE POLICY "staff_scorm_attempts_all" ON scorm_attempts FOR ALL USING (attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid()))`],
 
     // --- TRAINING FEEDBACK FORMS (EY.FR.40) ---
@@ -243,11 +248,11 @@ async function run() {
     [`CREATE POLICY "staff_tfb_forms_select" ON training_feedback_forms FOR SELECT USING (organization_id = public.get_user_org_id() AND is_active = true)`],
 
     // --- TRAINING FEEDBACK CATEGORIES ---
-    [`CREATE POLICY "admin_tfb_categories_all" ON training_feedback_categories FOR ALL USING (form_id IN (SELECT id FROM training_feedback_forms WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_tfb_categories_all" ON training_feedback_categories FOR ALL USING (public.get_user_role() = 'admin' AND form_id IN (SELECT id FROM training_feedback_forms WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_tfb_categories_select" ON training_feedback_categories FOR SELECT USING (form_id IN (SELECT id FROM training_feedback_forms WHERE organization_id = public.get_user_org_id() AND is_active = true))`],
 
     // --- TRAINING FEEDBACK ITEMS ---
-    [`CREATE POLICY "admin_tfb_items_all" ON training_feedback_items FOR ALL USING (category_id IN (SELECT c.id FROM training_feedback_categories c JOIN training_feedback_forms f ON c.form_id = f.id WHERE f.organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_tfb_items_all" ON training_feedback_items FOR ALL USING (public.get_user_role() = 'admin' AND category_id IN (SELECT c.id FROM training_feedback_categories c JOIN training_feedback_forms f ON c.form_id = f.id WHERE f.organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_tfb_items_select" ON training_feedback_items FOR SELECT USING (category_id IN (SELECT c.id FROM training_feedback_categories c JOIN training_feedback_forms f ON c.form_id = f.id WHERE f.organization_id = public.get_user_org_id() AND f.is_active = true))`],
 
     // --- TRAINING FEEDBACK RESPONSES ---
@@ -257,9 +262,23 @@ async function run() {
     [`CREATE POLICY "staff_tfb_responses_insert_own" ON training_feedback_responses FOR INSERT WITH CHECK (attempt_id IN (SELECT id FROM exam_attempts WHERE user_id = auth.uid()) AND organization_id = public.get_user_org_id())`],
 
     // --- TRAINING FEEDBACK ANSWERS ---
-    [`CREATE POLICY "admin_tfb_answers_select" ON training_feedback_answers FOR SELECT USING (response_id IN (SELECT id FROM training_feedback_responses WHERE organization_id = public.get_user_org_id()))`],
+    [`CREATE POLICY "admin_tfb_answers_select" ON training_feedback_answers FOR SELECT USING (public.get_user_role() = 'admin' AND response_id IN (SELECT id FROM training_feedback_responses WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_tfb_answers_select_own" ON training_feedback_answers FOR SELECT USING (response_id IN (SELECT r.id FROM training_feedback_responses r JOIN exam_attempts a ON r.attempt_id = a.id WHERE a.user_id = auth.uid()))`],
     [`CREATE POLICY "staff_tfb_answers_insert_own" ON training_feedback_answers FOR INSERT WITH CHECK (response_id IN (SELECT r.id FROM training_feedback_responses r JOIN exam_attempts a ON r.attempt_id = a.id WHERE a.user_id = auth.uid()))`],
+
+    // ── GÜVENLİK (sistemik RLS sertleştirmesi) ──
+    // Yukarıda role='admin' predikatı eklenerek daraltılan admin_* politikalarının super_admin
+    // (cross-org platform desteği) karşılıkları. Bu tablolarda önceden super_admin politikası YOKTU;
+    // rol kapısı eklenince super_admin'in Supabase-client erişimi kaybolmasın diye eklendi.
+    [`CREATE POLICY "super_admin_videos_all" ON training_videos FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_questions_all" ON questions FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_options_all" ON question_options FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_attempts_all" ON exam_attempts FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_answers_all" ON exam_answers FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_progress_all" ON video_progress FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_tfb_categories_all" ON training_feedback_categories FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_tfb_items_all" ON training_feedback_items FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "super_admin_tfb_answers_all" ON training_feedback_answers FOR ALL USING (public.get_user_role() = 'super_admin')`],
   ];
 
   let ok = 0, fail = 0;
