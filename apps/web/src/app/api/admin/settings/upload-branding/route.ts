@@ -3,7 +3,9 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { brandingKey, uploadBuffer } from '@/lib/s3'
 import { checkRateLimit } from '@/lib/redis'
 
-const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
+// SVG bilinçli olarak hariç: <script>/onload gömülü SVG yüklenip
+// /api/public/organization/[slug] üzerinden servis edilirse stored-XSS açar.
+const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const MAX_LOGO_SIZE = 2 * 1024 * 1024 // 2MB
 const MAX_BANNER_SIZE = 5 * 1024 * 1024 // 5MB
 
@@ -22,7 +24,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
   }
 
   if (!ACCEPTED_TYPES.includes(file.type)) {
-    return errorResponse('Sadece PNG, JPG, SVG veya WebP dosyaları yüklenebilir.', 400)
+    return errorResponse('Sadece PNG, JPG veya WebP dosyaları yüklenebilir.', 400)
   }
 
   const maxSize = type === 'logo' ? MAX_LOGO_SIZE : MAX_BANNER_SIZE

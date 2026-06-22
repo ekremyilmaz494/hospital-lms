@@ -55,7 +55,7 @@ const ALLOWED_CONTENT_TYPES = [
   'audio/aac',
   'image/png',
   'image/jpeg',
-  'image/svg+xml',
+  // SVG bilinçli olarak hariç: gömülü <script> ile servis edilince stored-XSS açar.
   'image/webp',
   // Belge ve metin kaynakları (içerik kütüphanesi)
   'application/msword',
@@ -312,7 +312,8 @@ export function backupKey(orgId: string) {
   return `backups/${orgId}/${Date.now()}.json`
 }
 
-const ALLOWED_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
+// 'svg' bilinçli olarak hariç: branding upload'ında stored-XSS (gömülü <script>) riski.
+const ALLOWED_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp']
 
 const ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'ogg']
 // AI soru üretimi kaynakları: PDF + Office (Word/PowerPoint/Excel). Sunucu
