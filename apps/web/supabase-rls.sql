@@ -528,3 +528,16 @@ CREATE POLICY "all_badges_select" ON badges
 CREATE POLICY "super_admin_badges_all" ON badges
   FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 
+-- ── RECONCILIATION: apply-rls.js ile parite ──
+-- Önceden yalnız kanonik apply-rls.js'de tanımlıydı; iki dosya aynı tablo kümesini korusun diye eklendi.
+
+-- HIS INTEGRATIONS (hastane bilgi sistemi entegrasyonları)
+ALTER TABLE his_integrations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_his_all" ON his_integrations FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_his_all" ON his_integrations FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+
+-- SYNC LOGS (HIS senkronizasyon kayıtları)
+ALTER TABLE sync_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "super_admin_sync_logs_all" ON sync_logs FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_sync_logs_select" ON sync_logs FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+

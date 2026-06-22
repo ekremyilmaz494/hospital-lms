@@ -34,6 +34,9 @@ async function run() {
     'daily_reviews','daily_submissions',
     // Oyunlaştırma Faz 2 — Puan / Streak / Rozet
     'point_ledger','user_streaks','badges','user_badges',
+    // RECONCILIATION (parite): önceden yalnız supabase-rls.sql'de RLS'i açılan tablolar.
+    'trusted_devices','smg_categories','smg_targets','activity_logs','training_periods',
+    'exam_attempt_requests','expo_push_tokens','expo_push_tickets','invitations',
   ];
 
   for (const t of tables) {
@@ -279,6 +282,38 @@ async function run() {
     [`CREATE POLICY "super_admin_tfb_categories_all" ON training_feedback_categories FOR ALL USING (public.get_user_role() = 'super_admin')`],
     [`CREATE POLICY "super_admin_tfb_items_all" ON training_feedback_items FOR ALL USING (public.get_user_role() = 'super_admin')`],
     [`CREATE POLICY "super_admin_tfb_answers_all" ON training_feedback_answers FOR ALL USING (public.get_user_role() = 'super_admin')`],
+
+    // ── RECONCILIATION: supabase-rls.sql ile parite ──
+    // Önceden yalnız .sql'de tanımlı (Supabase Security Advisor + statik denetim turu) tablolar
+    // kanonik applier'a taşındı; inline JWT formundan helper formuna çevrildi, rol kapıları korundu.
+    // --- TRUSTED DEVICES (SMS MFA) ---
+    [`CREATE POLICY "user_trusted_devices_own" ON trusted_devices FOR ALL USING (user_id = auth.uid())`],
+    // --- SMG CATEGORIES / TARGETS (SKS) ---
+    [`CREATE POLICY "admin_smg_categories_all" ON smg_categories FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "staff_smg_categories_select" ON smg_categories FOR SELECT USING (organization_id = public.get_user_org_id() AND is_active = true)`],
+    [`CREATE POLICY "admin_smg_targets_all" ON smg_targets FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "staff_smg_targets_select" ON smg_targets FOR SELECT USING (organization_id = public.get_user_org_id())`],
+    // --- ACTIVITY LOGS (personel hareket takibi) ---
+    [`CREATE POLICY "super_admin_activity_logs_all" ON activity_logs FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_activity_logs_select" ON activity_logs FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "staff_activity_logs_select" ON activity_logs FOR SELECT USING (user_id = auth.uid())`],
+    [`CREATE POLICY "authenticated_activity_logs_insert" ON activity_logs FOR INSERT WITH CHECK (user_id = auth.uid() AND organization_id = public.get_user_org_id())`],
+    // --- TRAINING PERIODS (yıllık eğitim dönemleri) ---
+    [`CREATE POLICY "super_admin_periods_all" ON training_periods FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_periods_all" ON training_periods FOR ALL USING (organization_id = public.get_user_org_id() AND public.get_user_role() IN ('admin', 'super_admin'))`],
+    [`CREATE POLICY "staff_periods_select" ON training_periods FOR SELECT USING (organization_id = public.get_user_org_id())`],
+    // --- EXAM ATTEMPT REQUESTS (ek sınav hakkı talepleri) ---
+    [`CREATE POLICY "super_admin_attempt_requests_all" ON exam_attempt_requests FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_attempt_requests_all" ON exam_attempt_requests FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "staff_attempt_requests_select" ON exam_attempt_requests FOR SELECT USING (user_id = auth.uid())`],
+    [`CREATE POLICY "staff_attempt_requests_insert" ON exam_attempt_requests FOR INSERT WITH CHECK (user_id = auth.uid() AND organization_id = public.get_user_org_id())`],
+    // --- EXPO PUSH (mobil token/ticket) ---
+    [`CREATE POLICY "user_expo_push_tokens_own" ON expo_push_tokens FOR ALL USING (user_id = auth.uid())`],
+    [`CREATE POLICY "super_admin_expo_push_tickets_all" ON expo_push_tickets FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "user_expo_push_tickets_select" ON expo_push_tickets FOR SELECT USING (user_id = auth.uid())`],
+    // --- INVITATIONS (KVKK: tc_encrypted + e-posta + token_hash; client erişimi YOK) ---
+    [`CREATE POLICY "super_admin_invitations_all" ON invitations FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_invitations_all" ON invitations FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
   ];
 
   let ok = 0, fail = 0;
