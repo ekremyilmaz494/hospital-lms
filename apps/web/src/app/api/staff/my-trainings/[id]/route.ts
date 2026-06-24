@@ -190,6 +190,21 @@ export const GET = withStaffRoute<{ id: string }>(
       assignment.currentAttempt < assignment.maxAttempts &&
       !isExpired;
 
+    // Ön test GERÇEKTEN tamamlanmış mı? Bu atamadaki herhangi bir deneme ön testi submit
+    // etmiş (started+completed dolu — sahte retry-skip damgası started=NULL bırakır). "Retry'da
+    // ön testi atla" kararı buna bağlı; deneme sayısına değil (2026-06 düzeltme — ön testi hiç
+    // vermeden, ilk denemesi ön testteyken expire/timeout olanların videoya atlanması bug'ı).
+    const preExamGenuinelyDone =
+      !isFresh &&
+      (await prisma.examAttempt.count({
+        where: {
+          assignmentId: assignment.id,
+          userId: dbUser.id,
+          preExamStartedAt: { not: null },
+          preExamCompletedAt: { not: null },
+        },
+      })) > 0;
+
     // ═══ DETERMINE STEP PROGRESS ═══
     let currentAttempt: number;
     let preExamCompleted: boolean;
@@ -205,7 +220,9 @@ export const GET = withStaffRoute<{ id: string }>(
     } else if (isRetryPending) {
       // User failed, needs to start a new attempt
       currentAttempt = assignment.currentAttempt + 1;
-      preExamCompleted = true; // 2+ denemede ön sınav atlanır
+      // Ön sınav YALNIZ önceki denemede gerçekten tamamlandıysa atlanır (aksi halde retry'da
+      // baştan verilir). start route ile aynı kural — orada da preExamAlreadyDone gate'i var.
+      preExamCompleted = preExamGenuinelyDone && t.requirePreExamOnRetry !== true;
       videosCompleted = false; // videolar sıfırdan izlenmeli
       postExamCompleted = false; // son sınav tekrar girilmeli
     } else if (isExpiredRetryable) {
@@ -216,16 +233,19 @@ export const GET = withStaffRoute<{ id: string }>(
       // mantık expired attempt'in ilerlemesini okuyup "aşama TAMAM + video %0" çelişkisi
       // yaratıyordu (Devakent ÖZGÜR ÜNVER incident, 2026-05-20).
       currentAttempt = assignment.currentAttempt + 1;
-      // requirePreExamOnRetry=false → yeni deneme watching_videos'tan başlar (ön sınav
-      // atlanır, 2 adımlı retry). true → pre_exam'dan başlar (3 adımlı normal akış).
-      preExamCompleted = t.requirePreExamOnRetry !== true;
+      // Ön sınav YALNIZ önceki denemede gerçekten tamamlandıysa (VE requirePreExamOnRetry
+      // false) atlanır. İlk denemesi ön testteyken expire olan personel ön testi hiç
+      // vermemiştir → yeni denemede baştan vermeli (2026-06 düzeltme).
+      preExamCompleted = preExamGenuinelyDone && t.requirePreExamOnRetry !== true;
       videosCompleted = false;
       postExamCompleted = false;
     } else if (isActive) {
       // Active attempt in progress
       currentAttempt = assignment.currentAttempt;
-      const isRetry = latestAttempt.attemptNumber > 1;
-      preExamCompleted = isRetry || latestAttempt.preExamCompletedAt !== null;
+      // Ön sınav tamamlandı SAYILMASI yalnız bu denemenin preExamCompletedAt'ına bağlı —
+      // eskiden `attemptNumber>1` de true yapıyordu, bu yüzden ön testte takılı bir retry
+      // attempt'i "tamam" görünüp video aşamasına yönlendiriliyordu (2026-06 düzeltme).
+      preExamCompleted = latestAttempt.preExamCompletedAt !== null;
       // Video completion: PDF içerikler opsiyonel — yalnızca video/ses tamamlanma şartı geçişi belirler
       const attemptVideoProgress = new Map(
         (latestAttempt.videoProgress ?? []).map((vp) => [vp.videoId, vp])
@@ -316,10 +336,10 @@ export const GET = withStaffRoute<{ id: string }>(
         preExamCompleted,
         videosCompleted,
         postExamCompleted,
-        // needsRetry: frontend retry-flow (pre-exam atla, 2-step) için bayrak.
-        // isExpiredRetryable'da preExamCompleted = (requirePreExamOnRetry !== true) olduğu
-        // için bu formül: requirePreExamOnRetry=false → needsRetry=true (2-step retry),
-        // true → needsRetry=false (3-step normal akış, ön sınav baştan izlenir).
+        // needsRetry: frontend retry-flow (pre-exam atla, 2-step) için bayrak. preExamCompleted
+        // artık "ön test GERÇEKTEN tamamlandı + requirePreExamOnRetry false" demek; ön testi
+        // hiç vermeyenlerde false → expired-retry 2-step sayılmaz. Not: yönlendirme her hâlükârda
+        // POST /start dönen status'üne göre yapılır (start route ön test gerekiyorsa pre_exam döner).
         needsRetry: isRetryPending || (isExpiredRetryable && preExamCompleted),
         // Banner ayrımı için: isRetryPending = "kullanıcı sınavdan kaldı, yeni deneme bekliyor",
         // isExpiredRetryable = "süre doldu, cron expire etti, hâlâ deneme hakkı var" — farklı UX mesajları.

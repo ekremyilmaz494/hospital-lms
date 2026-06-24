@@ -137,10 +137,13 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 
     if (existingInTx) {
       // Promote kararı state machine dışında kalır (iş mantığı koşulu).
-      const skipPreExamOnRetryInTx = !assignment.training.requirePreExamOnRetry
+      // SADECE self-heal: preExamCompletedAt GERÇEKTEN dolu ama status pre_exam'da takılı.
+      // Eskiden `attemptNumber>1 && !requirePreExamOnRetry` de promote ediyordu — bu, ön
+      // testi hiç tamamlamamış (ilk denemesi ön testteyken expire/timeout olan) retry'ı da
+      // videoya atlatıyordu (2026-06 düzeltme). Artık ölçüt: ön test fiilen tamamlandı mı
+      // (preExamCompletedAt), deneme sayısı değil.
       const shouldPromoteInTx =
-        existingInTx.status === 'pre_exam' &&
-        ((existingInTx.attemptNumber > 1 && skipPreExamOnRetryInTx) || existingInTx.preExamCompletedAt !== null)
+        existingInTx.status === 'pre_exam' && existingInTx.preExamCompletedAt !== null
       if (shouldPromoteInTx) {
         // Self-heal sinyali: preExamCompletedAt dolu ama status hâlâ pre_exam.
         // submit route'un CAS'li transaction'ı bu ikisini ATOMİK yazar — bu warn
@@ -182,17 +185,31 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 
     // Yeni attempt için initial status'ü state machine belirler:
     //   - examOnly=true → post_exam (ön sınav + video atlanır)
-    //   - isRetry + !requirePreExamOnRetry → watching_videos (retry'da pre-exam atlanır)
+    //   - preExamAlreadyDone + !requirePreExamOnRetry → watching_videos (ön sınav atlanır)
     //   - Aksi halde → pre_exam
-    // requirePreExamOnRetry gerçek davranışı training schema field'ından gelir.
+    // KRİTİK: "retry'da ön testi atla" kararı deneme sayısına (attemptNumber>1) DEĞİL, ön
+    // testin ÖNCEKİ bir denemede GERÇEKTEN tamamlanmış (submit) olmasına bağlı. İlk denemesi
+    // ön testteyken expire/timeout olan personel ön testi hiç vermemiştir → atlanmamalı
+    // (2026-06 düzeltme; aksi halde ön testi hiç vermeyen kişi videoya atlanıyordu). Sahte
+    // retry-skip damgası preExamStartedAt'ı NULL bıraktığı için genuine sayılmaz.
+    const priorPreExam = await tx.examAttempt.findFirst({
+      where: {
+        assignmentId,
+        userId: dbUser.id,
+        preExamStartedAt: { not: null },
+        preExamCompletedAt: { not: null },
+      },
+      orderBy: { attemptNumber: 'desc' },
+      select: { preExamScore: true },
+    })
+    const preExamAlreadyDone = priorPreExam !== null
     const isExamOnly = assignment.training.examOnly === true
-    const isRetry = newAttemptNumber > 1
     const requirePreExamOnRetry = assignment.training.requirePreExamOnRetry === true
 
     const startTransition = attemptNextStatus(null, {
       type: 'START',
       examOnly: isExamOnly,
-      isRetry,
+      isRetry: preExamAlreadyDone,
       requirePreExamOnRetry,
     })
     if (!startTransition.ok) {
@@ -205,7 +222,10 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       initialStatus === 'post_exam'
         ? { postExamStartedAt: new Date() }
         : initialStatus === 'watching_videos'
-          ? { preExamCompletedAt: new Date(), preExamScore: 0 }
+          ? // Ön test atlandı (önceki denemede gerçekten tamamlanmıştı): bu attempt'in pre
+            // fazını çözülmüş işaretle ama SAHTE 0 yazma — önceki gerçek puanı taşı (rapor
+            // doğruluğu). watching_videos'a ancak preExamAlreadyDone iken gelinir.
+            { preExamCompletedAt: new Date(), preExamScore: priorPreExam?.preExamScore ?? null }
           : { preExamStartedAt: new Date() }
 
     const createdAttempt = await tx.examAttempt.create({
