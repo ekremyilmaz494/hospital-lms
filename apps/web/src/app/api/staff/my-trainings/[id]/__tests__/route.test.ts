@@ -24,6 +24,9 @@ const { prismaMock, isEndDatePassedMock } = vi.hoisted(() => ({
     examAttempt: {
       findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
+      // preExamGenuinelyDone hesabı: ön testi gerçekten tamamlamış (started+completed) attempt
+      // sayısı. Base 0 → "ön test hiç verilmemiş"; retry-skip senaryoları per-test 1 verir.
+      count: vi.fn().mockResolvedValue(0),
     },
     // EY.FR.40 geri bildirim — route Promise.all içinde her zaman çağırır.
     // Base mock'lar null/[] döner → feedback.formActive=false (mevcut testler etkilenmez).
@@ -153,6 +156,8 @@ describe('Staff my-trainings detail — isExpiredRetryable temiz-retry sözleşm
         { requirePreExamOnRetry: false }
       )
     );
+    // Ön test GERÇEKTEN tamamlanmış (started+completed) → genuine retry, atlama meşru.
+    prismaMock.examAttempt.count.mockResolvedValueOnce(1);
 
     const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) });
     expect(res.status).toBe(200);
@@ -202,6 +207,8 @@ describe('Staff my-trainings detail — isExpiredRetryable temiz-retry sözleşm
         { requirePreExamOnRetry: true }
       )
     );
+    // Ön test gerçekten tamamlanmış olsa bile requirePreExamOnRetry=true → yine baştan.
+    prismaMock.examAttempt.count.mockResolvedValueOnce(1);
 
     const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) });
     const body = await res.json();
@@ -212,6 +219,46 @@ describe('Staff my-trainings detail — isExpiredRetryable temiz-retry sözleşm
     expect(body.postExamCompleted).toBe(false);
     expect(body.isExpiredRetryable).toBe(true);
     expect(body.needsRetry).toBe(false);
+  });
+
+  it("expired + ön test HİÇ tamamlanmadı (count=0) → preExam FALSE (retry'da baştan verilir), needsRetry false", async () => {
+    // 2026-06 düzeltme: ilk denemesi ön testteyken expire/timeout olan personel ön testi
+    // hiç vermemiştir (preExamCompletedAt NULL). Eskiden requirePreExamOnRetry=false olduğu
+    // için preExamCompleted=true sayılıp videoya atlanıyordu. Artık genuine tamamlanma yoksa
+    // (count=0) ön test baştan istenir.
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(
+      makeAssignment(
+        { status: 'expired', preExamCompletedAt: null, preExamScore: null },
+        { requirePreExamOnRetry: false }
+      )
+    );
+    // count base mock 0 → ön test gerçekten tamamlanmamış.
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) });
+    const body = await res.json();
+
+    expect(body.isExpiredRetryable).toBe(true);
+    expect(body.preExamCompleted).toBe(false); // KRİTİK: ön test baştan verilmeli
+    expect(body.needsRetry).toBe(false); // 2-step (pre-exam atla) DEĞİL
+  });
+
+  it('retry-pending (son testten kaldı) ama ön test HİÇ tamamlanmadı (count=0) → preExam FALSE', async () => {
+    // İlk denemesi ön testteyken TIMEOUT olup completed+failed olan personel: son testi
+    // "geçemedi" görünür ama ön testi hiç vermemiştir. Retry'da ön test baştan istenmeli.
+    prismaMock.trainingAssignment.findFirst.mockResolvedValueOnce(
+      makeAssignment(
+        { status: 'completed', isPassed: false, preExamCompletedAt: null, preExamScore: null },
+        { requirePreExamOnRetry: false }
+      )
+    );
+    // count base mock 0 → ön test gerçekten tamamlanmamış.
+
+    const res = await GET(detailRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) });
+    const body = await res.json();
+
+    expect(body.preExamCompleted).toBe(false); // KRİTİK
+    // needsRetry yine true (yeni attempt POST /start ile açılmalı; start route pre_exam döner)
+    expect(body.needsRetry).toBe(true);
   });
 
   it('expired + eğitim süresi GERÇEKTEN dolmuş (effectiveDueDate geçmiş) → isExpiredRetryable false', async () => {

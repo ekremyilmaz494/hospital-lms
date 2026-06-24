@@ -321,3 +321,67 @@ describe('POST /api/exam/[id]/start — expired attempt resume engeli (KRİTİK)
     expect(prismaMock.$transaction).toHaveBeenCalledOnce()
   })
 })
+
+describe('POST /api/exam/[id]/start — ön test FİİLEN tamamlanmadıysa retry atlanmaz (2026-06 düzeltme)', () => {
+  // tx mock'u create çağrısının data'sını yakalar; create dönüşü GERÇEK status'ü yansıtır
+  // (hardcoded değil) ki initialStatus hesabı doğrulanabilsin. findFirst sırayla:
+  // 1) existingInTx (resume kontrolü), 2) priorPreExam (ön test fiilen tamamlandı mı).
+  function txCapture(opts: { existingInTx: unknown; priorPreExam: unknown }) {
+    const create = vi.fn().mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => ({
+        id: 'new-attempt-id',
+        attemptNumber: data.attemptNumber,
+        status: data.status,
+        preExamScore: data.preExamScore ?? null,
+        trainingId: TRAINING_ID,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        videoProgress: [],
+      }),
+    )
+    prismaMock.$transaction.mockImplementation(
+      async (cb: (tx: Record<string, unknown>) => Promise<unknown>) => {
+        const findFirst = vi
+          .fn()
+          .mockResolvedValueOnce(opts.existingInTx)
+          .mockResolvedValue(opts.priorPreExam)
+        const tx = {
+          $queryRaw: vi.fn().mockResolvedValue([]),
+          examAttempt: { findFirst, create, update: vi.fn() },
+          trainingAssignment: { update: vi.fn().mockResolvedValue({}) },
+        }
+        return cb(tx)
+      },
+    )
+    return create
+  }
+
+  it("ön testi hiç tamamlamamış retry → yeni attempt pre_exam'da yaratılır (videoya atlanmaz)", async () => {
+    // İlk denemesi ön testteyken expire/timeout olan personel: önceki gerçek tamamlanma YOK.
+    mockFlow(null)
+    const create = txCapture({ existingInTx: null, priorPreExam: null })
+
+    const res = await POST(startRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    expect(res.status).toBe(200)
+
+    expect(create).toHaveBeenCalledTimes(1)
+    const data = (create.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    expect(data.status).toBe('pre_exam') // KRİTİK: ön test baştan istenir
+    expect(data.preExamStartedAt).toBeInstanceOf(Date)
+    expect(data.preExamCompletedAt).toBeUndefined() // sahte tamamlanma damgası YOK
+    expect(data.preExamScore).toBeUndefined() // sahte 0 puan YOK
+  })
+
+  it("ön testi gerçekten tamamlamış retry → watching_videos'ta yaratılır, gerçek puan taşınır (sahte 0 değil)", async () => {
+    mockFlow(null)
+    const create = txCapture({ existingInTx: null, priorPreExam: { preExamScore: 85 } })
+
+    const res = await POST(startRequest(), { params: Promise.resolve({ id: ASSIGNMENT_ID }) })
+    expect(res.status).toBe(200)
+
+    const data = (create.mock.calls[0][0] as { data: Record<string, unknown> }).data
+    expect(data.status).toBe('watching_videos') // genuine retry → ön test atlanır
+    expect(data.preExamCompletedAt).toBeInstanceOf(Date)
+    expect(data.preExamScore).toBe(85) // önceki GERÇEK puan taşındı, sahte 0 değil
+  })
+})
