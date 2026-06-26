@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { cookies, headers } from 'next/headers'
-import { createHash } from 'crypto'
 import { createClient, createBearerClient } from '@/lib/supabase/server'
 import { verifyAccessToken } from '@/lib/supabase/verify-jwt'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
+import { computeAuditHash } from '@/lib/audit-hash'
 
 /**
  * Mobile/native client'lar JWT'yi `Authorization: Bearer <token>` header'ı ile
@@ -479,28 +479,11 @@ function sanitizeAuditData(data: unknown): unknown {
   return sanitized;
 }
 
-/**
- * Compute SHA-256 hash for audit log chain integrity.
- * Includes enough fields to make tampering evident.
- */
-export function computeAuditHash(fields: {
-  prevHash: string | null
-  action: string
-  entityType: string
-  entityId: string | null
-  userId: string | null
-  createdAt: string
-}): string {
-  const payload = [
-    fields.prevHash ?? '',
-    fields.action,
-    fields.entityType,
-    fields.entityId ?? '',
-    fields.userId ?? '',
-    fields.createdAt,
-  ].join('|')
-  return createHash('sha256').update(payload).digest('hex')
-}
+// Audit hash fonksiyonu bağımsız `audit-hash.ts`'e taşındı (ham pg kullanan ops
+// scriptlerinin Prisma/Next import etmeden tek kaynaktan kullanabilmesi için).
+// Yukarıda import edildi; hem bu dosyada (createAuditLog) hem de mevcut dış
+// `import { computeAuditHash } from '@/lib/api-helpers'` çağrıları için re-export.
+export { computeAuditHash }
 
 /** Audit log helper — creates a hash-chained record for JCI/SKS compliance */
 export async function createAuditLog(params: {
