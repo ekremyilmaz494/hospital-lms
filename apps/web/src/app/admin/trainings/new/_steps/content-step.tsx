@@ -8,10 +8,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { K, type VideoItem } from './types';
-import type { SelectedContent } from '../content-library-modal';
+import type { SelectedContent } from '../media-library-modal';
 
-const ContentLibraryModal = dynamic(
-  () => import('../content-library-modal').then(m => ({ default: m.ContentLibraryModal })),
+const MediaLibraryModal = dynamic(
+  () => import('../media-library-modal').then(m => ({ default: m.MediaLibraryModal })),
   { ssr: false }
 );
 
@@ -506,7 +506,7 @@ export default function ContentStep({
         )}
       </div>
 
-      <ContentLibraryModal
+      <MediaLibraryModal
         open={libraryModalOpen}
         onClose={() => setLibraryModalOpen(false)}
         onSelect={addFromLibrary}

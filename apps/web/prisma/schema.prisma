@@ -151,13 +151,12 @@ model Organization {
   smgPeriods             SmgPeriod[]
   smgCategories          SmgCategory[]
   smgTargetsList         SmgTarget[]                  @relation("SmgTargetOrg")
-  contentLibraryInstalls OrganizationContentLibrary[]
+  mediaAssets            MediaAsset[]                 @relation("OrgMediaAssets")
   competencyForms        CompetencyForm[]
   accreditationReports   AccreditationReport[]
   accreditationStandards AccreditationStandard[]      @relation("OrgAccreditationStandards")
   trainingCategories     TrainingCategory[]
   questionBank           QuestionBank[]
-  orgContentLibrary      ContentLibrary[]             @relation("OrgContentLibrary")
   examAttempts           ExamAttempt[]
   certificates           Certificate[]
   trainingAssignments    TrainingAssignment[]
@@ -337,8 +336,7 @@ model User {
   smgActivities                 SmgActivity[]                @relation("UserSmgActivities")
   smgApprovals                  SmgActivity[]                @relation("SmgApprovals")
   smgTargetOverrides            SmgTarget[]                  @relation("SmgTargetOverrides")
-  createdContentLibraries       ContentLibrary[]             @relation("ContentLibraryCreator")
-  contentLibraryInstalls        OrganizationContentLibrary[] @relation("ContentLibraryInstaller")
+  mediaAssets                   MediaAsset[]                 @relation("MediaAssetUploader")
   subjectEvaluations            CompetencyEvaluation[]       @relation("EvaluationSubject")
   evaluatorEvaluations          CompetencyEvaluation[]       @relation("EvaluationEvaluator")
   pushSubscriptions             PushSubscription[]
@@ -426,10 +424,6 @@ model Training {
   randomizeQuestions    Boolean @default(true) @map("randomize_questions")
   randomQuestionCount   Int?    @map("random_question_count")
 
-  // İçerik Kütüphanesi
-  isFromLibrary   Boolean @default(false) @map("is_from_library")
-  sourceLibraryId String? @map("source_library_id") @db.Uuid
-
   // Wizard taslak state'i — publishStatus='draft' iken full snapshot.
   // Yayın sonrası tutulur (ileride re-edit içinde reuse) ama yayın akışı bu kolonu okumaz.
   draftData      Json?     @map("draft_data")
@@ -437,7 +431,6 @@ model Training {
   draftUpdatedAt DateTime? @map("draft_updated_at") @db.Timestamptz
 
   organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sourceLibrary     ContentLibrary?            @relation("TrainingFromLibrary", fields: [sourceLibraryId], references: [id], onDelete: SetNull)
   createdBy         User?                      @relation("TrainingCreator", fields: [createdById], references: [id], onDelete: SetNull)
   videos            TrainingVideo[]
   questions         Question[]
@@ -478,13 +471,18 @@ model TrainingVideo {
   pageCount       Int?     @map("page_count")
   fileSizeBytes   BigInt?  @map("file_size_bytes")
   sortOrder       Int      @default(0) @map("sort_order")
+  // Medya Kütüphanesinden seçildiyse kaynak asset'e soft geri-bağ (silme engellemez,
+  // yalnız "N eğitimde kullanılıyor" rozeti + S3 referans-kontrolü için).
+  sourceMediaAssetId String? @map("source_media_asset_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  training      Training        @relation(fields: [trainingId], references: [id], onDelete: Cascade)
-  videoProgress VideoProgress[]
+  training        Training        @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  sourceMediaAsset MediaAsset?    @relation("TrainingVideoFromMediaAsset", fields: [sourceMediaAssetId], references: [id], onDelete: SetNull)
+  videoProgress   VideoProgress[]
 
   @@index([trainingId], map: "idx_training_videos_training")
+  @@index([sourceMediaAssetId], map: "idx_training_videos_source_media_asset")
   @@map("training_videos")
 }
 
@@ -1005,62 +1003,33 @@ model SmgTarget {
   @@map("smg_targets")
 }
 
-// ── İÇERİK KÜTÜPHANESİ ──
-model ContentLibrary {
-  id             String   @id @default(uuid()) @db.Uuid
-  title          String   @db.VarChar(500)
-  description    String?  @db.Text
-  category       String   @db.VarChar(50)
-  // INFECTION_CONTROL | FIRE_SAFETY | PATIENT_RIGHTS | KVKK |
-  // OCCUPATIONAL_HEALTH | FIRST_AID | MEDICAL_WASTE | HAND_HYGIENE |
-  // WORKPLACE_VIOLENCE | EMERGENCY_PROCEDURES
-  thumbnailUrl   String?  @map("thumbnail_url") @db.Text
-  duration       Int // dakika
-  smgPoints      Int      @default(0) @map("smg_points")
-  difficulty     String   @db.VarChar(20) // BASIC | INTERMEDIATE | ADVANCED
-  targetRoles    Json     @map("target_roles") // ["doctor","nurse","all"]
-  isActive       Boolean  @default(true) @map("is_active")
-  createdById    String?  @map("created_by") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  // AI İçerik alanları
-  contentType    String?  @map("content_type") @db.VarChar(30) // video | audio | pdf | quiz | flashcards | report | infographic
-  s3Key          String?  @map("s3_key") @db.Text
-  fileType       String?  @map("file_type") @db.VarChar(20) // mp3 | mp4 | pdf | json | png | md | pptx
-  contentData    Json?    @map("content_data") // quiz/flashcards JSON verisi
-  organizationId String?  @map("organization_id") @db.Uuid
-  // Storage quota toplamı: trainingVideo.fileSizeBytes + contentLibrary.fileSizeBytes
-  // Upload anında client'tan gelen file.size yazılır; geçmiş kayıtlarda null kalır.
-  fileSizeBytes  BigInt?  @map("file_size_bytes")
+// ── MEDYA KÜTÜPHANESİ ──
+// Admin'in yüklediği video + ses dosyaları. Eğitim sihirbazında seçilince
+// TrainingVideo'ya videoKey (s3Key) PAYLAŞILARAK kopyalanır → kütüphane öğesi
+// silinse bile eğitim çalışmaya devam eder. Tenant-scope (organizationId zorunlu).
+model MediaAsset {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  title           String   @db.VarChar(500)
+  description     String?  @db.Text
+  mediaType       String   @map("media_type") @db.VarChar(20) // 'video' | 'audio'
+  s3Key           String   @map("s3_key") @db.Text // kanonik kaynak (videos/... veya audio/...)
+  mimeType        String?  @map("mime_type") @db.VarChar(100)
+  durationSeconds Int?     @map("duration_seconds")
+  // Storage quota toplamı: trainingVideo.fileSizeBytes + mediaAsset.fileSizeBytes
+  fileSizeBytes   BigInt?  @map("file_size_bytes")
+  uploadedById    String?  @map("uploaded_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  createdBy    User?                        @relation("ContentLibraryCreator", fields: [createdById], references: [id])
-  organization Organization?                @relation("OrgContentLibrary", fields: [organizationId], references: [id], onDelete: SetNull)
-  installs     OrganizationContentLibrary[]
-  trainings    Training[]                   @relation("TrainingFromLibrary")
+  organization   Organization    @relation("OrgMediaAssets", fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy     User?           @relation("MediaAssetUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  trainingVideos TrainingVideo[] @relation("TrainingVideoFromMediaAsset")
 
-  @@unique([organizationId, s3Key], map: "idx_content_library_org_s3key_unique")
-  @@index([category], map: "idx_content_library_category")
-  @@index([contentType], map: "idx_content_library_content_type")
-  @@index([organizationId], map: "idx_content_library_org_id")
-  @@map("content_library")
-}
-
-// ── KURUM İÇERİK KÜTÜPHANESİ (kurulum takibi) ──
-model OrganizationContentLibrary {
-  id               String   @id @default(uuid()) @db.Uuid
-  organizationId   String   @map("organization_id") @db.Uuid
-  contentLibraryId String   @map("content_library_id") @db.Uuid
-  installedAt      DateTime @default(now()) @map("installed_at") @db.Timestamptz
-  installedBy      String?  @map("installed_by") @db.Uuid
-  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contentLibrary ContentLibrary @relation(fields: [contentLibraryId], references: [id], onDelete: Cascade)
-  installer      User?          @relation("ContentLibraryInstaller", fields: [installedBy], references: [id])
-
-  @@unique([organizationId, contentLibraryId])
-  @@index([organizationId], map: "idx_org_content_library_org")
-  @@map("organization_content_library")
+  @@unique([organizationId, s3Key], map: "idx_media_assets_org_s3key_unique")
+  @@index([organizationId], map: "idx_media_assets_org_id")
+  @@index([organizationId, mediaType], map: "idx_media_assets_org_media_type")
+  @@map("media_assets")
 }
 
 

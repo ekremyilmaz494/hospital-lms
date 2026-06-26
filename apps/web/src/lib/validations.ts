@@ -412,22 +412,20 @@ export const contentLibraryCategoryEnum = z.enum([
   'EMERGENCY_PROCEDURES',
 ])
 
-export const createContentLibrarySchema = z.object({
-  title:        z.string().min(1).max(500),
-  description:  z.string().optional(),
-  category:     contentLibraryCategoryEnum,
-  thumbnailUrl: z.string().url().optional().or(z.literal('')).transform(v => v || undefined),
-  duration:     z.coerce.number().int().min(1).max(480),
-  smgPoints:    z.coerce.number().int().min(0).max(100).default(0),
-  difficulty:   z.enum(['BASIC', 'INTERMEDIATE', 'ADVANCED']),
-  targetRoles:  z.array(z.string().min(1)).min(1).max(10),
-  isActive:     z.boolean().default(true),
+// ── Medya Kütüphanesi (admin'in yüklediği video + ses) ──
+// POST /api/admin/media-library: her dosya için presign + MediaAsset kaydı.
+// mediaType client'ın gönderdiği contentType'tan türetilir; yalnız video/audio.
+const mediaUploadFileSchema = z.object({
+  fileName:        z.string().min(1).max(500),
+  contentType:     z.string().min(1).max(150), // MIME (örn. 'video/mp4', 'audio/mpeg')
+  fileSize:        z.coerce.number().int().positive(),
+  title:           z.string().min(1).max(500).optional(),
+  description:     z.string().max(2000).optional(),
+  durationSeconds: z.coerce.number().int().min(0).optional(),
 })
 
-export const updateContentLibrarySchema = createContentLibrarySchema.partial()
-
-export const bulkInstallSchema = z.object({
-  category: contentLibraryCategoryEnum,
+export const createMediaAssetSchema = z.object({
+  files: z.array(mediaUploadFileSchema).min(1).max(20),
 })
 
 // ── SMG ──

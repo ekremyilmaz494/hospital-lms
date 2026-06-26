@@ -84,7 +84,6 @@ export const superAdminNav: NavGroup[] = [
         ],
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
-      { title: 'İçerik Kütüphanesi', href: '/super-admin/content-library', icon: Library },
     ],
   },
   {
@@ -136,7 +135,7 @@ export const adminNav: NavGroup[] = [
           { title: 'Soru Bankası', href: '/admin/exams/question-bank' },
         ],
       },
-      { title: 'Medya Kütüphanesi', href: '/admin/content-library', icon: Library },
+      { title: 'Medya Kütüphanesi', href: '/admin/media-library', icon: Library },
       { title: 'Eğitim Dönemleri', href: '/admin/training-periods', icon: Calendar },
     ],
   },

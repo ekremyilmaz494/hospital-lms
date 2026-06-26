@@ -30,6 +30,8 @@ export interface VideoItem {
   documentKey?: string;
   documentFile?: File;
   documentUploading?: boolean;
+  /** Medya kütüphanesinden seçildiyse kaynak asset id (soft geri-bağ). */
+  sourceMediaAssetId?: string;
 }
 
 export interface QuestionItem {

@@ -58,9 +58,14 @@ const INTENTIONALLY_EXCLUDED = new Set([
   'SubscriptionPlan',
   'TrainingCategory',
   'AccreditationStandard',
-  'ContentLibrary',
   'QuestionBank',
   'QuestionBankOption',
+
+  // Medya Kütüphanesi — S3 nesneleri üzerinde per-org ikincil index. Kanonik eğitim
+  // içeriği TrainingVideo'da (yedekleniyor) + S3 dosyaları kalıcı; library listesi
+  // kaybolsa eğitimler çalışmaya devam eder. Eski ContentLibrary de yedek scope'unda
+  // değildi → davranış değişmedi.
+  'MediaAsset',
 
   // Backup sisteminin kendisi — kendi metadata'sını yedeklemez (sonsuz döngü)
   'DbBackup',
@@ -97,9 +102,6 @@ const INTENTIONALLY_EXCLUDED = new Set([
   'UserStreak',
   'Badge',
   'UserBadge',
-
-  // İçerik kütüphanesi link tablosu — global tabloya bağlı
-  'OrganizationContentLibrary',
 
   // Yetkinlik değerlendirme modülü (yeni feature — henüz backup scope'unda değil)
   'CompetencyForm',
