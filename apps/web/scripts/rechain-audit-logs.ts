@@ -19,17 +19,27 @@
  * bazında advisory kilit alır (createAuditLog ile AYNI anahtar) → çalışırken gelen
  * canlı audit yazımlarıyla yarışmaz.
  *
- * KULLANIM (apps/web cwd):
- *   pnpm tsx scripts/rechain-audit-logs.ts            # KURU ÇALIŞMA (rapor; hiçbir şey yazmaz)
- *   pnpm tsx scripts/rechain-audit-logs.ts --execute  # gerçek güncelleme
- * veya repo kökünden:
- *   pnpm rechain:audit -- --execute
+ * KULLANIM (repo kökü = hospital-lms klasörü):
+ *   pnpm rechain:audit                 # KURU ÇALIŞMA (rapor; hiçbir şey yazmaz)
+ *   pnpm rechain:audit -- --execute    # gerçek güncelleme
  *
- * SIRA: Önce A1 (createAuditLog atomik) + A2 (verify) deploy edilmeli; SONRA bu script
- * prod'da BİR KEZ çalıştırılır. Sonrası: "Zinciri Doğrula" yeşil.
+ * Script HANGİ veritabanına bağlıysa ONU düzeltir. Varsayılan `.env.local`'deki
+ * DATABASE_URL'dir (genelde YEREL Supabase). Devakent'i (CANLI) düzeltmek için canlı
+ * bağlantıyı ortam değişkeni olarak ver — shell env `.env.local`'i geçersiz kılar:
+ *   DATABASE_URL="postgresql://...CANLI..." pnpm rechain:audit               # kuru
+ *   DATABASE_URL="postgresql://...CANLI..." pnpm rechain:audit -- --execute  # uygula
+ * (Canlı DATABASE_URL: Vercel → Settings → Environment Variables → DATABASE_URL.)
+ *
+ * SIRA: Önce yeni kod (atomik createAuditLog + verify) deploy edilmeli; SONRA bu script
+ * BİR KEZ çalıştırılır. Sonrası: "Zinciri Doğrula" yeşil.
  */
-import { prisma } from '@/lib/prisma'
-import { computeAuditHash } from '@/lib/api-helpers'
+import 'dotenv/config'
+import { config as loadEnv } from 'dotenv'
+// .env.local'i de yükle (Next varsayılanı) AMA override YOK: dışarıdan verilen
+// DATABASE_URL (ör. canlı prod) kazanır, .env.local onu ezmez. prisma + computeAuditHash
+// AŞAĞIDA dinamik import edilir — statik import env yüklenmeden prisma'yı başlatır →
+// "DATABASE_URL tanımlı değil" hatası. (Desen: setup-e2e-users.ts.)
+loadEnv({ path: '.env.local' })
 
 const EXECUTE = process.argv.includes('--execute')
 
@@ -44,107 +54,113 @@ interface Row {
   createdAt: Date
 }
 
-/** Bir org'un (veya null org'un) zincirini yeniden hesaplar; değişen satır sayısını döner. */
-async function rechainOrg(organizationId: string | null): Promise<{ total: number; changed: number }> {
-  const lockKey = `audit:${organizationId ?? 'global'}`
-  const label = organizationId ?? '(platform-geneli / null)'
+async function main() {
+  // dotenv yüklendikten SONRA dinamik import (statik import prisma'yı env'siz başlatır).
+  const { prisma } = await import('../src/lib/prisma')
+  const { computeAuditHash } = await import('../src/lib/api-helpers')
 
-  const rows = (await prisma.auditLog.findMany({
-    where: { organizationId },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: {
-      id: true,
-      action: true,
-      entityType: true,
-      entityId: true,
-      userId: true,
-      hash: true,
-      prevHash: true,
-      createdAt: true,
-    },
-  })) as Row[]
+  /** Bir org'un (veya null org'un) zincirini yeniden hesaplar; değişen satır sayısını döner. */
+  async function rechainOrg(organizationId: string | null): Promise<{ total: number; changed: number }> {
+    const lockKey = `audit:${organizationId ?? 'global'}`
+    const label = organizationId ?? '(platform-geneli / null)'
 
-  // Beklenen prevHash/hash'i sırayla hesapla; sapan satırları topla.
-  let previousHash: string | null = null
-  const updates: { id: string; hash: string; prevHash: string | null }[] = []
-  for (const row of rows) {
-    const expectedPrev = previousHash
-    const expectedHash = computeAuditHash({
-      prevHash: expectedPrev,
-      action: row.action,
-      entityType: row.entityType,
-      entityId: row.entityId,
-      userId: row.userId,
-      createdAt: row.createdAt.toISOString(),
-    })
-    if (row.hash !== expectedHash || row.prevHash !== expectedPrev) {
-      updates.push({ id: row.id, hash: expectedHash, prevHash: expectedPrev })
+    const rows = (await prisma.auditLog.findMany({
+      where: { organizationId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        action: true,
+        entityType: true,
+        entityId: true,
+        userId: true,
+        hash: true,
+        prevHash: true,
+        createdAt: true,
+      },
+    })) as Row[]
+
+    // Beklenen prevHash/hash'i sırayla hesapla; sapan satırları topla.
+    let previousHash: string | null = null
+    const updates: { id: string; hash: string; prevHash: string | null }[] = []
+    for (const row of rows) {
+      const expectedPrev = previousHash
+      const expectedHash = computeAuditHash({
+        prevHash: expectedPrev,
+        action: row.action,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        userId: row.userId,
+        createdAt: row.createdAt.toISOString(),
+      })
+      if (row.hash !== expectedHash || row.prevHash !== expectedPrev) {
+        updates.push({ id: row.id, hash: expectedHash, prevHash: expectedPrev })
+      }
+      previousHash = expectedHash
     }
-    previousHash = expectedHash
-  }
 
-  if (updates.length === 0) {
-    console.log(`  ✓ ${label}: ${rows.length} kayıt — zincir zaten sağlam (değişiklik yok)`)
-    return { total: rows.length, changed: 0 }
-  }
+    if (updates.length === 0) {
+      console.log(`  ✓ ${label}: ${rows.length} kayıt — zincir zaten sağlam (değişiklik yok)`)
+      return { total: rows.length, changed: 0 }
+    }
 
-  if (!EXECUTE) {
-    console.log(`  ~ ${label}: ${rows.length} kayıt — ${updates.length} satır DÜZELTİLECEK (kuru çalışma)`)
+    if (!EXECUTE) {
+      console.log(`  ~ ${label}: ${rows.length} kayıt — ${updates.length} satır DÜZELTİLECEK (kuru çalışma)`)
+      return { total: rows.length, changed: updates.length }
+    }
+
+    // Gerçek güncelleme — advisory kilit altında, tek transaction'da.
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`
+      for (const u of updates) {
+        await tx.auditLog.update({
+          where: { id: u.id },
+          data: { hash: u.hash, prevHash: u.prevHash },
+        })
+      }
+    })
+    console.log(`  ✔ ${label}: ${rows.length} kayıt — ${updates.length} satır güncellendi`)
     return { total: rows.length, changed: updates.length }
   }
 
-  // Gerçek güncelleme — advisory kilit altında, tek transaction'da.
-  await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`
-    for (const u of updates) {
-      await tx.auditLog.update({
-        where: { id: u.id },
-        data: { hash: u.hash, prevHash: u.prevHash },
-      })
+  try {
+    console.log('')
+    console.log('🔗 Audit Log Zinciri — Yeniden Tabana Alma')
+    console.log(`   Mod: ${EXECUTE ? '⚠️  EXECUTE (gerçek güncelleme)' : '🔍 DRY-RUN (yalnız rapor)'}`)
+    console.log('')
+
+    // audit_logs içinde geçen tüm organizationId değerleri (null dahil).
+    const distinct = await prisma.auditLog.findMany({
+      distinct: ['organizationId'],
+      select: { organizationId: true },
+    })
+    const orgIds = distinct.map((d) => d.organizationId)
+    console.log(`Zincir sayısı (org + null): ${orgIds.length}`)
+    console.log('')
+
+    let totalRows = 0
+    let totalChanged = 0
+    for (const orgId of orgIds) {
+      const { total, changed } = await rechainOrg(orgId)
+      totalRows += total
+      totalChanged += changed
     }
-  })
-  console.log(`  ✔ ${label}: ${rows.length} kayıt — ${updates.length} satır güncellendi`)
-  return { total: rows.length, changed: updates.length }
+
+    console.log('')
+    console.log(`Toplam: ${totalRows} kayıt, ${totalChanged} satır ${EXECUTE ? 'güncellendi' : 'düzeltilecek'}.`)
+    if (!EXECUTE && totalChanged > 0) {
+      console.log('➡️  Uygulamak için: pnpm rechain:audit -- --execute')
+    } else if (EXECUTE) {
+      console.log('✅ Tamam. Şimdi "Zinciri Doğrula" yeşil dönmeli.')
+    } else {
+      console.log('✅ Tüm zincirler zaten sağlam.')
+    }
+    console.log('')
+  } finally {
+    await prisma.$disconnect()
+  }
 }
 
-async function main() {
-  console.log('')
-  console.log('🔗 Audit Log Zinciri — Yeniden Tabana Alma')
-  console.log(`   Mod: ${EXECUTE ? '⚠️  EXECUTE (gerçek güncelleme)' : '🔍 DRY-RUN (yalnız rapor)'}`)
-  console.log('')
-
-  // audit_logs içinde geçen tüm organizationId değerleri (null dahil).
-  const distinct = await prisma.auditLog.findMany({
-    distinct: ['organizationId'],
-    select: { organizationId: true },
-  })
-  const orgIds = distinct.map((d) => d.organizationId)
-  console.log(`Zincir sayısı (org + null): ${orgIds.length}`)
-  console.log('')
-
-  let totalRows = 0
-  let totalChanged = 0
-  for (const orgId of orgIds) {
-    const { total, changed } = await rechainOrg(orgId)
-    totalRows += total
-    totalChanged += changed
-  }
-
-  console.log('')
-  console.log(`Toplam: ${totalRows} kayıt, ${totalChanged} satır ${EXECUTE ? 'güncellendi' : 'düzeltilecek'}.`)
-  if (!EXECUTE && totalChanged > 0) {
-    console.log('➡️  Uygulamak için: pnpm tsx scripts/rechain-audit-logs.ts --execute')
-  } else if (EXECUTE) {
-    console.log('✅ Tamam. Şimdi "Zinciri Doğrula" yeşil dönmeli.')
-  } else {
-    console.log('✅ Tüm zincirler zaten sağlam.')
-  }
-  console.log('')
-}
-
-main()
-  .catch((err) => {
-    console.error('🛑 rechain-audit-logs başarısız:', err)
-    process.exitCode = 1
-  })
-  .finally(() => prisma.$disconnect())
+main().catch((err) => {
+  console.error('🛑 rechain-audit-logs başarısız:', err)
+  process.exitCode = 1
+})
