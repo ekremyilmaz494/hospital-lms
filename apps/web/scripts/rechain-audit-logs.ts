@@ -99,12 +99,27 @@ async function rechainOrg(client: Client, organizationId: string | null): Promis
     return { total: rows.length, changed: updates.length }
   }
 
-  // Gerçek güncelleme — advisory kilit altında tek transaction.
+  // Gerçek güncelleme — advisory kilit altında tek transaction, TOPLU UPDATE.
+  // Tek tek UPDATE yerine VALUES-join ile parça parça yazılır → kilit yalnızca
+  // ~saniyeler tutulur, canlı audit yazımları uzun süre bloklanmaz.
+  const CHUNK = 500
   await client.query('BEGIN')
   try {
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey])
-    for (const u of updates) {
-      await client.query('UPDATE audit_logs SET hash = $1, prev_hash = $2 WHERE id = $3', [u.hash, u.prevHash, u.id])
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const chunk = updates.slice(i, i + CHUNK)
+      const valuesSql = chunk
+        .map((_, j) => `($${j * 3 + 1}::uuid, $${j * 3 + 2}::text, $${j * 3 + 3}::text)`)
+        .join(',')
+      const params: (string | null)[] = []
+      for (const u of chunk) params.push(u.id, u.hash, u.prevHash)
+      await client.query(
+        `UPDATE audit_logs AS a
+            SET hash = v.hash, prev_hash = v.prev_hash
+           FROM (VALUES ${valuesSql}) AS v(id, hash, prev_hash)
+          WHERE a.id = v.id`,
+        params,
+      )
     }
     await client.query('COMMIT')
   } catch (e) {
