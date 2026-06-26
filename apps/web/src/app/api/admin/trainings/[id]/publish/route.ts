@@ -131,17 +131,17 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
       await tx.question.deleteMany({ where: { trainingId: t.id } })
 
       // 3) Videoları yeniden yarat — N sıralı create yerine tek createMany.
-      // Library item lookup'ları paralel toplanır (sıralı await yerine Promise.all).
+      // Medya kütüphanesi lookup'ları paralel toplanır (sıralı await yerine Promise.all).
       if (videos && videos.length > 0) {
-        const libItemIds = videos
-          .map(v => (v as Record<string, unknown>).libraryItemId as string | undefined)
+        const assetIds = videos
+          .map(v => (v as Record<string, unknown>).sourceMediaAssetId as string | undefined)
           .filter((id): id is string => !!id)
-        const libItems = libItemIds.length > 0
-          ? await tx.contentLibrary.findMany({
-              where: { id: { in: libItemIds }, organizationId },
+        const assets = assetIds.length > 0
+          ? await tx.mediaAsset.findMany({
+              where: { id: { in: assetIds }, organizationId },
             })
           : []
-        const libMap = new Map(libItems.map(l => [l.id, l]))
+        const assetMap = new Map(assets.map(a => [a.id, a]))
 
         const videoData = videos
           .map((v, idx) => {
@@ -157,14 +157,16 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
             const pgCount = v.pageCount ?? null
             let videoTitle = v.title
 
-            const libId = (v as Record<string, unknown>).libraryItemId as string | undefined
-            if (libId) {
-              const libItem = libMap.get(libId)
-              if (libItem?.s3Key) {
-                url = libItem.s3Key
-                ct = (libItem.contentType as typeof ct) || 'video'
-                duration = (libItem.duration || 0) * 60
-                videoTitle = videoTitle || libItem.title
+            // Kütüphaneden seçildiyse asset'in s3Key'ini PAYLAŞARAK kopyala
+            // (fiziksel S3 kopyası yok) + soft geri-bağ kur.
+            const sourceMediaAssetId = (v as Record<string, unknown>).sourceMediaAssetId as string | undefined
+            if (sourceMediaAssetId) {
+              const asset = assetMap.get(sourceMediaAssetId)
+              if (asset?.s3Key) {
+                url = asset.s3Key
+                ct = (asset.mediaType as typeof ct) || 'video'
+                duration = asset.durationSeconds || duration
+                videoTitle = videoTitle || asset.title
               }
             }
 
@@ -184,6 +186,8 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
               pageCount: pgCount,
               documentKey: docKey,
               sortOrder: idx,
+              // Kütüphane öğesi silinse de bu kopya bağımsız çalışır (SetNull).
+              sourceMediaAssetId: sourceMediaAssetId ?? null,
             }
           })
           .filter((d): d is NonNullable<typeof d> => d !== null)

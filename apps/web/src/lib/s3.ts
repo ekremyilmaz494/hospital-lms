@@ -365,25 +365,24 @@ export function audioKey(orgId: string, trainingId: string, filename: string) {
  *
  * İki kaynağı toplar:
  *  - trainingVideo.fileSizeBytes (Training'lere bağlı dosyalar)
- *  - contentLibrary.fileSizeBytes (kuruma özel kütüphane öğeleri)
+ *  - mediaAsset.fileSizeBytes (medya kütüphanesine yüklenen video/ses dosyaları)
  *
- * Kütüphaneden install edilen platform içerikleri (organizationId=NULL ile
- * yaratılan ContentLibrary kayıtları) bu org'a fiziksel kopyalama yapmadan
- * referans olarak kullanıldığı için quota'ya dahil edilmez — sadece bu kurumun
- * S3'e yüklediği nesneler sayılır.
+ * Sihirbazda kütüphaneden seçilen öğeler TrainingVideo'ya s3Key PAYLAŞARAK
+ * kopyalanır (fiziksel S3 kopyası yok), bu yüzden aynı dosya iki kez
+ * sayılabilir — kabul edilebilir küçük bir üst-tahmin (kota güvenli tarafta).
  */
 export async function getOrgStorageBytes(orgId: string): Promise<number> {
-  const [videoAgg, libraryAgg] = await Promise.all([
+  const [videoAgg, mediaAgg] = await Promise.all([
     prisma.trainingVideo.aggregate({
       where: { training: { organizationId: orgId } },
       _sum: { fileSizeBytes: true },
     }),
-    prisma.contentLibrary.aggregate({
+    prisma.mediaAsset.aggregate({
       where: { organizationId: orgId },
       _sum: { fileSizeBytes: true },
     }),
   ])
-  return Number(videoAgg._sum.fileSizeBytes ?? 0) + Number(libraryAgg._sum.fileSizeBytes ?? 0)
+  return Number(videoAgg._sum.fileSizeBytes ?? 0) + Number(mediaAgg._sum.fileSizeBytes ?? 0)
 }
 
 /** Storage quota kontrolü — limit aşılmışsa hata mesajı döner, yoksa null */

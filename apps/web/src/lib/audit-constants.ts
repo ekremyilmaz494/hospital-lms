@@ -159,12 +159,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   // Yetkinlik (competency)
   EVALUATION_COMPLETED: 'Değerlendirme Tamamlandı',
 
-  // İçerik kütüphanesi
-  'content_library.create': 'İçerik Kütüphanesi Oluşturma',
-  'content_library.update': 'İçerik Kütüphanesi Güncelleme',
-  'content_library.delete': 'İçerik Kütüphanesi Silme',
-  'content_library.install': 'İçerik Kütüphanesi Kurulumu',
-  'content_library.bulk_install': 'İçerik Kütüphanesi Toplu Kurulum',
+  // Medya kütüphanesi
+  'media_asset.create': 'Medya Kütüphanesi Yükleme',
+  'media_asset.delete': 'Medya Kütüphanesi Silme',
 
   // Akreditasyon
   accreditation_action_plan_created: 'Akreditasyon Aksiyon Planı Oluşturuldu',
@@ -207,7 +204,7 @@ export const AUDIT_ENTITY_BADGE: Record<string, { variant: AuditBadgeVariant; la
   training_period: { variant: 'k-badge-info', label: 'Eğitim Dönemi' },
   training_video: { variant: 'k-badge-info', label: 'Eğitim Videosu' },
   video: { variant: 'k-badge-info', label: 'Video' },
-  content_library: { variant: 'k-badge-info', label: 'İçerik Kütüphanesi' },
+  media_asset: { variant: 'k-badge-info', label: 'Medya Kütüphanesi' },
 
   // Atama / sınav
   assignment: { variant: 'k-badge-info', label: 'Atama' },

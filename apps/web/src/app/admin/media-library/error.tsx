@@ -3,7 +3,7 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function ContentLibraryError({
+export default function ErrorPage({
   error,
   reset,
 }: {
@@ -26,7 +26,7 @@ export default function ContentLibraryError({
         >
           <AlertTriangle className="h-7 w-7" style={{ color: 'var(--color-error)' }} />
         </div>
-        <h2 className="mb-2 text-lg font-bold">Bir hata oluştu</h2>
+        <h2 className="mb-2 text-lg font-bold">Medya kütüphanesi yüklenemedi</h2>
         <p className="mb-6 text-sm" style={{ color: 'var(--color-text-muted)' }}>
           {error.message || 'Sayfa yüklenirken beklenmeyen bir hata oluştu.'}
         </p>

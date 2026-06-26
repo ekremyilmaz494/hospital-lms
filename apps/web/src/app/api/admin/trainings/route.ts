@@ -161,16 +161,18 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           const pgCount = v.pageCount ?? null
           let videoTitle = v.title
 
-          // Medya kütüphanesinden seçim — libraryItemId varsa bilgileri oradan çek
-          if ((v as Record<string, unknown>).libraryItemId) {
-            const libItem = await tx.contentLibrary.findFirst({
-              where: { id: (v as Record<string, unknown>).libraryItemId as string, organizationId: organizationId },
+          // Medya kütüphanesinden seçim — sourceMediaAssetId varsa bilgileri oradan çek
+          const sourceMediaAssetId =
+            (v as Record<string, unknown>).sourceMediaAssetId as string | undefined
+          if (sourceMediaAssetId) {
+            const asset = await tx.mediaAsset.findFirst({
+              where: { id: sourceMediaAssetId, organizationId: organizationId },
             })
-            if (libItem?.s3Key) {
-              url = libItem.s3Key
-              ct = (libItem.contentType as typeof ct) || 'video'
-              duration = (libItem.duration || 0) * 60
-              videoTitle = videoTitle || libItem.title
+            if (asset?.s3Key) {
+              url = asset.s3Key
+              ct = (asset.mediaType as typeof ct) || 'video'
+              duration = asset.durationSeconds || 0
+              videoTitle = videoTitle || asset.title
             }
           }
 
@@ -190,6 +192,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
               pageCount: pgCount,
               documentKey: docKey,
               sortOrder: idx,
+              // Kütüphaneden seçildiyse soft geri-bağ (silme engellemez).
+              sourceMediaAssetId: sourceMediaAssetId ?? null,
             }
           })
         }

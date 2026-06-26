@@ -36,8 +36,7 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smg_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smg_periods ENABLE ROW LEVEL SECURITY;
-ALTER TABLE content_library ENABLE ROW LEVEL SECURITY;
-ALTER TABLE organization_content_library ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media_assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_forms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_items ENABLE ROW LEVEL SECURITY;
@@ -182,13 +181,9 @@ CREATE POLICY "staff_smg_activities_own" ON smg_activities FOR ALL USING (user_i
 CREATE POLICY "admin_smg_periods_all" ON smg_periods FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 CREATE POLICY "staff_smg_periods_select" ON smg_periods FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
--- CONTENT LIBRARY
-CREATE POLICY "super_admin_content_library_all" ON content_library FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "all_content_library_select" ON content_library FOR SELECT USING (is_active = true);
-
--- ORGANIZATION CONTENT LIBRARY
-CREATE POLICY "admin_org_content_library_all" ON organization_content_library FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
-CREATE POLICY "staff_org_content_library_select" ON organization_content_library FOR SELECT USING (organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+-- MEDIA LIBRARY (admin'in yüklediği video + ses — tenant-scope)
+CREATE POLICY "super_admin_media_assets_all" ON media_assets FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_media_assets_all" ON media_assets FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- COMPETENCY FORMS
 CREATE POLICY "admin_comp_forms_all" ON competency_forms FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));

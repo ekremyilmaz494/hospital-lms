@@ -28,7 +28,7 @@ import {
   K, cardStyle, distributePoints,
   type VideoItem, type QuestionItem, type CategoryOption,
 } from '../_steps/types';
-import type { SelectedContent } from '../content-library-modal';
+import type { SelectedContent } from '../media-library-modal';
 import { useUploadManager, type UploadItem } from '@/components/admin/upload-manager';
 
 const stepLoading = () => (
@@ -419,6 +419,7 @@ export default function DraftWizardPage() {
         durationSeconds: item.durationSeconds,
         pageCount: item.pageCount,
         documentKey: item.documentKey,
+        sourceMediaAssetId: item.sourceMediaAssetId,
       }));
       return [...filled, ...newItems];
     });
@@ -592,6 +593,7 @@ export default function DraftWizardPage() {
             pageCount: v.pageCount,
             durationSeconds: v.durationSeconds,
             documentKey: v.documentKey,
+            sourceMediaAssetId: v.sourceMediaAssetId,
           })),
           questions: (() => {
             const dist = distributePoints(questions.length);
