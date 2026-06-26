@@ -31,6 +31,7 @@
     "verify:devakent": "pnpm --filter @tenants/devakent run verify",
     "cleanup:devakent:test-users": "pnpm --filter @tenants/devakent run cleanup:test-users",
     "snapshot:devakent": "pnpm --filter web exec tsx scripts/snapshot-devakent.ts",
+    "rechain:audit": "pnpm --filter web exec tsx scripts/rechain-audit-logs.ts",
     "prepare": "husky"
   },
   "devDependencies": {

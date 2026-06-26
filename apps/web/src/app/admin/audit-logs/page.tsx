@@ -7,6 +7,12 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import {
+  getActionLabel,
+  getEntityLabel,
+  getEntityBadge,
+  getActionBadgeVariant,
+} from '@/lib/audit-constants';
 
 interface AuditLogUser {
   firstName: string;
@@ -35,57 +41,8 @@ interface AuditLogResponse {
   totalPages: number;
 }
 
-// Entity tip → Klinova badge variant + label eşlemesi
-const entityBadgeMap: Record<string, { variant: string; label: string }> = {
-  training: { variant: 'k-badge-info', label: 'Eğitim' },
-  assignment: { variant: 'k-badge-info', label: 'Atama' },
-  user: { variant: 'k-badge-info', label: 'Kullanıcı' },
-  staff: { variant: 'k-badge-info', label: 'Personel' },
-  certificate: { variant: 'k-badge-success', label: 'Sertifika' },
-  exam_attempt: { variant: 'k-badge-warning', label: 'Sınav' },
-  export: { variant: 'k-badge-info', label: 'Dışa Aktarım' },
-  backup: { variant: 'k-badge-muted', label: 'Yedek' },
-  department: { variant: 'k-badge-info', label: 'Departman' },
-  settings: { variant: 'k-badge-muted', label: 'Ayarlar' },
-  notification: { variant: 'k-badge-info', label: 'Bildirim' },
-  video: { variant: 'k-badge-info', label: 'Video' },
-  question: { variant: 'k-badge-info', label: 'Soru' },
-};
-
-// Action türü → semantic badge variant (CREATE/UPDATE/DELETE/READ)
-function getActionBadgeVariant(action: string): string {
-  const a = action.toLowerCase();
-  if (a.includes('delete') || a.includes('remove') || a.includes('suspend')) return 'k-badge-error';
-  if (a.includes('create') || a.includes('assign') || a.includes('add')) return 'k-badge-success';
-  if (a.includes('update') || a.includes('reset') || a.includes('reopen') || a.includes('restore')) return 'k-badge-warning';
-  if (a.includes('export') || a.includes('read') || a.includes('view')) return 'k-badge-info';
-  return 'k-badge-muted';
-}
-
-const actionLabels: Record<string, string> = {
-  create: 'Oluşturma',
-  update: 'Güncelleme',
-  delete: 'Silme',
-  'data.export': 'Dışa Aktarım',
-  assign: 'Atama',
-  'reset_attempt': 'Hak Sıfırlama',
-  'reopen_assignment': 'Yeniden Atama',
-  duplicate: 'Kopyalama',
-  suspend: 'Askıya Alma',
-  restore: 'Geri Yükleme',
-  'training.create.full': 'Eğitim Oluşturma',
-  'training.update': 'Eğitim Güncelleme',
-  'training.delete': 'Eğitim Silme',
-  'department.create': 'Departman Oluşturma',
-  'department.update': 'Departman Güncelleme',
-  'department.delete': 'Departman Silme',
-  'department.add_member': 'Departmana Üye Ekleme',
-  'department.remove_member': 'Departmandan Üye Çıkarma',
-  'bulk_assign': 'Toplu Atama',
-  'certificate.create': 'Sertifika Oluşturma',
-  'settings.update': 'Ayar Güncelleme',
-  'send_reminder': 'Hatırlatma Gönderme',
-};
+// Audit etiketleri (action/entityType → Türkçe) ortak sözlükten gelir:
+// @/lib/audit-constants — admin + super-admin sayfaları aynı kaynağı kullanır.
 
 const avatarColors = [
   'var(--k-primary)', '#e67e22', '#3498db', '#9b59b6', '#e74c3c',
@@ -111,15 +68,6 @@ function getUserName(user: AuditLogUser | null): string {
   return `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Sistem';
 }
 
-function getActionLabel(action: string): string {
-  if (actionLabels[action]) return actionLabels[action];
-  return action.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function getEntityLabel(entityType: string): string {
-  return entityBadgeMap[entityType]?.label ?? entityType.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('tr-TR', {
     day: '2-digit',
@@ -135,6 +83,7 @@ export default function AdminAuditLogsPage() {
   const [entityTypeFilter, setEntityTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [verifying, setVerifying] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
 
   const handleVerifyChain = useCallback(async () => {
@@ -142,22 +91,24 @@ export default function AdminAuditLogsPage() {
     try {
       const res = await fetch('/api/admin/audit-logs/verify');
       if (res.status === 429) {
-        toast('Bu islem 5 dakikada bir yapilabilir. Lutfen bekleyin.', 'warning');
+        toast('Bu işlem 5 dakikada bir yapılabilir. Lütfen bekleyin.', 'warning');
         return;
       }
       if (!res.ok) {
-        toast('Dogrulama sirasinda bir hata olustu', 'error');
+        toast('Doğrulama sırasında bir hata oluştu', 'error');
         return;
       }
       const data = await res.json();
       if (data.verified) {
-        toast(`Audit log zinciri dogrulandi — ${data.totalRecords} kayit kontrol edildi`, 'success');
-      } else {
+        toast(`Audit log zinciri doğrulandı — ${data.totalRecords} kayıt kontrol edildi`, 'success');
+      } else if (data.brokenAt?.createdAt) {
         const brokenDate = new Date(data.brokenAt.createdAt).toLocaleString('tr-TR');
-        toast(`Zincir bozuldu! Ilk uyumsuz kayit: ${brokenDate}`, 'error');
+        toast(`Zincir bozuldu! İlk uyumsuz kayıt: ${brokenDate}`, 'error');
+      } else {
+        toast('Zincir bütünlüğü doğrulanamadı', 'error');
       }
     } catch {
-      toast('Dogrulama sirasinda bir hata olustu', 'error');
+      toast('Doğrulama sırasında bir hata oluştu', 'error');
     } finally {
       setVerifying(false);
     }
@@ -172,36 +123,50 @@ export default function AdminAuditLogsPage() {
   const { data, isLoading, error } = useFetch<AuditLogResponse>(queryUrl);
 
   const handleExportCSV = async () => {
-    // max 500 kayıt — ?limit=1000 performans sorunu yaratıyordu
-    const exportParams = new URLSearchParams();
-    exportParams.set('limit', '500');
-    exportParams.set('page', '1');
-    if (entityTypeFilter) exportParams.set('entityType', entityTypeFilter);
-    const res = await fetch(`/api/admin/audit-logs?${exportParams.toString()}`);
-    if (!res.ok) return;
-    const { logs } = await res.json();
-    if (!logs?.length) return;
+    setExporting(true);
+    try {
+      // max 500 kayıt — ?limit=1000 performans sorunu yaratıyordu
+      const exportParams = new URLSearchParams();
+      exportParams.set('limit', '500');
+      exportParams.set('page', '1');
+      if (entityTypeFilter) exportParams.set('entityType', entityTypeFilter);
+      const res = await fetch(`/api/admin/audit-logs?${exportParams.toString()}`);
+      if (!res.ok) {
+        toast('Dışa aktarım başarısız oldu', 'error');
+        return;
+      }
+      const { logs } = await res.json();
+      if (!logs?.length) {
+        toast('Dışa aktarılacak kayıt bulunamadı', 'warning');
+        return;
+      }
 
-    const headers = ['Tarih', 'Kullanıcı', 'E-posta', 'İşlem', 'Varlık Tipi', 'Varlık ID'];
-    const rows = logs.map((log: AuditLogItem) => [
-      new Date(log.createdAt).toLocaleString('tr-TR'),
-      getUserName(log.user),
-      log.user?.email ?? '-',
-      getActionLabel(log.action),
-      getEntityLabel(log.entityType),
-      log.entityId ?? '-',
-    ]);
-    const csv = [headers, ...rows].map((r: string[]) => r.map((c: string) => `"${c}"`).join(';')).join('\n');
-    const encoder = new TextEncoder();
-    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-    const csvBytes = encoder.encode(csv);
-    const blob = new Blob([bom, csvBytes], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `islem-gecmisi-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+      const headers = ['Tarih', 'Kullanıcı', 'E-posta', 'İşlem', 'Varlık Tipi', 'Varlık ID'];
+      const rows = logs.map((log: AuditLogItem) => [
+        new Date(log.createdAt).toLocaleString('tr-TR'),
+        getUserName(log.user),
+        log.user?.email ?? '-',
+        getActionLabel(log.action),
+        getEntityLabel(log.entityType),
+        log.entityId ?? '-',
+      ]);
+      const csv = [headers, ...rows].map((r: string[]) => r.map((c: string) => `"${c}"`).join(';')).join('\n');
+      const encoder = new TextEncoder();
+      const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const csvBytes = encoder.encode(csv);
+      const blob = new Blob([bom, csvBytes], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `islem-gecmisi-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast(`${logs.length} kayıt dışa aktarıldı`, 'success');
+    } catch {
+      toast('Dışa aktarım başarısız oldu', 'error');
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (isLoading) {
@@ -221,7 +186,7 @@ export default function AdminAuditLogsPage() {
         const term = search.toLowerCase();
         const userName = getUserName(log.user).toLowerCase();
         const actionLabel = getActionLabel(log.action).toLowerCase();
-        const entityLabel = (entityBadgeMap[log.entityType]?.label ?? '').toLowerCase();
+        const entityLabel = getEntityLabel(log.entityType).toLowerCase();
         return userName.includes(term) || actionLabel.includes(term) || entityLabel.includes(term) || log.action.toLowerCase().includes(term);
       })
     : logs;
@@ -244,8 +209,8 @@ export default function AdminAuditLogsPage() {
           <button onClick={handleVerifyChain} disabled={verifying} className="k-btn k-btn-ghost">
             <ShieldCheck size={15} /> {verifying ? 'Doğrulanıyor…' : 'Zinciri Doğrula'}
           </button>
-          <button onClick={handleExportCSV} className="k-btn k-btn-ghost">
-            <Download size={15} /> Dışa Aktar
+          <button onClick={handleExportCSV} disabled={exporting} className="k-btn k-btn-ghost">
+            <Download size={15} /> {exporting ? 'Aktarılıyor…' : 'Dışa Aktar'}
           </button>
         </div>
       </header>
@@ -257,6 +222,7 @@ export default function AdminAuditLogsPage() {
             <input
               type="text"
               placeholder="İşlem veya kullanıcı ara..."
+              aria-label="İşlem veya kullanıcı ara"
               className="k-input pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -265,6 +231,7 @@ export default function AdminAuditLogsPage() {
           <select
             value={entityTypeFilter}
             onChange={(e) => { setEntityTypeFilter(e.target.value); setPage(1); }}
+            aria-label="Tür filtresi"
             className="k-input"
             style={{ width: 'auto', minWidth: '160px' }}
           >
@@ -298,7 +265,7 @@ export default function AdminAuditLogsPage() {
                   </thead>
                   <tbody>
                     {filteredLogs.map((log) => {
-                      const entityBadge = entityBadgeMap[log.entityType] ?? { variant: 'k-badge-muted', label: log.entityType };
+                      const entityBadge = getEntityBadge(log.entityType);
                       const actionVariant = getActionBadgeVariant(log.action);
                       const color = getAvatarColor(log.userId);
                       const initials = getInitials(log.user);

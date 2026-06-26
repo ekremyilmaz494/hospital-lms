@@ -24,6 +24,15 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     const BATCH_SIZE = 1000
     let totalRecords = 0
     let previousHash: string | null = null
+    // Zinciri kuran sırayla AYNI deterministik sıra: [createdAt asc, id asc].
+    // (id tie-breaker'ı, aynı milisaniyedeki geçmiş kayıtların rastgele sıralanıp
+    //  zinciri yanlışlıkla "bozuk" göstermesini engeller.)
+    const chainOrder = [{ createdAt: 'asc' as const }, { id: 'asc' as const }]
+    // İlk hash'li kayıt "çapa"dır: prevHash bağı kontrol edilmez. Böylece 1 yıllık
+    // audit rotasyonu (cron) zincirin BAŞINI silse de doğrulama "bozuk" demez —
+    // kalan kayıtlar yine kendi hash'leri + aralarındaki bağ ile tamper-evident kalır.
+    // Zincirin ORTASINDAN bir kayıt silinir/değiştirilirse yine yakalanır.
+    let anchored = false
 
     const selectFields = {
       id: true,
@@ -36,10 +45,17 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       createdAt: true,
     } as const
 
+    const broken = (record: { id: string; createdAt: Date }) =>
+      jsonResponse({
+        verified: false,
+        brokenAt: { id: record.id, createdAt: record.createdAt },
+        totalRecords,
+      })
+
     // First batch (no cursor)
     let batch = await prisma.auditLog.findMany({
       where: { organizationId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: chainOrder,
       select: selectFields,
       take: BATCH_SIZE,
     })
@@ -48,22 +64,14 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       for (const record of batch) {
         totalRecords++
 
-        // Skip records without hash (created before hash chaining was enabled)
+        // Hash'siz kayıtları atla (hash zinciri eklenmeden önce yazılanlar) ve çapayı sıfırla.
         if (!record.hash) {
           previousHash = null
+          anchored = false
           continue
         }
 
-        // Verify prevHash links to previous record's hash
-        if (record.prevHash !== previousHash) {
-          return jsonResponse({
-            verified: false,
-            brokenAt: { id: record.id, createdAt: record.createdAt },
-            totalRecords,
-          })
-        }
-
-        // Recalculate hash and compare
+        // 1) Bütünlük: kaydın kendi içeriği + sakladığı prevHash'ten hash'i yeniden hesapla.
         const expectedHash = computeAuditHash({
           prevHash: record.prevHash,
           action: record.action,
@@ -72,16 +80,17 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
           userId: record.userId,
           createdAt: record.createdAt.toISOString(),
         })
-
         if (expectedHash !== record.hash) {
-          return jsonResponse({
-            verified: false,
-            brokenAt: { id: record.id, createdAt: record.createdAt },
-            totalRecords,
-          })
+          return broken(record)
+        }
+
+        // 2) Bağ: yalnız çapadan SONRA zorunlu (prefix-truncation/rotasyon toleransı).
+        if (anchored && record.prevHash !== previousHash) {
+          return broken(record)
         }
 
         previousHash = record.hash
+        anchored = true
       }
 
       // If batch was smaller than BATCH_SIZE, we've reached the end
@@ -89,10 +98,10 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
 
       const lastId = batch[batch.length - 1].id
 
-      // Next batch using cursor pagination
+      // Next batch using cursor pagination (aynı deterministik sıra)
       batch = await prisma.auditLog.findMany({
         where: { organizationId },
-        orderBy: { createdAt: 'asc' },
+        orderBy: chainOrder,
         select: selectFields,
         take: BATCH_SIZE,
         skip: 1,
@@ -105,6 +114,6 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     })
   } catch (err) {
     logger.error('AuditVerify', 'Chain verification failed', err)
-    return errorResponse('Dogrulama sirasinda bir hata olustu', 500)
+    return errorResponse('Doğrulama sırasında bir hata oluştu', 500)
   }
 }, { requireOrganization: true })

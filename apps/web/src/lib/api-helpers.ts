@@ -517,42 +517,60 @@ export async function createAuditLog(params: {
   const userAgent = params.request?.headers.get('user-agent') ?? null
 
   try {
-    // Fetch the last audit log for this organization to get its hash (chain link)
-    const lastLog = params.organizationId
-      ? await prisma.auditLog.findFirst({
-          where: { organizationId: params.organizationId },
-          orderBy: { createdAt: 'desc' },
-          select: { hash: true },
-        })
-      : null
+    // Hash zinciri ATOMİK ve DETERMİNİSTİK kurulmalı (JCI/SKS — değişmezlik kanıtı):
+    //  1. Advisory kilit (org-bazlı): aynı organizasyona EŞZAMANLI iki audit yazımı,
+    //     aynı `prevHash`'i okuyup zinciri ÇATALLAMASIN diye yazımları seri hale getirir.
+    //     (Çatallanma, doğrulamada `prevHash !== previousHash` → "zincir bozuldu" yanılması.)
+    //  2. Strictly-increasing createdAt: aynı milisaniyedeki çakışma, doğrulamadaki
+    //     `[createdAt asc, id asc]` sıralamasıyla zincirin kurulduğu sıranın AYNI olmasını
+    //     bozardı. Yeni satır her zaman zincirin SONUNA düşsün diye createdAt en az
+    //     (son kayıt + 1 ms) yapılır. Sapma sub-saniye → denetim zamanı pratikte aynı kalır.
+    // null org (platform-geneli) kayıtları da `organization_id IS NULL` zincirinde tutarlı kalır.
+    const lockKey = `audit:${params.organizationId ?? 'global'}`
+    const orgWhere = { organizationId: params.organizationId ?? null }
 
-    const prevHash = lastLog?.hash ?? null
-    const now = new Date()
+    await prisma.$transaction(async (tx) => {
+      // pg_advisory_xact_lock: transaction sonunda otomatik bırakılır (manuel unlock gerekmez).
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`
 
-    const hash = computeAuditHash({
-      prevHash,
-      action: params.action,
-      entityType: params.entityType,
-      entityId: params.entityId ?? null,
-      userId: params.userId ?? null,
-      createdAt: now.toISOString(),
-    })
+      const lastLog = await tx.auditLog.findFirst({
+        where: orgWhere,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: { hash: true, createdAt: true },
+      })
 
-    await prisma.auditLog.create({
-      data: {
-        userId: params.userId ?? null,
-        organizationId: params.organizationId ?? null,
+      const prevHash = lastLog?.hash ?? null
+
+      let ts = new Date()
+      if (lastLog && ts.getTime() <= lastLog.createdAt.getTime()) {
+        ts = new Date(lastLog.createdAt.getTime() + 1)
+      }
+
+      const hash = computeAuditHash({
+        prevHash,
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId ?? null,
-        oldData: params.oldData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.oldData))) as object : undefined,
-        newData: params.newData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.newData))) as object : undefined,
-        ipAddress,
-        userAgent,
-        hash,
-        prevHash,
-        createdAt: now,
-      },
+        userId: params.userId ?? null,
+        createdAt: ts.toISOString(),
+      })
+
+      await tx.auditLog.create({
+        data: {
+          userId: params.userId ?? null,
+          organizationId: params.organizationId ?? null,
+          action: params.action,
+          entityType: params.entityType,
+          entityId: params.entityId ?? null,
+          oldData: params.oldData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.oldData))) as object : undefined,
+          newData: params.newData ? sanitizeAuditData(JSON.parse(JSON.stringify(params.newData))) as object : undefined,
+          ipAddress,
+          userAgent,
+          hash,
+          prevHash,
+          createdAt: ts,
+        },
+      })
     })
   } catch (err) {
     // Audit log hatasi ana is akisini durdurmasin — log'la ve devam et

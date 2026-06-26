@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
+import { jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { hashInvitationToken, getInvitationClaimError } from '@/lib/invitations'
@@ -259,17 +259,17 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         }).catch(err => logger.error('invitations.accept', 'ownerUserId update başarısız', err))
       : Promise.resolve(),
 
-    // Audit log (organization-scoped)
-    prisma.auditLog.create({
-      data: {
-        userId: newUser.id,
-        organizationId: invitation.organizationId,
-        action: 'invitation.accept',
-        entityType: 'user',
-        entityId: newUser.id,
-        newData: { invitationId: invitation.id, setAsOwner: invitation.setAsOwner },
-      },
-    }).catch(err => logger.error('invitations.accept', 'Audit log başarısız', err)),
+    // Audit log (organization-scoped) — hash zincirine dahil olsun diye createAuditLog
+    // (kendi hatasını yutar; ip/userAgent'i request'ten otomatik doldurur).
+    createAuditLog({
+      userId: newUser.id,
+      organizationId: invitation.organizationId,
+      action: 'invitation.accept',
+      entityType: 'user',
+      entityId: newUser.id,
+      newData: { invitationId: invitation.id, setAsOwner: invitation.setAsOwner },
+      request,
+    }),
   ])
 
   // Departman eğitim kurallarına göre otomatik atama (best-effort, sadece staff için)

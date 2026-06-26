@@ -15,6 +15,12 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
+// Mock createAuditLog — auto-assign artık hash zincirine dahil etmek için bunu kullanır
+// (doğrudan prisma.auditLog.create yerine).
+vi.mock('@/lib/api-helpers', () => ({
+  createAuditLog: vi.fn(),
+}))
+
 // Mock training-periods — auto-assign aktif period çözmeye çalışır.
 // Default: throw ettir → periodId null kalır (mevcut null-period assertion'ları korunur).
 // Case bazlı: aktif period'lu davranış için case içinde mockResolvedValueOnce ile override.
@@ -25,6 +31,7 @@ vi.mock('@/lib/training-periods', () => ({
 import { autoAssignByDepartment } from '../auto-assign'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { createAuditLog } from '@/lib/api-helpers'
 import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 
 const mockUserFindFirst = prisma.user.findFirst as ReturnType<typeof vi.fn>
@@ -32,6 +39,7 @@ const mockRuleFindMany = prisma.departmentTrainingRule.findMany as ReturnType<ty
 const mockAssignmentFindMany = prisma.trainingAssignment.findMany as ReturnType<typeof vi.fn>
 const mockCreateMany = prisma.trainingAssignment.createMany as ReturnType<typeof vi.fn>
 const mockAuditCreate = prisma.auditLog.create as ReturnType<typeof vi.fn>
+const mockCreateAuditLog = createAuditLog as ReturnType<typeof vi.fn>
 const mockGetOrCreatePeriod = getOrCreateActivePeriodForAssignment as ReturnType<typeof vi.fn>
 
 const userId = 'user-1'
@@ -142,8 +150,9 @@ describe('autoAssignByDepartment', () => {
 
     await autoAssignByDepartment(userId, departmentId, organizationId, assignedById)
 
-    expect(mockAuditCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    // Hash zincirine dahil olsun diye createAuditLog ile yazılır (data: sarmalayıcı yok).
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
         action: 'auto_assign',
         entityType: 'training_assignment',
         entityId: departmentId,
@@ -155,7 +164,7 @@ describe('autoAssignByDepartment', () => {
           departmentId,
         }),
       }),
-    })
+    )
   })
 
   it('aktif period varsa periodId ile atama oluşturur', async () => {

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { createAuditLog } from '@/lib/api-helpers'
 import { getOrCreateActivePeriodForAssignment } from '@/lib/training-periods'
 
 /**
@@ -92,25 +93,21 @@ export async function autoAssignByDepartment(
   if (assignedCount > 0) {
     logger.info('AutoAssign', `${assignedCount} egitim otomatik atandi`, { userId, departmentId })
 
-    try {
-      await prisma.auditLog.create({
-        data: {
-          action: 'auto_assign',
-          entityType: 'training_assignment',
-          entityId: departmentId,
-          organizationId,
-          userId: assignedById ?? userId,
-          newData: {
-            assignedCount,
-            targetUserId: userId,
-            departmentId,
-            message: `${assignedCount} eğitim departman kuralına göre otomatik atandı`,
-          },
-        },
-      })
-    } catch (err) {
-      logger.warn('AutoAssign', 'Audit log olusturulamadi', (err as Error).message)
-    }
+    // Hash zincirine dahil olsun diye doğrudan create yerine createAuditLog
+    // (kendi hatasını yutar — ana akışı durdurmaz).
+    await createAuditLog({
+      action: 'auto_assign',
+      entityType: 'training_assignment',
+      entityId: departmentId,
+      organizationId,
+      userId: assignedById ?? userId,
+      newData: {
+        assignedCount,
+        targetUserId: userId,
+        departmentId,
+        message: `${assignedCount} eğitim departman kuralına göre otomatik atandı`,
+      },
+    })
   }
 
   return assignedCount

@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Search, Filter, X } from 'lucide-react';
+import { Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { PageHeader } from '@/components/shared/page-header';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
+import { getActionLabel, getEntityLabel } from '@/lib/audit-constants';
 
 interface AuditLog {
   id: string;
@@ -38,16 +39,17 @@ export default function AuditLogsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [entityType, setEntityType] = useState('');
   const [action, setAction] = useState('');
+  const [page, setPage] = useState(1);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
+    params.set('page', String(page));
     if (entityType) params.set('entityType', entityType);
     if (action) params.set('action', action);
-    const qs = params.toString();
-    return qs ? `?${qs}` : '';
-  }, [entityType, action]);
+    return `?${params.toString()}`;
+  }, [page, entityType, action]);
 
-  const { data, isLoading, error } = useFetch<{ logs: AuditLog[]; total: number }>(
+  const { data, isLoading, error } = useFetch<{ logs: AuditLog[]; total: number; page: number; totalPages: number }>(
     `/api/super-admin/audit-logs${queryString}`,
   );
 
@@ -60,6 +62,8 @@ export default function AuditLogsPage() {
   }
 
   const logList = data?.logs ?? [];
+  const totalPages = data?.totalPages ?? 1;
+  const total = data?.total ?? 0;
   const filteredLogs = search.trim()
     ? logList.filter(l => {
         const term = search.toLowerCase();
@@ -106,7 +110,7 @@ export default function AuditLogsPage() {
           </Button>
           {hasActiveFilters && (
             <button
-              onClick={() => { setEntityType(''); setAction(''); }}
+              onClick={() => { setEntityType(''); setAction(''); setPage(1); }}
               className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold"
               style={{ color: 'var(--color-text-muted)' }}
             >
@@ -121,24 +125,26 @@ export default function AuditLogsPage() {
               <label className="block text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Tür</label>
               <select
                 value={entityType}
-                onChange={(e) => setEntityType(e.target.value)}
+                onChange={(e) => { setEntityType(e.target.value); setPage(1); }}
+                aria-label="Tür filtresi"
                 className="rounded-lg border px-3 py-2 text-sm outline-none"
                 style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
               >
                 <option value="">Tümü</option>
-                {ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {ENTITY_TYPES.map(t => <option key={t} value={t}>{getEntityLabel(t)}</option>)}
               </select>
             </div>
             <div className="space-y-1">
               <label className="block text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>İşlem</label>
               <select
                 value={action}
-                onChange={(e) => setAction(e.target.value)}
+                onChange={(e) => { setAction(e.target.value); setPage(1); }}
+                aria-label="İşlem filtresi"
                 className="rounded-lg border px-3 py-2 text-sm outline-none"
                 style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
               >
                 <option value="">Tümü</option>
-                {ACTION_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+                {ACTION_TYPES.map(a => <option key={a} value={a}>{getActionLabel(a)}</option>)}
               </select>
             </div>
           </div>
@@ -177,11 +183,11 @@ export default function AuditLogsPage() {
                           <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{log.user}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3" style={{ color: 'var(--color-text-primary)' }}>{log.action}</td>
+                      <td className="px-5 py-3" style={{ color: 'var(--color-text-primary)' }}>{getActionLabel(log.action)}</td>
                       <td className="px-5 py-3" style={{ color: 'var(--color-text-secondary)' }}>{log.entity}</td>
                       <td className="px-5 py-3">
                         <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: typeStyle.bg, color: typeStyle.text }}>
-                          {log.entityType}
+                          {getEntityLabel(log.entityType)}
                         </span>
                       </td>
                       <td className="px-5 py-3" style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-muted)' }}>{log.ip}</td>
@@ -194,6 +200,22 @@ export default function AuditLogsPage() {
           </div>
         )}
       </div>
+
+      {/* Sayfalama (sunucu tarafı) */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Toplam {total} kayıt</span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} aria-label="Önceki sayfa">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs font-medium px-2" style={{ color: 'var(--color-text-secondary)' }}>{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} aria-label="Sonraki sayfa">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
