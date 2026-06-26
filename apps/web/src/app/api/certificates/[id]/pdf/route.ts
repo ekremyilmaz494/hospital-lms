@@ -2,19 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
-import { jsPDF } from 'jspdf'
 import { logActivity } from '@/lib/activity-logger'
-import { drawCertificatePage, type CertDrawData } from '@/lib/pdf/cert-design'
-import { applyTurkishFont } from '@/lib/pdf/helpers/font'
-import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
-
-function formatDateTR(date: Date): string {
-  return date.toLocaleDateString('tr-TR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
-}
+import { buildCertificatePdfBuffer } from '@/lib/pdf/build-certificate-pdf'
 
 export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id } = params
@@ -57,31 +46,23 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
       return errorResponse('Bu sertifikaya erişim yetkiniz yok', 403)
     }
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-    await applyTurkishFont(doc)
-
-    const logoDataUrl = await resolveOrgLogoDataUrl(certificate.user.organization?.logoUrl)
-
     const score = certificate.attempt?.postExamScore
       ? Number(certificate.attempt.postExamScore)
       : (certificate.scormAttempt?.score ?? null)
 
-    const data: CertDrawData = {
-      fullName: `${certificate.user.firstName} ${certificate.user.lastName}`,
+    const pdfBuffer = await buildCertificatePdfBuffer({
+      firstName: certificate.user.firstName,
+      lastName: certificate.user.lastName,
       trainingTitle: certificate.training.title,
       organizationName: certificate.user.organization?.name ?? '',
-      organizationLogoDataUrl: logoDataUrl,
-      issuedAtText: formatDateTR(certificate.issuedAt),
-      expiresAtText: certificate.expiresAt ? formatDateTR(certificate.expiresAt) : null,
-      isExpired: !!certificate.expiresAt && certificate.expiresAt < new Date(),
-      isRevoked: !!certificate.revokedAt,
+      organizationLogoUrl: certificate.user.organization?.logoUrl ?? null,
+      issuedAt: certificate.issuedAt,
+      expiresAt: certificate.expiresAt,
+      revokedAt: certificate.revokedAt,
       certificateCode: certificate.certificateCode,
       score,
-    }
+    })
 
-    drawCertificatePage(doc, data)
-
-    const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
     const fileName = `sertifika-${certificate.certificateCode}.pdf`
 
     void logActivity({

@@ -27,6 +27,15 @@ export interface CertDrawData {
   certificateCode: string
   score: number | null
   location?: string
+  /**
+   * Doğrulama QR kodu (PNG data URL). Çağıran route, `certificateVerifyUrl(code)`'i
+   * `QRCode.toDataURL` ile üretip geçer. Boş/undefined ise QR çizilmez (geriye dönük
+   * uyum: eski çağrılar değişmeden çalışır). cert-design senkron kalsın diye QR data
+   * URL'i burada DEĞİL, route'ta async üretilir.
+   */
+  qrCodeDataUrl?: string | null
+  /** QR altında ve alt-ortada basılacak okunabilir doğrulama adresi (protokolsüz). */
+  verifyUrlText?: string | null
 }
 
 type RGB = readonly [number, number, number]
@@ -173,6 +182,48 @@ function drawGoldMedal(doc: jsPDF, cx: number, cy: number, r: number) {
   }
 }
 
+/**
+ * Sağ-alt köşeye doğrulama QR'ını beyaz, gold çerçeveli bir kart içinde çizer.
+ * Kart, dekoratif navy köşe katmanının üstüne oturur (kasıtlı "doğrulama rozeti"
+ * görünümü). Koordinatlar imza çizgisinin sağında kalacak şekilde seçildi
+ * (imza/ madalya ile çakışmaz). QR yoksa hiçbir şey çizilmez.
+ */
+function drawVerificationBadge(doc: jsPDF, data: CertDrawData) {
+  if (!data.qrCodeDataUrl) return
+
+  const w = doc.internal.pageSize.getWidth()
+  const h = doc.internal.pageSize.getHeight()
+  const font = TURKISH_FONT_FAMILY
+
+  const qrSize = 21
+  const pad = 3
+  const cardW = qrSize + pad * 2
+  const cardH = qrSize + pad + 9
+  const cardX = w - 9 - cardW
+  const cardY = h - 8 - cardH
+  const cardCx = cardX + cardW / 2
+
+  setFill(doc, CERT_COLORS.WHITE)
+  doc.roundedRect(cardX, cardY, cardW, cardH, 2, 2, 'F')
+  setDraw(doc, CERT_COLORS.GOLD)
+  doc.setLineWidth(0.4)
+  doc.roundedRect(cardX, cardY, cardW, cardH, 2, 2, 'S')
+
+  try {
+    doc.addImage(data.qrCodeDataUrl, 'PNG', cardX + pad, cardY + pad, qrSize, qrSize)
+  } catch {
+    // Bozuk data URL → kartı boş bırak, sertifikayı bozma.
+  }
+
+  doc.setFont(font, 'bold')
+  doc.setFontSize(6)
+  setText(doc, CERT_COLORS.NAVY)
+  doc.text('Sertifikayı Doğrula', cardCx, cardY + pad + qrSize + 4, {
+    align: 'center',
+    maxWidth: cardW - 2,
+  })
+}
+
 export function drawCertificateContent(doc: jsPDF, data: CertDrawData) {
   const w = doc.internal.pageSize.getWidth()
   const h = doc.internal.pageSize.getHeight()
@@ -285,6 +336,15 @@ export function drawCertificateContent(doc: jsPDF, data: CertDrawData) {
   doc.text('Mühür', rightSigX, sigLineY + 10, { align: 'center' })
 
   drawGoldMedal(doc, cx, sigLineY + 2, 10)
+
+  drawVerificationBadge(doc, data)
+
+  if (data.verifyUrlText) {
+    doc.setFont(font, 'normal')
+    doc.setFontSize(7)
+    setText(doc, CERT_COLORS.MUTED)
+    doc.text(`Doğrulama: ${data.verifyUrlText}`, cx, h - 9, { align: 'center' })
+  }
 
   doc.setFont(font, 'normal')
   doc.setFontSize(7)

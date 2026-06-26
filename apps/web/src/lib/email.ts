@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { BRAND } from '@/lib/brand'
 import { emailLayout, cta, alertBox, infoCard } from '@/lib/email-layout'
 import { getOrgUrl } from '@/lib/api-helpers'
+import { certificateVerifyUrl } from '@/lib/certificate-url'
 
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
@@ -899,6 +900,7 @@ export async function loginAlertEmail(email: string, ipAddress: string, userAgen
 /** Eğitim sertifikası hazır bildirimi */
 export async function certificateIssuedEmail(email: string, staffName: string, trainingTitle: string, certificateCode: string) {
   const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/staff/certificates`
+  const verifyUrl = certificateVerifyUrl(certificateCode)
   const content = `
     <h2 style="color: #1e293b; margin-top: 0;">Sertifikanız Hazır</h2>
     <p style="color: #64748b;">Merhaba ${escapeHtml(staffName)},</p>
@@ -906,6 +908,7 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
     ${infoCard({ title: 'Eğitim', body: trainingTitle })}
     ${infoCard({ title: 'Sertifika Kodu', body: certificateCode })}
     ${cta(ctaUrl, 'Sertifikamı İndir')}
+    <p style="color: #64748b; font-size: 14px; margin-top: 16px;">Sertifikanın gerçekliğini üçüncü kişiler (denetçi, kurum) şu adresten doğrulayabilir:<br><a href="${verifyUrl}" style="color: #0d9668; word-break: break-all;">${escapeHtml(verifyUrl)}</a></p>
     <p style="color: #94a3b8; font-size: 12px; margin-top: 16px;">Bu e-posta otomatik olarak gönderilmiştir.</p>
   `
   const html = emailLayout({ content, theme: 'success', headerSubtitle: 'Sertifika Bildirimi' })

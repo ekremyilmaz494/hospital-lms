@@ -1,10 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
+import { certificateVerifyUrl } from '@/lib/certificate-url'
 import { withAdminRoute } from '@/lib/api-handler'
 import { turkishSearchIds } from '@/lib/turkish-search'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { jsPDF } from 'jspdf'
+import QRCode from 'qrcode'
 import { drawCertificatePage as drawCertPageShared, type CertDrawData } from '@/lib/pdf/cert-design'
 import { applyTurkishFont } from '@/lib/pdf/helpers/font'
 import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
@@ -363,6 +365,18 @@ async function renderCertificateBundlePdf(
   const logoDataUrl = await resolveOrgLogoDataUrl(orgLogoUrl)
   const now = new Date()
 
+  // QR'ları render döngüsünden ÖNCE paralel üret (perf: döngüde ardışık await yok).
+  // Tek QR hatası tüm paketi düşürmesin → her biri null'a fallback eder.
+  const verifyUrls = certs.map(c => certificateVerifyUrl(c.certificateCode))
+  const qrDataUrls = await Promise.all(
+    verifyUrls.map(url =>
+      QRCode.toDataURL(url, { width: 256, margin: 1, errorCorrectionLevel: 'M' }).catch(err => {
+        logger.error('Certificate bundle PDF', 'QR kod üretilemedi', err)
+        return null
+      }),
+    ),
+  )
+
   certs.forEach((c, i) => {
     if (i > 0) doc.addPage('a4', 'landscape')
     const score = c.attempt?.postExamScore ? Number(c.attempt.postExamScore) : (c.scormAttempt?.score ?? null)
@@ -377,6 +391,8 @@ async function renderCertificateBundlePdf(
       isRevoked: !!c.revokedAt,
       certificateCode: c.certificateCode,
       score,
+      qrCodeDataUrl: qrDataUrls[i],
+      verifyUrlText: verifyUrls[i].replace(/^https?:\/\//, ''),
     }
     drawCertPageShared(doc, data)
   })
