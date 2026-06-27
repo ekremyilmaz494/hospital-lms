@@ -144,8 +144,13 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
   try {
     await uploadBuffer(key, buffer, isEncrypted ? 'application/octet-stream' : 'application/json')
     uploadSuccess = true
-  } catch {
-    // S3 erişimi yoksa local backup olarak devam et
+  } catch (err) {
+    // S3'e yüklenemediyse yedek HİÇBİR yere kalıcı yazılmadı — 'completed' demek
+    // restore edilemez bir yedeği "tamamlandı" göstermek olur (yanıltıcı).
+    logger.error('manual-backup', 'S3 yükleme başarısız — yedek failed işaretlendi', {
+      orgId,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 
   const backup = await prisma.dbBackup.create({
@@ -154,7 +159,7 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
       backupType: 'manual',
       fileUrl: uploadSuccess ? key : 'local',
       fileSizeMb: Math.round(sizeMb * 100) / 100,
-      status: 'completed',
+      status: uploadSuccess ? 'completed' : 'failed',
       createdById: dbUser.id,
     },
   })
@@ -164,6 +169,12 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
     entityType: 'backup',
     entityId: backup.id,
   })
+
+  // S3'e yazılamadıysa kullanıcıya AÇIK hata dön (UI "başarısız" gösterir); DB satırı
+  // 'failed' olarak kalır (görünür kanıt).
+  if (!uploadSuccess) {
+    return errorResponse('Yedek depolamaya (S3) yüklenemedi — yedek alınamadı. Lütfen S3 erişimini kontrol edin.', 502)
+  }
 
   // Boyut uyarısı: snapshot büyüdükçe S3 maliyeti + restore süresi büyür.
   // 100 MB üzeri admin'e e-posta uyarısı (ADMIN_ALERT_EMAIL tanımlıysa).

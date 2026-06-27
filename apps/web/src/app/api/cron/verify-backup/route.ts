@@ -76,6 +76,8 @@ export async function GET(request: Request) {
   }
 
   if (problems.length > 0) {
+    // Email'den BAĞIMSIZ backstop — ADMIN_ALERT_EMAIL set değilse bile log/Sentry görür.
+    logger.error('VerifyBackupCron', `${problems.length} kurumda yedek doğrulama sorunu`, { problems: problems.slice(0, 20) })
     const adminEmail = process.env.ADMIN_ALERT_EMAIL
     if (adminEmail) {
       await sendEmail({
@@ -91,11 +93,12 @@ export async function GET(request: Request) {
     }
   }
 
+  // Dead-man's switch: sorun varsa non-2xx → Vercel cron monitörü kırmızı görür.
   return NextResponse.json({
     success: problems.length === 0,
     organizationsChecked: organizations.length,
     problemCount: problems.length,
     results,
     timestamp: new Date().toISOString(),
-  }, { headers: { 'Cache-Control': 'no-store' } })
+  }, { status: problems.length > 0 ? 500 : 200, headers: { 'Cache-Control': 'no-store' } })
 }

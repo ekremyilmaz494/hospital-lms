@@ -178,6 +178,9 @@ export async function GET(request: Request) {
 
   // Başarısız yedekler varsa admin'e email gönder
   if (failures.length > 0) {
+    // Email'den BAĞIMSIZ backstop — ADMIN_ALERT_EMAIL set değilse bile log/Sentry görür.
+    // (Devakent 44 gün sessiz kaldı çünkü tek alarm kanalı koşullu email'di.)
+    logger.error('BackupCron', `${failures.length}/${organizations.length} kurum yedeği başarısız`, { failures: failures.slice(0, 20) })
     const adminEmail = process.env.ADMIN_ALERT_EMAIL
     if (adminEmail) {
       sendEmail({
@@ -193,11 +196,13 @@ export async function GET(request: Request) {
     }
   }
 
+  // Dead-man's switch: başarısızlık varsa non-2xx dön → Vercel cron monitörü KIRMIZI
+  // görür (eskiden hep 200 dönüyordu, bu yüzden 44 günlük arıza sessiz kaldı).
   return NextResponse.json({
     success: failures.length === 0,
     organizationsProcessed: organizations.length,
     failedCount: failures.length,
     results,
     timestamp: new Date().toISOString(),
-  })
+  }, { status: failures.length > 0 ? 500 : 200 })
 }
