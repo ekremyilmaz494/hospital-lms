@@ -3,7 +3,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { decryptBackup } from '@/lib/backup-crypto'
+import { decryptBackup, stripSensitiveBackupFields } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
@@ -39,7 +39,10 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
       if (rawBody) {
         // Şifreli veya düz — decrypt otomatik algılar
         const decrypted = decryptBackup(rawBody)
-        return new Response(decrypted, { headers })
+        // GÜVENLİK: auth.users (parola hash'leri + ham metadata) tarayıcıya İNMEZ.
+        // Restore S3'i sunucu tarafında okur; indirme yalnız insan-okuması/arşiv içindir.
+        const sanitized = stripSensitiveBackupFields(decrypted)
+        return new Response(sanitized, { headers })
       }
     } catch (s3Error) {
       logger.error('Backup Download', 'S3 yedek indirme başarısız, DB yedeklemesine geçiliyor', {

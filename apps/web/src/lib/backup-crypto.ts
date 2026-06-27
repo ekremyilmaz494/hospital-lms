@@ -34,6 +34,31 @@ export function stringifyBackup(data: unknown): string {
 }
 
 /**
+ * İndirilen/insan-okunur yedekten HASSAS alanları çıkarır.
+ *
+ * `auth.users` satırları (bcrypt `encrypted_password` hash'leri + ham metadata)
+ * yalnızca felaket-kurtarma RESTORE'u içindir; restore S3'i SUNUCU tarafında okur.
+ * İndirme endpoint'i (`backups/[id]/download`) ham yedeği tarayıcıya veriyordu →
+ * sıradan hastane admini tüm personelin parola hash'lerini indirebiliyordu (KVKK/güvenlik).
+ * Bu fonksiyon decrypt edilmiş JSON'dan `authUsers`'ı ayıklar.
+ *
+ * @param backupJson decrypt edilmiş yedek JSON string'i
+ * @returns authUsers çıkarılmış JSON string (parse edilemezse ham veriyi DÖNDÜRMEZ)
+ */
+export function stripSensitiveBackupFields(backupJson: string): string {
+  try {
+    const data = JSON.parse(backupJson)
+    if (data && typeof data === 'object') {
+      delete (data as Record<string, unknown>).authUsers
+    }
+    return JSON.stringify(data)
+  } catch {
+    // Beklenmedik şekilde parse edilemezse güvenli tarafta kal — ham (şifresi çözülmüş) veriyi sızdırma.
+    return JSON.stringify({ error: 'backup_unreadable' })
+  }
+}
+
+/**
  * AES-256-GCM ile plaintext şifreler.
  *
  * GÜVENLİK (KVKK): Plaintext fallback artık NODE_ENV'e değil, AÇIK opt-in'e bağlı.
