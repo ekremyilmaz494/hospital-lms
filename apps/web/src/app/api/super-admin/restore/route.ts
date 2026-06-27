@@ -280,7 +280,12 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
 
       for (const trn of backupData.trainings) {
         const t = trn as Record<string, unknown>
-        const videos = (t.videos ?? []) as Record<string, unknown>[]
+        // fileSizeBytes (BigInt) yedekte string olarak saklanır (stringifyBackup) —
+        // createMany için BigInt'e geri çevir. Eski (null fileSizeBytes) yedekler null kalır.
+        const videos = ((t.videos ?? []) as Record<string, unknown>[]).map((v) => ({
+          ...v,
+          fileSizeBytes: v.fileSizeBytes == null ? null : BigInt(v.fileSizeBytes as string | number),
+        }))
         const questions = (t.questions ?? []) as Record<string, unknown>[]
         const { videos: _v, questions: _q, ...trainingData } = t
         await tx.training.create({

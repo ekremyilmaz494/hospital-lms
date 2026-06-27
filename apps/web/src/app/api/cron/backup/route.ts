@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { uploadBuffer, backupKey, verifyS3Object, downloadBuffer } from '@/lib/s3'
 import { sendEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
-import { encryptBackup, decryptBackup } from '@/lib/backup-crypto'
+import { encryptBackup, decryptBackup, stringifyBackup } from '@/lib/backup-crypto'
 import { assertCronAuth } from '@/lib/cron-auth'
 
 /**
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
         schemaVersion: 3,
       }
 
-      const jsonBlob = JSON.stringify(backupData)
+      const jsonBlob = stringifyBackup(backupData)
 
       // AES-256-GCM şifreleme (BACKUP_ENCRYPTION_KEY varsa)
       const { data: finalData, isEncrypted } = encryptBackup(jsonBlob)

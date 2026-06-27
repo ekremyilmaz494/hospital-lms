@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { uploadBuffer, backupKey } from '@/lib/s3'
-import { encryptBackup } from '@/lib/backup-crypto'
+import { encryptBackup, stringifyBackup } from '@/lib/backup-crypto'
 import { checkRateLimit } from '@/lib/redis'
 import { sendEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
@@ -132,7 +132,7 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
     organizationId: orgId,
     schemaVersion: 2,
   }
-  const jsonBlob = JSON.stringify(backupData)
+  const jsonBlob = stringifyBackup(backupData)
 
   // AES-256-GCM ile sifreleme (BACKUP_ENCRYPTION_KEY varsa)
   const { data: encrypted, isEncrypted } = encryptBackup(jsonBlob)
