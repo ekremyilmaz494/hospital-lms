@@ -469,6 +469,8 @@ export async function GET(request: Request) {
 
   // Verify-fail olanlar için admin uyarısı
   if (skippedVerifyFail.length > 0) {
+    // Email'den BAĞIMSIZ backstop — ADMIN_ALERT_EMAIL set değilse bile log/Sentry görür.
+    logger.error('cleanup', `${skippedVerifyFail.length} eski yedek doğrulamadan geçemedi`, { skipped: skippedVerifyFail.slice(0, 20) })
     const adminEmail = process.env.ADMIN_ALERT_EMAIL
     if (adminEmail) {
       sendEmail({
