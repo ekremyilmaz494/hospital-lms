@@ -30,7 +30,7 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, or
   const updated = await prisma.trainingCategory.update({
     where: { id },
     data: parsed.data,
-    select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
+    select: { id: true, value: true, label: true, icon: true, color: true, order: true, isDefault: true },
   })
 
   await audit({

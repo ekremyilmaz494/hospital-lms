@@ -23,6 +23,8 @@ import {
   Activity,
   MessageSquare,
   UserCog,
+  Database,
+  Gauge,
   type LucideIcon,
 } from 'lucide-react';
 import type { Sector } from '@/generated/prisma/enums';
@@ -98,6 +100,7 @@ export const superAdminNav: NavGroup[] = [
     label: 'SİSTEM',
     items: [
       { title: 'Sistem Sağlığı', href: '/super-admin/system-health', icon: Activity },
+      { title: 'Yedekler', href: '/super-admin/backups', icon: Database },
       { title: 'Ayarlar', href: '/super-admin/settings', icon: Settings },
     ],
   },
@@ -149,10 +152,12 @@ export const adminNav: NavGroup[] = [
         icon: Users,
         children: [
           { title: 'Personel Listesi', href: '/admin/staff' },
+          { title: 'İçe Aktarma Geçmişi', href: '/admin/staff/imports' },
         ],
       },
       { title: 'Sertifikalar', href: '/admin/certificates', icon: Award },
       { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix', icon: Grid3x3 },
+      { title: 'Yetkinlik Değerlendirmesi', href: '/admin/competency', icon: Gauge },
       {
         title: 'SMG Takibi',
         href: '/admin/smg',
@@ -169,6 +174,7 @@ export const adminNav: NavGroup[] = [
     label: 'UYUM & RAPORLAMA',
     items: [
       { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck, sectors: ['healthcare'] },
+      { title: 'Denetim Hazırlık', href: '/admin/accreditation', icon: ClipboardCheck },
       { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
       {
         title: 'Geri Bildirim',
@@ -190,12 +196,15 @@ export const adminNav: NavGroup[] = [
     items: [
       // Yalnızca Esas Yönetici görür — sıradan admin'lerde gizli
       { title: 'Yönetici Yönetimi', href: '/admin/yoneticiler', icon: UserCog, ownerOnly: true },
+      { title: 'Abonelik', href: '/admin/subscription', icon: CreditCard },
+      { title: 'Yedekler', href: '/admin/backups', icon: Database },
       {
         title: 'Ayarlar',
         href: '/admin/settings',
         icon: Settings,
         children: [
           { title: 'Genel Ayarlar', href: '/admin/settings' },
+          { title: 'Güvenlik', href: '/admin/settings/security' },
         ],
       },
     ],

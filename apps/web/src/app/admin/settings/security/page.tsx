@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, MessageSquare, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Shield, MessageSquare, Loader2, CheckCircle2, AlertTriangle, Lock } from 'lucide-react';
 import { useToast } from '@/components/shared/toast';
+import { PASSWORD_POLICY_RULES } from '@/lib/password-policy';
+import { TotpSection } from './totp-section';
+import { DevicesSection } from './devices-section';
+import { SecurityPolicySection } from './security-policy-section';
 
 const K = {
   PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
@@ -151,6 +155,48 @@ export default function SecuritySettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Parola politikası — kurum geneli (bilgilendirme) */}
+      <div className="p-6 mb-4"
+        style={{ background: K.SURFACE, border: `1.5px solid ${K.BORDER}`, borderRadius: 14, boxShadow: K.SHADOW_CARD }}>
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl"
+            style={{ background: K.PRIMARY_LIGHT }}>
+            <Lock className="h-6 w-6" style={{ color: K.PRIMARY }} />
+          </div>
+          <div className="flex-1">
+            <h3 style={{ fontFamily: K.FONT_DISPLAY, fontSize: 18, fontWeight: 700, color: K.TEXT_PRIMARY, marginBottom: 4 }}>
+              Parola Politikası
+            </h3>
+            <p className="text-sm leading-relaxed mb-3" style={{ color: K.TEXT_MUTED }}>
+              Tüm yeni parolalar (kayıt, davet kabul, şifre değiştirme) aşağıdaki kuralları karşılamak zorundadır.
+            </p>
+            <ul className="space-y-1.5">
+              {PASSWORD_POLICY_RULES.map((rule) => (
+                <li key={rule} className="flex items-center gap-2 text-sm" style={{ color: K.TEXT_SECONDARY }}>
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: K.SUCCESS }} />
+                  {rule}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Veri saklama (KVKK) + IP allowlist — kurum geneli politika */}
+      <SecurityPolicySection />
+
+      {/* Kişisel güvenlik — yalnızca giriş yapan yöneticinin kendi hesabı */}
+      <div className="mt-8 mb-4">
+        <h2 style={{ fontFamily: K.FONT_DISPLAY, fontSize: 16, fontWeight: 700, color: K.TEXT_PRIMARY }}>
+          Kişisel Güvenlik
+        </h2>
+        <p className="text-sm mt-1" style={{ color: K.TEXT_MUTED }}>
+          Bu ayarlar yalnızca sizin hesabınızı etkiler, diğer personeli etkilemez.
+        </p>
+      </div>
+      <TotpSection />
+      <DevicesSection />
 
       {confirmToggle !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"

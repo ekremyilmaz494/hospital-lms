@@ -23,7 +23,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
   const categories = await prisma.trainingCategory.findMany({
     where: { organizationId },
     orderBy: { order: 'asc' },
-    select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
+    select: { id: true, value: true, label: true, icon: true, color: true, order: true, isDefault: true },
   })
 
   // DB boşsa: varsayılanları DB'ye YAZMADAN salt-okunur döndür (CLAUDE.md
@@ -59,7 +59,7 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
     return errorResponse(firstIssue?.message ?? 'Geçersiz veri', 400)
   }
 
-  const { label, icon, order } = parsed.data
+  const { label, icon, color, order } = parsed.data
   const value = toSlug(label)
 
   if (!value) {
@@ -95,17 +95,18 @@ export const POST = withAdminRoute(async ({ request, organizationId, audit }) =>
       value,
       label,
       icon,
+      color: color ?? null,
       order: nextOrder,
       isDefault: false,
     },
-    select: { id: true, value: true, label: true, icon: true, order: true, isDefault: true },
+    select: { id: true, value: true, label: true, icon: true, color: true, order: true, isDefault: true },
   })
 
   await audit({
     action: 'training_category.create',
     entityType: 'training_category',
     entityId: category.id,
-    newData: { label, icon, value },
+    newData: { label, icon, color, value },
   })
 
   return jsonResponse(category, 201)

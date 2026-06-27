@@ -85,12 +85,36 @@ export const PUT = withAdminRoute(async ({ request, organizationId, audit }) => 
     },
   })
 
+  // Denetim izi (KVKK/JCI) — yalnız ad/email/telefon değil, değişebilen TÜM ayar
+  // alanlarının önce/sonra anlık görüntüsü kaydedilir.
+  const auditSnapshot = (o: typeof updated | null) =>
+    o
+      ? {
+          name: o.name,
+          email: o.email,
+          phone: o.phone,
+          address: o.address,
+          logoUrl: o.logoUrl,
+          sessionTimeout: o.sessionTimeout,
+          defaultPassingScore: o.defaultPassingScore,
+          defaultMaxAttempts: o.defaultMaxAttempts,
+          defaultExamDuration: o.defaultExamDuration,
+          brandColor: o.brandColor,
+          secondaryColor: o.secondaryColor,
+          loginBannerUrl: o.loginBannerUrl,
+          emailNotifications: o.emailNotifications,
+          reminderDaysBefore: o.reminderDaysBefore,
+          notifyOnComplete: o.notifyOnComplete,
+          notifyOnFail: o.notifyOnFail,
+        }
+      : null
+
   await audit({
     action: 'settings.update',
     entityType: 'organization',
     entityId: organizationId,
-    oldData: { name: oldOrg?.name, email: oldOrg?.email, phone: oldOrg?.phone },
-    newData: { name: updated.name, email: updated.email, phone: updated.phone },
+    oldData: auditSnapshot(oldOrg),
+    newData: auditSnapshot(updated),
   })
 
   return jsonResponse({

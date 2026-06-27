@@ -22,13 +22,29 @@ export async function GET(request: Request) {
   const authErr = assertCronAuth(request)
   if (authErr) return authErr
 
-  // 1. Delete old read notifications (older than 90 days)
-  const deletedNotifications = await prisma.notification.deleteMany({
-    where: {
-      isRead: true,
-      createdAt: { lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
-    },
+  // Org-bazlı veri saklama süreleri (KVKK) — her org kendi ayarını kullanır;
+  // organization_id NULL (platform-global) satırlar için sabit varsayılan kullanılır.
+  const dayMs = 24 * 60 * 60 * 1000
+  const retentionOrgs = await prisma.organization.findMany({
+    select: { id: true, dataRetentionDays: true, notificationRetentionDays: true, backupRetentionDays: true },
   })
+
+  // 1. Eski OKUNMUŞ bildirimleri sil — org-bazlı saklama (null-org: 90 gün)
+  let notifDeletedCount = 0
+  for (const o of retentionOrgs) {
+    const r = await prisma.notification.deleteMany({
+      where: {
+        organizationId: o.id,
+        isRead: true,
+        createdAt: { lt: new Date(Date.now() - o.notificationRetentionDays * dayMs) },
+      },
+    })
+    notifDeletedCount += r.count
+  }
+  const notifNullDeleted = await prisma.notification.deleteMany({
+    where: { organizationId: null, isRead: true, createdAt: { lt: new Date(Date.now() - 90 * dayMs) } },
+  })
+  const deletedNotifications = { count: notifDeletedCount + notifNullDeleted.count }
 
   // 2. Clean up stale exam attempts.
   // ÖNCEKİ TASARIM (problematik): 24 saatten eski tüm non-terminal attempt'leri
@@ -82,12 +98,25 @@ export async function GET(request: Request) {
 
   const staleAttempts = { count: staleAttemptsList.length }
 
-  // 3. Delete old audit logs (older than 1 year)
-  const deletedLogs = await prisma.auditLog.deleteMany({
-    where: {
-      createdAt: { lt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
-    },
+  // 3. Eski denetim loglarını sil — org-bazlı saklama (null-org: 365 gün)
+  let auditDeletedCount = 0
+  for (const o of retentionOrgs) {
+    const r = await prisma.auditLog.deleteMany({
+      where: { organizationId: o.id, createdAt: { lt: new Date(Date.now() - o.dataRetentionDays * dayMs) } },
+    })
+    auditDeletedCount += r.count
+  }
+  const auditNullDeleted = await prisma.auditLog.deleteMany({
+    where: { organizationId: null, createdAt: { lt: new Date(Date.now() - 365 * dayMs) } },
   })
+  const deletedLogs = { count: auditDeletedCount + auditNullDeleted.count }
+
+  // 3.6 Süresi dolmuş güvenilir cihaz (TrustedDevice) kayıtlarını sil — SMS/MFA atlatan
+  // cookie zaten geçersiz; DB temizliği birikmeyi önler.
+  const expiredDevices = await prisma.trustedDevice.deleteMany({
+    where: { expiresAt: { lt: new Date() } },
+  })
+  logger.info('cleanup', 'Suresi dolmus guvenilir cihazlar silindi', { count: expiredDevices.count })
 
   // 3.5 Expo push ticket purge — receipt audit kısa pencere yeter:
   //   - 30 gün eski 'ok' / 'expired' (delivery confirmed, debug penceresi geçti)
@@ -346,7 +375,13 @@ export async function GET(request: Request) {
   //  2) S3'ten download + decrypt + JSON parse round-trip yap; başarılıysa sil.
   //     Round-trip başarısızsa silmeyi atla, admin'e uyarı için failure kaydı bırak.
   //  3) S3 delete hatası logla (sessiz yutma yok).
-  const oldBackupCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+  // Aday penceresi = en kısa org retention'ı (tüm adaylar gelsin); her yedek ASIL
+  // kendi org'unun backupRetentionDays'ine göre döngüde değerlendirilir.
+  const backupRetentionByOrg = new Map(retentionOrgs.map(o => [o.id, o.backupRetentionDays]))
+  const minBackupRetentionDays = retentionOrgs.length > 0
+    ? Math.min(90, ...retentionOrgs.map(o => o.backupRetentionDays))
+    : 90
+  const oldBackupCutoff = new Date(Date.now() - minBackupRetentionDays * dayMs)
   const oldBackups = await prisma.dbBackup.findMany({
     where: { createdAt: { lt: oldBackupCutoff } },
     select: { id: true, fileUrl: true, organizationId: true, status: true, createdAt: true },
@@ -373,6 +408,11 @@ export async function GET(request: Request) {
   const deletedKeys: string[] = []
 
   for (const b of oldBackups) {
+    // Bu yedek henüz KENDİ org'unun saklama süresini doldurmadıysa atla (org-bazlı retention).
+    const bRetentionDays = b.organizationId ? (backupRetentionByOrg.get(b.organizationId) ?? 90) : 90
+    if (b.createdAt.getTime() >= Date.now() - bRetentionDays * dayMs) {
+      continue
+    }
     // Org'ta yenisi yoksa eskiyi tutmayı tercih et — hiçbiri kalmasın senaryosunu engelle.
     if (b.organizationId && !orgsWithRecentVerified.has(b.organizationId)) {
       skippedNoRecent.push(b.id)

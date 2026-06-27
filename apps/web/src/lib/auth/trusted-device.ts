@@ -127,6 +127,62 @@ export async function revokeAllTrustedDevices(userId: string): Promise<void> {
   }
 }
 
+export interface TrustedDeviceInfo {
+  id: string
+  userAgent: string | null
+  ipAddress: string | null
+  lastUsedAt: Date
+  expiresAt: Date
+  /** Bu kayıt, isteği yapan tarayıcının kendi cihazı mı? */
+  isCurrent: boolean
+}
+
+/**
+ * Kullanıcının aktif (iptal edilmemiş + süresi dolmamış) güvenilir cihazlarını listeler.
+ * "Cihazlarım" ekranı için. Mevcut tarayıcının cihazı `isCurrent: true` ile işaretlenir.
+ */
+export async function listTrustedDevices(userId: string): Promise<TrustedDeviceInfo[]> {
+  const cookieStore = await cookies()
+  const currentToken = cookieStore.get(COOKIE_NAME)?.value
+  const currentHash = currentToken ? hashToken(currentToken) : null
+
+  try {
+    const devices = await prisma.trustedDevice.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      select: { id: true, tokenHash: true, userAgent: true, ipAddress: true, lastUsedAt: true, expiresAt: true },
+      orderBy: { lastUsedAt: 'desc' },
+    })
+    return devices.map((d) => ({
+      id: d.id,
+      userAgent: d.userAgent,
+      ipAddress: d.ipAddress,
+      lastUsedAt: d.lastUsedAt,
+      expiresAt: d.expiresAt,
+      isCurrent: currentHash != null && d.tokenHash === currentHash,
+    }))
+  } catch (err) {
+    logger.error('trusted-device', 'Cihaz listesi alinamadi', err)
+    return []
+  }
+}
+
+/**
+ * Tek bir güvenilir cihazı iptal eder (yalnız kaydın sahibi). "Çıkış yaptır" butonu.
+ * @returns iptal edildiyse `true`, cihaz bulunamadı/yetki yoksa `false`
+ */
+export async function revokeTrustedDevice(userId: string, deviceId: string): Promise<boolean> {
+  try {
+    const res = await prisma.trustedDevice.updateMany({
+      where: { id: deviceId, userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    return res.count > 0
+  } catch (err) {
+    logger.error('trusted-device', 'Tekil cihaz revoke basarisiz', err)
+    return false
+  }
+}
+
 /**
  * Mevcut cihazın trusted cookie'sini siler (session logout tarafından çağrılabilir).
  * DB kaydını silmez — audit için korunur.

@@ -1,13 +1,15 @@
 import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
-import { getRateLimitCount, incrementRateLimit, deleteRateLimit, getRedis } from '@/lib/redis'
+import { getRateLimitCount, incrementRateLimit, deleteRateLimit } from '@/lib/redis'
 import { createLoginClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
 import { isDeviceTrusted } from '@/lib/auth/trusted-device'
+import { getAccountLock, registerFailedLogin, LOGIN_LOCK } from '@/lib/auth/login-lock'
+import { isIpAllowed } from '@/lib/auth/ip-allowlist'
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc'
 import { hashTcKimlik } from '@/lib/tc-crypto'
 
@@ -158,6 +160,18 @@ export async function POST(request: NextRequest) {
       return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
 
+    // Hesap kilidi: ardışık başarısız denemeler eşiği aşmışsa giriş geçici engellenir
+    // (IP rate-limit'in aksine saldırgan IP değiştirse de hesap korunur).
+    const accountLock = await getAccountLock(normalizedEmail)
+    if (accountLock.locked) {
+      logger.warn('auth:login', 'Kilitli hesaba giriş denemesi', { email: normalizedEmail, ip })
+      const mins = Math.max(1, Math.ceil(accountLock.retryAfterSec / 60))
+      return errorResponse(
+        `Çok fazla hatalı deneme nedeniyle hesabınız geçici olarak kilitlendi. ${mins} dakika sonra tekrar deneyin.`,
+        423,
+      )
+    }
+
     const authTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('auth_timeout')), 12000)
     )
@@ -175,27 +189,22 @@ export async function POST(request: NextRequest) {
         incrementRateLimit(`login:${normalizedEmail}`, 300),
       ]).catch(() => {})
 
-      // Track consecutive failures — fire-and-forget (response'u bekletme)
-      const redis = getRedis()
-      if (redis) {
-        const failKey = `login-fail:${normalizedEmail}`
-        void (async () => {
-          try {
-            await redis.set(failKey, 0, { nx: true, ex: 900 })
-            const failCount = await redis.incr(failKey)
-            if (failCount === ALERT_THRESHOLD) {
-              const adminEmail = process.env.ADMIN_ALERT_EMAIL
-              if (adminEmail) {
-                sendEmail({
-                  to: adminEmail,
-                  subject: `[Güvenlik Uyarısı] ${normalizedEmail} için ${ALERT_THRESHOLD} başarısız giriş denemesi`,
-                  html: `<p>IP: <strong>${ip}</strong><br>E-posta: <strong>${normalizedEmail}</strong><br>Zaman: ${new Date().toLocaleString('tr-TR')}</p><p>Bu kişi hesabına erişmeye çalışıyor olabilir. Lütfen kontrol edin.</p>`,
-                }).catch(err => logger.warn('LoginAlert', 'Guvenlik uyari emaili gonderilemedi', (err as Error).message))
-              }
+      // Ardışık başarısızlıkları say + eşik aşılırsa hesabı kilitle — fire-and-forget.
+      void (async () => {
+        try {
+          const { failCount } = await registerFailedLogin(normalizedEmail)
+          if (failCount === ALERT_THRESHOLD) {
+            const adminEmail = process.env.ADMIN_ALERT_EMAIL
+            if (adminEmail) {
+              sendEmail({
+                to: adminEmail,
+                subject: `[Güvenlik Uyarısı] ${normalizedEmail} için ${ALERT_THRESHOLD} başarısız giriş denemesi`,
+                html: `<p>IP: <strong>${ip}</strong><br>E-posta: <strong>${normalizedEmail}</strong><br>Zaman: ${new Date().toLocaleString('tr-TR')}</p><p>Bu kişi hesabına erişmeye çalışıyor olabilir. Hesap ${LOGIN_LOCK.threshold} başarısız denemede ${Math.round(LOGIN_LOCK.durationSec / 60)} dakika kilitlenir. Lütfen kontrol edin.</p>`,
+              }).catch(err => logger.warn('LoginAlert', 'Guvenlik uyari emaili gonderilemedi', (err as Error).message))
             }
-          } catch { /* Redis failure tracking is best-effort */ }
-        })()
-      }
+          }
+        } catch { /* Redis failure tracking is best-effort */ }
+      })()
 
       return errorResponse(
         looksLikeTc ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.',
@@ -214,7 +223,7 @@ export async function POST(request: NextRequest) {
         organizationId: true,
         phone: true,
         phoneVerifiedAt: true,
-        organization: { select: { slug: true, smsMfaEnabled: true, setupCompleted: true } },
+        organization: { select: { slug: true, smsMfaEnabled: true, setupCompleted: true, ipAllowlistEnabled: true, ipAllowlist: true } },
       }
     })
 
@@ -231,6 +240,18 @@ export async function POST(request: NextRequest) {
         { error: 'Hesabınız devre dışı bırakılmış. Yöneticinizle iletişime geçin.' },
         403
       )
+    }
+
+    // IP allowlist — org açtıysa yalnız izinli IP/CIDR'lerden giriş yapılabilir.
+    // super_admin (platform operatörü) muaftır; SMS MFA muafiyetiyle aynı gerekçe.
+    if (dbUser.organization?.ipAllowlistEnabled && dbUser.role !== 'super_admin') {
+      if (!isIpAllowed(ip, dbUser.organization.ipAllowlist)) {
+        logger.warn('auth:login', 'IP allowlist disi giris denemesi', { email: normalizedEmail, ip })
+        return jsonResponse(
+          { error: 'Bu IP adresinden erişime izin verilmiyor. Kurum yöneticinizle iletişime geçin.' },
+          403,
+        )
+      }
     }
 
     const role = (data.user?.app_metadata?.role ?? data.user?.user_metadata?.role) as string | undefined
@@ -279,10 +300,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Başarılı giriş — fail counter sıfırla
+    // Başarılı giriş — fail counter + hesap kilidi sıfırla
     void Promise.all([
       deleteRateLimit(`login:${normalizedEmail}`),
       deleteRateLimit(`login-fail:${normalizedEmail}`),
+      deleteRateLimit(`login-locked:${normalizedEmail}`),
     ]).catch(() => {})
 
     // "7 gün açık tut" sentinel cookie — middleware refresh'te okuyup maxAge uygulayacak

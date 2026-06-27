@@ -7,10 +7,11 @@ import { z } from 'zod/v4'
 import { passwordChangedEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 import { logActivity } from '@/lib/activity-logger'
+import { passwordSchema } from '@/lib/password-policy'
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Mevcut şifre zorunludur'),
-  newPassword: z.string().min(8, 'Yeni şifre en az 8 karakter olmalıdır').max(128),
+  newPassword: passwordSchema,
   confirmPassword: z.string().min(1, 'Şifre tekrarı zorunludur'),
 }).refine(data => data.newPassword === data.confirmPassword, {
   message: 'Şifreler eşleşmiyor',

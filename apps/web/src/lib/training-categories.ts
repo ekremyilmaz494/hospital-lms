@@ -57,11 +57,11 @@ export interface CategoryMeta {
  * döndürür; böylece UI'da liste/filtre/rozet asla kırılmaz.
  *
  * @param dbCategories Org'un güncel kategori listesi (opsiyonel). Verilirse
- *   admin'in yeniden adlandırdığı etiketler ve özel kategoriler de çözülür.
+ *   admin'in yeniden adlandırdığı etiketler, seçtiği renkler ve özel kategoriler de çözülür.
  */
 export function resolveCategoryMeta(
   value: string | null | undefined,
-  dbCategories?: readonly { value: string; label: string }[],
+  dbCategories?: readonly { value: string; label: string; color?: string | null }[],
 ): CategoryMeta {
   if (!value) {
     return { value: null, label: UNCATEGORIZED_LABEL, color: UNCATEGORIZED_COLOR, isOrphan: true };
@@ -77,7 +77,7 @@ export function resolveCategoryMeta(
 
   // Etiket: admin DB'de yeniden adlandırmış olabilir → DB önceliklidir.
   const label = db?.label ?? builtin!.label;
-  // Renk: yerleşik kategori kendi markasını taşır; özel kategori slug-hash paletinden.
-  const color = builtin?.color ?? paletteColor(value);
+  // Renk önceliği: admin'in DB'de seçtiği renk → yerleşik marka rengi → slug-hash paleti.
+  const color = db?.color ?? builtin?.color ?? paletteColor(value);
   return { value, label, color, isOrphan: false };
 }
