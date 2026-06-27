@@ -2,22 +2,17 @@
  * Organizasyon yedek payload'ı — tek doğruluk kaynağı.
  *
  * Manuel backup (POST /api/admin/backups), cron backup (GET /api/cron/backup)
- * ve download fallback (GET /api/admin/backups/[id]/download) artık AYNI
- * assembler'ı çağırır. Daha önce üç ayrı yerde inline yazılıyordu (drift);
- * download fallback'te `organization`, `subscription`, `auditLogs`,
- * `organizationId`, `schemaVersion` eksikti + BigInt serialize crash'i vardı —
- * bu da local fallback'ten alınan yedeklerin restore'da bozulmasına yol açıyordu.
+ * ve download fallback (GET /api/admin/backups/[id]/download) AYNI assembler'ı
+ * çağırır (drift yok).
  *
  * ──────────────────────────────────────────────────────────────────
  * YENİ PRİSMA MODELİ EKLERSEN — OKU
  * ──────────────────────────────────────────────────────────────────
- * Bu dosya 12 üst-düzey alan + Training içinde 3 nested alan + (opsiyonel)
- * Supabase `authUsers` yedekler. schema.prisma'ya yeni model eklediğinde:
- *
+ * schema.prisma'ya yeni model eklediğinde:
  *  1) Per-org veri mi tutuyor? → Aşağıdaki Promise.all + return objesine ekle,
- *     `BACKUP_SCHEMA_VERSION`'ı bir artır, restore route'un
- *     `BackupData` interface + `isValidBackupData` + delete-then-create
- *     bloklarını + `MAX_SUPPORTED_SCHEMA_VERSION`'ı güncelle.
+ *     `BACKUP_SCHEMA_VERSION`'ı bir artır, restore route'un `BackupData` interface +
+ *     `isValidBackupData` + delete/insert bloklarını + `MAX_SUPPORTED_SCHEMA_VERSION`'ı
+ *     güncelle (FK sırası: parent→child insert, child→parent delete; Restrict'liler önce).
  *  2) Global veya kasıtlı dışarıda mı? → `__tests__/snapshot.test.ts` içinde
  *     `INTENTIONALLY_EXCLUDED` listesine ekle ve neden olduğunu yorumla.
  *
@@ -27,12 +22,13 @@
 import { prisma } from '@/lib/prisma'
 
 /**
- * schemaVersion 3: `authUsers` (Supabase auth.users — parola hash'leri dahil) eklendi.
- * Restore'un DR'de personel parolalarını geri yükleyebilmesi için kritik (2026-05-20
- * incident: yedek auth.users içermiyordu → wipe+restore sonrası tüm personel kilitlendi).
- * v2: organization/subscription/auditLogs. v1: yalnız 9 dizi.
+ * schemaVersion 4: kapsam genişletildi — 27 org modeli daha eklendi (MediaAsset, ScormAttempt,
+ * TrainingFeedback*, Smg*, Accreditation*, Competency*, QuestionBank*, TrainingCategory/Period,
+ * DepartmentTrainingRule, ExamAttemptRequest, Daily*, KvkkRequest). Restore'da bunlar yoksa
+ * kalıcı kaybediliyordu.
+ * v3: authUsers (parola hash'leri). v2: organization/subscription/auditLogs. v1: 9 dizi.
  */
-export const BACKUP_SCHEMA_VERSION = 3
+export const BACKUP_SCHEMA_VERSION = 4
 
 /** Org `dataRetentionDays` okunamazsa kullanılacak audit-log saklama süresi (DB default'u ile aynı). */
 const DEFAULT_AUDIT_RETENTION_DAYS = 365
@@ -45,16 +41,14 @@ export interface BackupSnapshotOptions {
   /**
    * Supabase `auth.users` (parola hash'leri dahil) yedeğe eklensin mi?
    * Restore için ZORUNLU → cron + manuel yedek `true` verir. İndirme/export
-   * yolları `false` verir: download endpoint zaten `stripSensitiveBackupFields`
-   * uygular ama hiç çekmemek "defense in depth"tir (hash dosyaya hiç yazılmaz).
+   * yolları `false` verir (download endpoint zaten `stripSensitiveBackupFields` uygular;
+   * hiç çekmemek "defense in depth" — hash dosyaya hiç yazılmaz).
    */
   includeAuthUsers?: boolean
 }
 
 export async function buildBackupSnapshot(orgId: string, options: BackupSnapshotOptions = {}) {
   // AuditLog retention: kurumun KENDİ `dataRetentionDays` ayarı (DB ile aynı pencere).
-  // Eskiden 90g sabitti → DB 365g tutarken yedek 90g alıyordu, restore'da 90–365 günlük
-  // audit geçmişi kalıcı kayboluyordu (uyum/forensics açığı, Bulgu ORTA).
   const orgRetention = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { dataRetentionDays: true },
@@ -63,6 +57,7 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
   const auditLogCutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
 
   const [
+    // ── Mevcut çekirdek (schemaVersion ≤ 3) ──
     organization,
     subscription,
     users,
@@ -75,6 +70,35 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     notifications,
     certificates,
     auditLogs,
+    // ── v4 kapsam genişlemesi (27 model) ──
+    mediaAssets,
+    trainingCategories,
+    trainingPeriods,
+    scormAttempts,
+    trainingFeedbackForms,
+    trainingFeedbackCategories,
+    trainingFeedbackItems,
+    trainingFeedbackResponses,
+    trainingFeedbackAnswers,
+    smgPeriods,
+    smgCategories,
+    smgActivities,
+    smgTargets,
+    accreditationStandards,
+    accreditationReports,
+    departmentTrainingRules,
+    questionBanks,
+    questionBankOptions,
+    competencyForms,
+    competencyCategories,
+    competencyItems,
+    competencyEvaluations,
+    competencyAnswers,
+    examAttemptRequests,
+    kvkkRequests,
+    dailyReviews,
+    dailySubmissions,
+    // ── Opsiyonel: Supabase auth.users (en sonda — koşullu) ──
     authUsers,
   ] = await Promise.all([
     prisma.organization.findUnique({ where: { id: orgId } }),
@@ -92,10 +116,37 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     prisma.notification.findMany({ where: { organizationId: orgId } }),
     prisma.certificate.findMany({ where: { training: { organizationId: orgId } } }),
     prisma.auditLog.findMany({ where: { organizationId: orgId, createdAt: { gte: auditLogCutoff } } }),
-    // auth.users — parola hash'leri (encrypted_password) SADECE burada saklanır; public
-    // şemasında parola yoktur. Restore'da public.users'tan ÖNCE
-    // `INSERT INTO auth.users (...) ON CONFLICT (id) DO NOTHING` ile geri yüklenir.
-    // includeAuthUsers=false ise (download/export) hiç çekilmez → hash sızıntısı yok.
+    // ── v4 modelleri (org-scope; transitive olanlar parent relation'ı üzerinden) ──
+    prisma.mediaAsset.findMany({ where: { organizationId: orgId } }),
+    prisma.trainingCategory.findMany({ where: { organizationId: orgId } }),
+    prisma.trainingPeriod.findMany({ where: { organizationId: orgId } }),
+    prisma.scormAttempt.findMany({ where: { organizationId: orgId } }),
+    prisma.trainingFeedbackForm.findMany({ where: { organizationId: orgId } }),
+    prisma.trainingFeedbackCategory.findMany({ where: { form: { organizationId: orgId } } }),
+    prisma.trainingFeedbackItem.findMany({ where: { category: { form: { organizationId: orgId } } } }),
+    prisma.trainingFeedbackResponse.findMany({ where: { organizationId: orgId } }),
+    prisma.trainingFeedbackAnswer.findMany({ where: { response: { organizationId: orgId } } }),
+    prisma.smgPeriod.findMany({ where: { organizationId: orgId } }),
+    prisma.smgCategory.findMany({ where: { organizationId: orgId } }),
+    prisma.smgActivity.findMany({ where: { organizationId: orgId } }),
+    prisma.smgTarget.findMany({ where: { organizationId: orgId } }),
+    // AccreditationStandard.organizationId NULLABLE → { organizationId: orgId } global (null) olanları HARİÇ tutar (kasıtlı).
+    prisma.accreditationStandard.findMany({ where: { organizationId: orgId } }),
+    prisma.accreditationReport.findMany({ where: { organizationId: orgId } }),
+    prisma.departmentTrainingRule.findMany({ where: { organizationId: orgId } }),
+    prisma.questionBank.findMany({ where: { organizationId: orgId } }),
+    prisma.questionBankOption.findMany({ where: { question: { organizationId: orgId } } }),
+    prisma.competencyForm.findMany({ where: { organizationId: orgId } }),
+    prisma.competencyCategory.findMany({ where: { form: { organizationId: orgId } } }),
+    prisma.competencyItem.findMany({ where: { category: { form: { organizationId: orgId } } } }),
+    prisma.competencyEvaluation.findMany({ where: { form: { organizationId: orgId } } }),
+    prisma.competencyAnswer.findMany({ where: { evaluation: { form: { organizationId: orgId } } } }),
+    prisma.examAttemptRequest.findMany({ where: { organizationId: orgId } }),
+    prisma.kvkkRequest.findMany({ where: { organizationId: orgId } }),
+    prisma.dailyReview.findMany({ where: { organizationId: orgId } }),
+    prisma.dailySubmission.findMany({ where: { organizationId: orgId } }),
+    // auth.users — parola hash'leri (encrypted_password) SADECE burada. Restore'da public.users'tan
+    // ÖNCE INSERT ... ON CONFLICT (id) DO NOTHING ile geri yüklenir. includeAuthUsers=false ise hiç çekilmez.
     options.includeAuthUsers
       ? prisma.$queryRaw<Array<Record<string, unknown>>>`
           SELECT au.id, au.email, au.encrypted_password, au.email_confirmed_at,
@@ -121,6 +172,34 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     notifications,
     certificates,
     auditLogs,
+    // v4 kapsam
+    mediaAssets,
+    trainingCategories,
+    trainingPeriods,
+    scormAttempts,
+    trainingFeedbackForms,
+    trainingFeedbackCategories,
+    trainingFeedbackItems,
+    trainingFeedbackResponses,
+    trainingFeedbackAnswers,
+    smgPeriods,
+    smgCategories,
+    smgActivities,
+    smgTargets,
+    accreditationStandards,
+    accreditationReports,
+    departmentTrainingRules,
+    questionBanks,
+    questionBankOptions,
+    competencyForms,
+    competencyCategories,
+    competencyItems,
+    competencyEvaluations,
+    competencyAnswers,
+    examAttemptRequests,
+    kvkkRequests,
+    dailyReviews,
+    dailySubmissions,
     // authUsers yalnız includeAuthUsers=true iken eklenir — aksi halde anahtar hiç çıkmaz.
     ...(authUsers ? { authUsers } : {}),
     exportedAt: (options.exportedAt ?? new Date()).toISOString(),
