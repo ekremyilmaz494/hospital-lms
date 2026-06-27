@@ -8,7 +8,7 @@ import {
 } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { downloadBuffer } from '@/lib/s3'
-import { checkRateLimit } from '@/lib/redis'
+import { getRateLimitCount, incrementRateLimit } from '@/lib/redis'
 import { decryptBackup } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
 
@@ -16,8 +16,17 @@ import { logger } from '@/lib/logger'
 export const maxDuration = 300
 
 /**
+ * Restore kodunun desteklediği EN YÜKSEK yedek şema sürümü. Daha yeni bir yedek
+ * (örn. ileride v4 + ek modeller) bu kodla restore edilirse yeni alanlar SESSİZCE
+ * düşerdi → veri kaybı. Guard bunu 400 hatasına çevirir: "önce kodu güncelle".
+ * Yeni model eklerken snapshot.ts BACKUP_SCHEMA_VERSION ile birlikte BURAYI da artır.
+ */
+const MAX_SUPPORTED_SCHEMA_VERSION = 3
+
+/**
  * Expected shape of a backup JSON file (mirrors backup cron output).
- * schemaVersion 1: v1 (9 arrays). schemaVersion 2+: organization, subscription, auditLogs eklendi.
+ * schemaVersion 1: v1 (9 arrays). v2: organization, subscription, auditLogs eklendi.
+ * v3: authUsers (Supabase parola hash'leri) eklendi — DR'de parola geri-yükleme.
  */
 interface BackupData {
   users: unknown[]
@@ -36,6 +45,8 @@ interface BackupData {
   organization?: Record<string, unknown> | null
   subscription?: Record<string, unknown> | null
   auditLogs?: unknown[]
+  // v3+ — Supabase auth.users satırları (parola hash'i dahil). Eski yedeklerde yok.
+  authUsers?: unknown[]
   schemaVersion?: number
 }
 
@@ -65,6 +76,7 @@ function isValidBackupData(data: unknown): data is BackupData {
 
   // v2+ opsiyonel alanlar — varsa tip kontrol
   if (d.auditLogs !== undefined && !Array.isArray(d.auditLogs)) return false
+  if (d.authUsers !== undefined && !Array.isArray(d.authUsers)) return false
 
   return true
 }
@@ -93,10 +105,14 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
 
     const { backupId, confirm } = body
 
-    // ── Rate limit (1 actual restore per hour) ──
+    // ── Rate limit (1 actual restore per hour) — yalnız PEEK (tüketmeden oku) ──
+    // Budget SADECE başarılı restore'da tüketilir (aşağıda incrementRateLimit). Başarısız
+    // bir DR denemesi (S3 hatası, bozuk yedek, tx rollback) operatörü 1 saat KİLİTLEMEMELİ —
+    // gerçek felakette tekrar denemek hayati. Eskiden checkRateLimit baştan tüketiyordu.
+    const restoreRateKey = `restore:${dbUser.id}`
     if (confirm) {
-      const allowed = await checkRateLimit(`restore:${dbUser.id}`, 1, 3600)
-      if (!allowed) {
+      const used = await getRateLimitCount(restoreRateKey)
+      if (used >= 1) {
         return errorResponse('Saatte yalnızca 1 geri yükleme yapılabilir. Lütfen daha sonra tekrar deneyin.', 429)
       }
     }
@@ -135,6 +151,14 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       if (!isValidBackupData(parsed)) {
         return errorResponse('Yedek dosyasının yapısı geçersiz veya bozuk.', 400)
       }
+      // schemaVersion guard: yedek restore kodundan YENİ ise (yeni modeller) restore onları
+      // sessizce düşürürdü → veri kaybı. Açık 400 hatasına çevir ("önce kodu güncelle").
+      if (typeof parsed.schemaVersion === 'number' && parsed.schemaVersion > MAX_SUPPORTED_SCHEMA_VERSION) {
+        return errorResponse(
+          `Bu yedek şema sürümü (v${parsed.schemaVersion}) bu geri yükleme kodundan daha yeni (desteklenen en yüksek: v${MAX_SUPPORTED_SCHEMA_VERSION}). Veri kaybını önlemek için lütfen önce uygulamayı güncelleyin.`,
+          400,
+        )
+      }
       backupData = parsed
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Bilinmeyen hata'
@@ -154,6 +178,7 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       notifications: backupData.notifications.length,
       certificates: backupData.certificates.length,
       auditLogs: backupData.auditLogs?.length ?? 0,
+      authUsers: backupData.authUsers?.length ?? 0,
       hasOrganization: backupData.organization ? 1 : 0,
       hasSubscription: backupData.subscription ? 1 : 0,
     }
@@ -262,6 +287,29 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         }
       }
 
+      // ── auth.users (Supabase parola hash'leri) — public.users'tan ÖNCE geri yükle ──
+      // KRİTİK #1: 2026-05-20 incident'inde restore parolaları geri yüklemiyordu →
+      // wipe+restore sonrası TÜM personel kilitleniyordu. v3 yedek auth.users'ı taşır.
+      //
+      // ON CONFLICT (id) DO NOTHING semantiği:
+      //  • Tam-wipe DR'de auth.users boş → tüm hash'ler yazılır.
+      //  • Kısmi restore'da mevcut canlı parola KORUNUR (clobber yok) — DELETE/UPDATE
+      //    zaten supabase-least-privilege.sql ile REVOKE'lu; DO NOTHING tek güvenli yol.
+      // jsonb_to_recordset: tek-statement toplu insert (büyük org'da tx marjını korur).
+      // raw_*_meta_data jsonb → ::jsonb cast şart (raw SQL; param text gelir).
+      // public.users → auth.users arasında DB-seviyesi FK YOK (yerelde doğrulandı) ama
+      // kimlik tablosunu önce yazmak DR'de en güvenli sıra.
+      if (backupData.authUsers && backupData.authUsers.length > 0) {
+        await tx.$executeRaw`
+          INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, phone, created_at, updated_at, raw_user_meta_data, raw_app_meta_data)
+          SELECT id, email, encrypted_password, email_confirmed_at, phone, created_at, updated_at, raw_user_meta_data, raw_app_meta_data
+          FROM jsonb_to_recordset(${JSON.stringify(backupData.authUsers)}::jsonb)
+            AS x(id uuid, email text, encrypted_password text, email_confirmed_at timestamptz, phone text,
+                 created_at timestamptz, updated_at timestamptz, raw_user_meta_data jsonb, raw_app_meta_data jsonb)
+          ON CONFLICT (id) DO NOTHING
+        `
+      }
+
       // Users (upsert to handle existing auth users)
       for (const usr of backupData.users) {
         const u = usr as Record<string, unknown>
@@ -360,6 +408,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       timeout: 120_000, // 2 minute tx body — büyük kurumlarda delete+createMany akışı için
       maxWait: 10_000,  // 10s connection wait — prod'da pool tıkalıysa hızlı patlayıp 503 dön
     })
+
+    // Restore BAŞARIYLA tamamlandı — rate-limit budget'i ŞİMDİ tüket. Başarısız bir denemede
+    // (yukarıdaki return/throw yolları) tüketilmedi → operatör felakette tekrar deneyebilir.
+    await incrementRateLimit(restoreRateKey, 3600)
 
     // ── Audit log ──
     await createAuditLog({
