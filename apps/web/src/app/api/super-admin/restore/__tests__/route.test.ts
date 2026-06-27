@@ -417,4 +417,76 @@ describe('POST /api/super-admin/restore', () => {
       expect(executeRaw).not.toHaveBeenCalled()
     })
   })
+
+  // ─── v4 kapsam genişlemesi (27 model) ───
+  describe('v4 kapsam modelleri', () => {
+    // tx mock'u: hangi model accessor'ında createMany çağrıldığını kaydeder
+    function trackingTransaction(calledModels: Set<string>) {
+      return async (fn: (tx: unknown) => Promise<void>) => {
+        const tx = new Proxy({}, {
+          get: (_t, prop) => {
+            if (prop === '$executeRaw') return vi.fn().mockResolvedValue(1)
+            return new Proxy({}, {
+              get: (__t, method) => {
+                if (method === 'createMany') {
+                  return (arg: { data?: unknown[] }) => {
+                    calledModels.add(String(prop))
+                    return Promise.resolve({ count: arg?.data?.length ?? 0 })
+                  }
+                }
+                return vi.fn().mockResolvedValue({ count: 0 })
+              },
+            })
+          },
+        })
+        await fn(tx)
+      }
+    }
+
+    it('schemaVersion 4 kabul edilir + yeni model createMany çağrılır (mediaAsset/smg/kvkk)', async () => {
+      const called = new Set<string>()
+      prismaMock.$transaction.mockImplementation(trackingTransaction(called))
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 4,
+        mediaAssets: [{ id: 'm1', fileSizeBytes: '1024' }],
+        smgActivities: [{ id: 's1' }],
+        kvkkRequests: [{ id: 'k1' }],
+        accreditationReports: [{ id: 'r1' }],
+      }))
+
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect(called.has('mediaAsset')).toBe(true)
+      expect(called.has('smgActivity')).toBe(true)
+      expect(called.has('kvkkRequest')).toBe(true)
+      expect(called.has('accreditationReport')).toBe(true)
+    })
+
+    it('v2 backup (v4 alanları undefined): yeni model createMany ÇAĞRILMAZ (mevcut veri korunur)', async () => {
+      const called = new Set<string>()
+      prismaMock.$transaction.mockImplementation(trackingTransaction(called))
+      // validBackupData v4 alanları taşımaz → restore onlara dokunmamalı
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect(called.has('mediaAsset')).toBe(false)
+      expect(called.has('scormAttempt')).toBe(false)
+      expect(called.has('competencyAnswer')).toBe(false)
+    })
+
+    it('preview counts v4 modellerini sayar', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 4,
+        mediaAssets: [{ id: 'm1' }, { id: 'm2' }],
+        scormAttempts: [{ id: 'sc1' }],
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.counts.mediaAssets).toBe(2)
+      expect(data.counts.scormAttempts).toBe(1)
+      expect(data.counts.kvkkRequests).toBe(0)
+    })
+  })
 })

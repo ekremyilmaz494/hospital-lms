@@ -21,12 +21,12 @@ export const maxDuration = 300
  * düşerdi → veri kaybı. Guard bunu 400 hatasına çevirir: "önce kodu güncelle".
  * Yeni model eklerken snapshot.ts BACKUP_SCHEMA_VERSION ile birlikte BURAYI da artır.
  */
-const MAX_SUPPORTED_SCHEMA_VERSION = 3
+const MAX_SUPPORTED_SCHEMA_VERSION = 4
 
 /**
  * Expected shape of a backup JSON file (mirrors backup cron output).
  * schemaVersion 1: v1 (9 arrays). v2: organization, subscription, auditLogs eklendi.
- * v3: authUsers (Supabase parola hash'leri) eklendi — DR'de parola geri-yükleme.
+ * v3: authUsers (Supabase parola hash'leri). v4: 27 org modeli daha (aşağıdaki v4 bloğu).
  */
 interface BackupData {
   users: unknown[]
@@ -47,8 +47,48 @@ interface BackupData {
   auditLogs?: unknown[]
   // v3+ — Supabase auth.users satırları (parola hash'i dahil). Eski yedeklerde yok.
   authUsers?: unknown[]
+  // v4+ — kapsam genişlemesi (27 model). Eski yedeklerde undefined → restore dokunmaz (mevcut korunur).
+  mediaAssets?: unknown[]
+  trainingCategories?: unknown[]
+  trainingPeriods?: unknown[]
+  scormAttempts?: unknown[]
+  trainingFeedbackForms?: unknown[]
+  trainingFeedbackCategories?: unknown[]
+  trainingFeedbackItems?: unknown[]
+  trainingFeedbackResponses?: unknown[]
+  trainingFeedbackAnswers?: unknown[]
+  smgPeriods?: unknown[]
+  smgCategories?: unknown[]
+  smgActivities?: unknown[]
+  smgTargets?: unknown[]
+  accreditationStandards?: unknown[]
+  accreditationReports?: unknown[]
+  departmentTrainingRules?: unknown[]
+  questionBanks?: unknown[]
+  questionBankOptions?: unknown[]
+  competencyForms?: unknown[]
+  competencyCategories?: unknown[]
+  competencyItems?: unknown[]
+  competencyEvaluations?: unknown[]
+  competencyAnswers?: unknown[]
+  examAttemptRequests?: unknown[]
+  kvkkRequests?: unknown[]
+  dailyReviews?: unknown[]
+  dailySubmissions?: unknown[]
   schemaVersion?: number
 }
+
+/** v4 opsiyonel model anahtarları — isValidBackupData + counts + delete/insert tek listeden döner. */
+const V4_MODEL_KEYS = [
+  'mediaAssets', 'trainingCategories', 'trainingPeriods', 'scormAttempts',
+  'trainingFeedbackForms', 'trainingFeedbackCategories', 'trainingFeedbackItems',
+  'trainingFeedbackResponses', 'trainingFeedbackAnswers',
+  'smgPeriods', 'smgCategories', 'smgActivities', 'smgTargets',
+  'accreditationStandards', 'accreditationReports', 'departmentTrainingRules',
+  'questionBanks', 'questionBankOptions',
+  'competencyForms', 'competencyCategories', 'competencyItems', 'competencyEvaluations', 'competencyAnswers',
+  'examAttemptRequests', 'kvkkRequests', 'dailyReviews', 'dailySubmissions',
+] as const
 
 /** Validate that parsed JSON has the expected backup structure */
 function isValidBackupData(data: unknown): data is BackupData {
@@ -77,6 +117,10 @@ function isValidBackupData(data: unknown): data is BackupData {
   // v2+ opsiyonel alanlar — varsa tip kontrol
   if (d.auditLogs !== undefined && !Array.isArray(d.auditLogs)) return false
   if (d.authUsers !== undefined && !Array.isArray(d.authUsers)) return false
+  // v4 opsiyonel modeller — varsa array olmalı
+  for (const key of V4_MODEL_KEYS) {
+    if (d[key] !== undefined && !Array.isArray(d[key])) return false
+  }
 
   return true
 }
@@ -181,6 +225,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       authUsers: backupData.authUsers?.length ?? 0,
       hasOrganization: backupData.organization ? 1 : 0,
       hasSubscription: backupData.subscription ? 1 : 0,
+      // v4 modelleri (yedekte yoksa 0)
+      ...Object.fromEntries(
+        V4_MODEL_KEYS.map((k) => [k, (backupData[k] as unknown[] | undefined)?.length ?? 0]),
+      ),
     }
 
     // ── Preview mode ──
@@ -216,12 +264,53 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
     }
 
     await prisma.$transaction(async (tx) => {
-      // Delete existing data in dependency order (children first)
-      // AuditLog'ları sil — restore edilecekler ile çakışmamalı
+      // ── DELETE: child → parent (Restrict kenarları parent'tan ÖNCE) ──
+      // v4 modelleri YALNIZ yedek o modeli taşıyorsa silinir: eski v2/v3 yedekte alan
+      // `undefined` → dokunma (mevcut veri korunur). Aksi halde eski yedekten restore,
+      // o modelin mevcut verisini siler ama geri yazamazdı → sessiz kayıp.
       if (backupData.auditLogs && backupData.auditLogs.length > 0) {
         await tx.auditLog.deleteMany({ where: { organizationId: orgId } })
       }
+
+      // v4 — Eğitim geri bildirim (answer → response[Restrict→form] → item → category → form)
+      if (backupData.trainingFeedbackAnswers) await tx.trainingFeedbackAnswer.deleteMany({ where: { response: { organizationId: orgId } } })
+      if (backupData.trainingFeedbackResponses) await tx.trainingFeedbackResponse.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.trainingFeedbackItems) await tx.trainingFeedbackItem.deleteMany({ where: { category: { form: { organizationId: orgId } } } })
+      if (backupData.trainingFeedbackCategories) await tx.trainingFeedbackCategory.deleteMany({ where: { form: { organizationId: orgId } } })
+      if (backupData.trainingFeedbackForms) await tx.trainingFeedbackForm.deleteMany({ where: { organizationId: orgId } })
+
+      // v4 — Yetkinlik (answer → item → evaluation → category → form)
+      if (backupData.competencyAnswers) await tx.competencyAnswer.deleteMany({ where: { evaluation: { form: { organizationId: orgId } } } })
+      if (backupData.competencyItems) await tx.competencyItem.deleteMany({ where: { category: { form: { organizationId: orgId } } } })
+      if (backupData.competencyEvaluations) await tx.competencyEvaluation.deleteMany({ where: { form: { organizationId: orgId } } })
+      if (backupData.competencyCategories) await tx.competencyCategory.deleteMany({ where: { form: { organizationId: orgId } } })
+      if (backupData.competencyForms) await tx.competencyForm.deleteMany({ where: { organizationId: orgId } })
+
+      // v4 — SMG (activity/target → category/period)
+      if (backupData.smgActivities) await tx.smgActivity.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.smgTargets) await tx.smgTarget.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.smgCategories) await tx.smgCategory.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.smgPeriods) await tx.smgPeriod.deleteMany({ where: { organizationId: orgId } })
+
+      // v4 — Akreditasyon (report[Restrict→user] → standard). Report user'dan ÖNCE silinir.
+      if (backupData.accreditationReports) await tx.accreditationReport.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.accreditationStandards) await tx.accreditationStandard.deleteMany({ where: { organizationId: orgId } })
+
+      // v4 — Soru bankası (option → bank)
+      if (backupData.questionBankOptions) await tx.questionBankOption.deleteMany({ where: { question: { organizationId: orgId } } })
+      if (backupData.questionBanks) await tx.questionBank.deleteMany({ where: { organizationId: orgId } })
+
+      // v4 — Günlük / diğer org-çocukları
+      if (backupData.dailyReviews) await tx.dailyReview.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.dailySubmissions) await tx.dailySubmission.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.departmentTrainingRules) await tx.departmentTrainingRule.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.examAttemptRequests) await tx.examAttemptRequest.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.kvkkRequests) await tx.kvkkRequest.deleteMany({ where: { organizationId: orgId } })
+
+      // ── Mevcut çekirdek (child → parent) ──
       await tx.certificate.deleteMany({ where: { training: { organizationId: orgId } } })
+      // ScormAttempt, Certificate'in Restrict parent'ı → certificate'ten SONRA silinir.
+      if (backupData.scormAttempts) await tx.scormAttempt.deleteMany({ where: { organizationId: orgId } })
       await tx.videoProgress.deleteMany({ where: { attempt: { training: { organizationId: orgId } } } })
       await tx.examAnswer.deleteMany({ where: { attempt: { training: { organizationId: orgId } } } })
       await tx.examAttempt.deleteMany({ where: { training: { organizationId: orgId } } })
@@ -232,7 +321,12 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       await tx.questionOption.deleteMany({ where: { question: { training: { organizationId: orgId } } } })
       await tx.question.deleteMany({ where: { training: { organizationId: orgId } } })
       await tx.trainingVideo.deleteMany({ where: { training: { organizationId: orgId } } })
+      // MediaAsset, TrainingVideo'nun parent'ı (mediaAssetId SetNull) → video'lardan SONRA sil.
+      if (backupData.mediaAssets) await tx.mediaAsset.deleteMany({ where: { organizationId: orgId } })
       await tx.training.deleteMany({ where: { organizationId: orgId } })
+      // TrainingCategory/Period, Training/Assignment/Certificate'in parent'ı → onlardan SONRA sil.
+      if (backupData.trainingCategories) await tx.trainingCategory.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.trainingPeriods) await tx.trainingPeriod.deleteMany({ where: { organizationId: orgId } })
 
       await tx.department.deleteMany({ where: { organizationId: orgId } })
 
@@ -275,16 +369,45 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         })
       }
 
-      // Departments
+      // Departments — self-FK (parentId). İKİ GEÇİŞ: önce parentId=null ile hepsini ekle,
+      // sonra parentId'leri set et. Aksi halde alt-departman parent'ından önce gelirse
+      // FK ihlali tüm restore'u rollback eder (tek-geçiş upsert sırası garanti değil).
       if (backupData.departments.length > 0) {
+        const deptParents: Array<{ id: string; parentId: string }> = []
         for (const dept of backupData.departments) {
           const d = dept as Record<string, unknown>
+          if (d.parentId) deptParents.push({ id: d.id as string, parentId: d.parentId as string })
+          const createData = { ...d, parentId: null }
           await tx.department.upsert({
             where: { id: d.id as string },
-            create: d as Parameters<typeof tx.department.create>[0]['data'],
-            update: d as Parameters<typeof tx.department.update>[0]['data'],
+            create: createData as Parameters<typeof tx.department.create>[0]['data'],
+            update: createData as Parameters<typeof tx.department.update>[0]['data'],
           })
         }
+        for (const { id, parentId } of deptParents) {
+          await tx.department.update({ where: { id }, data: { parentId } })
+        }
+      }
+
+      // ── v4 Tier-A: yalnız org'a bağlı parent modeller (Training/Assignment/User'dan ÖNCE) ──
+      // NOT: TrainingPeriod burada DEĞİL — closedById→User FK'sı var, User'dan SONRA (Tier-B) eklenir.
+      if (backupData.trainingCategories?.length) {
+        await tx.trainingCategory.createMany({ data: backupData.trainingCategories as NonNullable<Parameters<typeof tx.trainingCategory.createMany>[0]>['data'] })
+      }
+      if (backupData.smgPeriods?.length) {
+        await tx.smgPeriod.createMany({ data: backupData.smgPeriods as NonNullable<Parameters<typeof tx.smgPeriod.createMany>[0]>['data'] })
+      }
+      if (backupData.smgCategories?.length) {
+        await tx.smgCategory.createMany({ data: backupData.smgCategories as NonNullable<Parameters<typeof tx.smgCategory.createMany>[0]>['data'] })
+      }
+      if (backupData.questionBanks?.length) {
+        await tx.questionBank.createMany({ data: backupData.questionBanks as NonNullable<Parameters<typeof tx.questionBank.createMany>[0]>['data'] })
+      }
+      if (backupData.competencyForms?.length) {
+        await tx.competencyForm.createMany({ data: backupData.competencyForms as NonNullable<Parameters<typeof tx.competencyForm.createMany>[0]>['data'] })
+      }
+      if (backupData.trainingFeedbackForms?.length) {
+        await tx.trainingFeedbackForm.createMany({ data: backupData.trainingFeedbackForms as NonNullable<Parameters<typeof tx.trainingFeedbackForm.createMany>[0]>['data'] })
       }
 
       // ── auth.users (Supabase parola hash'leri) — public.users'tan ÖNCE geri yükle ──
@@ -318,6 +441,63 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
           create: u as Parameters<typeof tx.user.create>[0]['data'],
           update: u as Parameters<typeof tx.user.update>[0]['data'],
         })
+      }
+
+      // ── v4 Tier-B: User / Tier-A parent gerektiren modeller (Training'den ÖNCE) ──
+      // MediaAsset.fileSizeBytes BigInt — yedekte string; createMany için BigInt'e çevir
+      // (TrainingVideo ile aynı). MediaAsset, TrainingVideo.mediaAssetId'nin parent'ı → video'lardan ÖNCE.
+      if (backupData.mediaAssets?.length) {
+        const assets = (backupData.mediaAssets as Record<string, unknown>[]).map((a) => ({
+          ...a,
+          fileSizeBytes: a.fileSizeBytes == null ? null : BigInt(a.fileSizeBytes as string | number),
+        }))
+        await tx.mediaAsset.createMany({ data: assets as NonNullable<Parameters<typeof tx.mediaAsset.createMany>[0]>['data'] })
+      }
+      // TrainingPeriod — closedById→User FK; User'dan SONRA. Assignment/Certificate'ten ÖNCE.
+      if (backupData.trainingPeriods?.length) {
+        await tx.trainingPeriod.createMany({ data: backupData.trainingPeriods as NonNullable<Parameters<typeof tx.trainingPeriod.createMany>[0]>['data'] })
+      }
+      if (backupData.accreditationStandards?.length) {
+        await tx.accreditationStandard.createMany({ data: backupData.accreditationStandards as NonNullable<Parameters<typeof tx.accreditationStandard.createMany>[0]>['data'] })
+      }
+      if (backupData.accreditationReports?.length) {
+        await tx.accreditationReport.createMany({ data: backupData.accreditationReports as NonNullable<Parameters<typeof tx.accreditationReport.createMany>[0]>['data'] })
+      }
+      if (backupData.kvkkRequests?.length) {
+        await tx.kvkkRequest.createMany({ data: backupData.kvkkRequests as NonNullable<Parameters<typeof tx.kvkkRequest.createMany>[0]>['data'] })
+      }
+      if (backupData.dailySubmissions?.length) {
+        await tx.dailySubmission.createMany({ data: backupData.dailySubmissions as NonNullable<Parameters<typeof tx.dailySubmission.createMany>[0]>['data'] })
+      }
+      if (backupData.questionBankOptions?.length) {
+        await tx.questionBankOption.createMany({ data: backupData.questionBankOptions as NonNullable<Parameters<typeof tx.questionBankOption.createMany>[0]>['data'] })
+      }
+      // Feedback: category → item (form Tier-A'da). Response/answer attempt'lerden sonra (aşağıda).
+      if (backupData.trainingFeedbackCategories?.length) {
+        await tx.trainingFeedbackCategory.createMany({ data: backupData.trainingFeedbackCategories as NonNullable<Parameters<typeof tx.trainingFeedbackCategory.createMany>[0]>['data'] })
+      }
+      if (backupData.trainingFeedbackItems?.length) {
+        await tx.trainingFeedbackItem.createMany({ data: backupData.trainingFeedbackItems as NonNullable<Parameters<typeof tx.trainingFeedbackItem.createMany>[0]>['data'] })
+      }
+      // Competency: category → item → evaluation → answer (form Tier-A'da).
+      if (backupData.competencyCategories?.length) {
+        await tx.competencyCategory.createMany({ data: backupData.competencyCategories as NonNullable<Parameters<typeof tx.competencyCategory.createMany>[0]>['data'] })
+      }
+      if (backupData.competencyItems?.length) {
+        await tx.competencyItem.createMany({ data: backupData.competencyItems as NonNullable<Parameters<typeof tx.competencyItem.createMany>[0]>['data'] })
+      }
+      if (backupData.competencyEvaluations?.length) {
+        await tx.competencyEvaluation.createMany({ data: backupData.competencyEvaluations as NonNullable<Parameters<typeof tx.competencyEvaluation.createMany>[0]>['data'] })
+      }
+      if (backupData.competencyAnswers?.length) {
+        await tx.competencyAnswer.createMany({ data: backupData.competencyAnswers as NonNullable<Parameters<typeof tx.competencyAnswer.createMany>[0]>['data'] })
+      }
+      // SMG: activity (category Tier-A) + target (period Tier-A), ikisi de User gerektirir.
+      if (backupData.smgActivities?.length) {
+        await tx.smgActivity.createMany({ data: backupData.smgActivities as NonNullable<Parameters<typeof tx.smgActivity.createMany>[0]>['data'] })
+      }
+      if (backupData.smgTargets?.length) {
+        await tx.smgTarget.createMany({ data: backupData.smgTargets as NonNullable<Parameters<typeof tx.smgTarget.createMany>[0]>['data'] })
       }
 
       // Trainings + nested children. Parent per-row (nested relation sayısı değişken),
@@ -366,6 +546,11 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         })
       }
 
+      // v4 — DepartmentTrainingRule: Department + Training gerektirir.
+      if (backupData.departmentTrainingRules?.length) {
+        await tx.departmentTrainingRule.createMany({ data: backupData.departmentTrainingRules as NonNullable<Parameters<typeof tx.departmentTrainingRule.createMany>[0]>['data'] })
+      }
+
       if (backupData.assignments.length > 0) {
         await tx.trainingAssignment.createMany({
           data: backupData.assignments as NonNullable<Parameters<typeof tx.trainingAssignment.createMany>[0]>['data'],
@@ -375,6 +560,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         await tx.examAttempt.createMany({
           data: backupData.attempts as NonNullable<Parameters<typeof tx.examAttempt.createMany>[0]>['data'],
         })
+      }
+      // v4 — ScormAttempt: Training + User gerektirir; Certificate'in Restrict parent'ı → certificate'ten ÖNCE.
+      if (backupData.scormAttempts?.length) {
+        await tx.scormAttempt.createMany({ data: backupData.scormAttempts as NonNullable<Parameters<typeof tx.scormAttempt.createMany>[0]>['data'] })
       }
       if (backupData.examAnswers.length > 0) {
         await tx.examAnswer.createMany({
@@ -386,6 +575,21 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
           data: backupData.videoProgress as NonNullable<Parameters<typeof tx.videoProgress.createMany>[0]>['data'],
         })
       }
+
+      // v4 — ExamAttemptRequest (Training+User), Feedback yanıtları (response→answer), DailyReview (User+Question).
+      if (backupData.examAttemptRequests?.length) {
+        await tx.examAttemptRequest.createMany({ data: backupData.examAttemptRequests as NonNullable<Parameters<typeof tx.examAttemptRequest.createMany>[0]>['data'] })
+      }
+      if (backupData.trainingFeedbackResponses?.length) {
+        await tx.trainingFeedbackResponse.createMany({ data: backupData.trainingFeedbackResponses as NonNullable<Parameters<typeof tx.trainingFeedbackResponse.createMany>[0]>['data'] })
+      }
+      if (backupData.trainingFeedbackAnswers?.length) {
+        await tx.trainingFeedbackAnswer.createMany({ data: backupData.trainingFeedbackAnswers as NonNullable<Parameters<typeof tx.trainingFeedbackAnswer.createMany>[0]>['data'] })
+      }
+      if (backupData.dailyReviews?.length) {
+        await tx.dailyReview.createMany({ data: backupData.dailyReviews as NonNullable<Parameters<typeof tx.dailyReview.createMany>[0]>['data'] })
+      }
+
       if (backupData.notifications.length > 0) {
         await tx.notification.createMany({
           data: backupData.notifications as NonNullable<Parameters<typeof tx.notification.createMany>[0]>['data'],

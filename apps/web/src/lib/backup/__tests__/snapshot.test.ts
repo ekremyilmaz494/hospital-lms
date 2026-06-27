@@ -30,6 +30,34 @@ const prismaMock = vi.hoisted(() => ({
   notification: { findMany: vi.fn().mockResolvedValue([]) },
   certificate: { findMany: vi.fn().mockResolvedValue([]) },
   auditLog: { findMany: vi.fn().mockResolvedValue([]) },
+  // v4 kapsam modelleri
+  mediaAsset: { findMany: vi.fn().mockResolvedValue([]) },
+  trainingCategory: { findMany: vi.fn().mockResolvedValue([]) },
+  trainingPeriod: { findMany: vi.fn().mockResolvedValue([]) },
+  scormAttempt: { findMany: vi.fn().mockResolvedValue([]) },
+  trainingFeedbackForm: { findMany: vi.fn().mockResolvedValue([]) },
+  trainingFeedbackCategory: { findMany: vi.fn().mockResolvedValue([]) },
+  trainingFeedbackItem: { findMany: vi.fn().mockResolvedValue([]) },
+  trainingFeedbackResponse: { findMany: vi.fn().mockResolvedValue([]) },
+  trainingFeedbackAnswer: { findMany: vi.fn().mockResolvedValue([]) },
+  smgPeriod: { findMany: vi.fn().mockResolvedValue([]) },
+  smgCategory: { findMany: vi.fn().mockResolvedValue([]) },
+  smgActivity: { findMany: vi.fn().mockResolvedValue([]) },
+  smgTarget: { findMany: vi.fn().mockResolvedValue([]) },
+  accreditationStandard: { findMany: vi.fn().mockResolvedValue([]) },
+  accreditationReport: { findMany: vi.fn().mockResolvedValue([]) },
+  departmentTrainingRule: { findMany: vi.fn().mockResolvedValue([]) },
+  questionBank: { findMany: vi.fn().mockResolvedValue([]) },
+  questionBankOption: { findMany: vi.fn().mockResolvedValue([]) },
+  competencyForm: { findMany: vi.fn().mockResolvedValue([]) },
+  competencyCategory: { findMany: vi.fn().mockResolvedValue([]) },
+  competencyItem: { findMany: vi.fn().mockResolvedValue([]) },
+  competencyEvaluation: { findMany: vi.fn().mockResolvedValue([]) },
+  competencyAnswer: { findMany: vi.fn().mockResolvedValue([]) },
+  examAttemptRequest: { findMany: vi.fn().mockResolvedValue([]) },
+  kvkkRequest: { findMany: vi.fn().mockResolvedValue([]) },
+  dailyReview: { findMany: vi.fn().mockResolvedValue([]) },
+  dailySubmission: { findMany: vi.fn().mockResolvedValue([]) },
   // auth.users raw sorgusu (includeAuthUsers=true iken)
   $queryRaw: vi.fn().mockResolvedValue([]),
 }))
@@ -54,21 +82,40 @@ const INCLUDED_MODELS = new Set([
   'Notification',
   'Certificate',
   'AuditLog',
+  // ── v4 kapsam genişlemesi (27 model) ──
+  'MediaAsset',
+  'ScormAttempt',
+  'TrainingFeedbackForm',
+  'TrainingFeedbackCategory',
+  'TrainingFeedbackItem',
+  'TrainingFeedbackResponse',
+  'TrainingFeedbackAnswer',
+  'SmgActivity',
+  'SmgCategory',
+  'SmgPeriod',
+  'SmgTarget',
+  'AccreditationStandard',
+  'AccreditationReport',
+  'DepartmentTrainingRule',
+  'TrainingCategory',
+  'TrainingPeriod',
+  'QuestionBank',
+  'QuestionBankOption',
+  'CompetencyForm',
+  'CompetencyCategory',
+  'CompetencyItem',
+  'CompetencyEvaluation',
+  'CompetencyAnswer',
+  'ExamAttemptRequest',
+  'DailyReview',
+  'DailySubmission',
+  'KvkkRequest',
 ])
 
 const INTENTIONALLY_EXCLUDED = new Set([
-  // Global (org-bağımsız) — yedek scope'unda değil
+  // Global / platform (org-bağımsız) — per-org yedek scope'unda değil
   'SubscriptionPlan',
-  'TrainingCategory',
-  'AccreditationStandard',
-  'QuestionBank',
-  'QuestionBankOption',
-
-  // Medya Kütüphanesi — S3 nesneleri üzerinde per-org ikincil index. Kanonik eğitim
-  // içeriği TrainingVideo'da (yedekleniyor) + S3 dosyaları kalıcı; library listesi
-  // kaybolsa eğitimler çalışmaya devam eder. Eski ContentLibrary de yedek scope'unda
-  // değildi → davranış değişmedi.
-  'MediaAsset',
+  'Badge', // global rozet kataloğu (migration seed'i, org-bağımsız)
 
   // Backup sisteminin kendisi — kendi metadata'sını yedeklemez (sonsuz döngü)
   'DbBackup',
@@ -77,55 +124,16 @@ const INTENTIONALLY_EXCLUDED = new Set([
   'Payment',
   'Invoice',
 
-  // Workflow / per-org — yedek scope'una alınmadı (kapsamı sonra genişletilebilir)
-  'ExamAttemptRequest',
-  'TrainingPeriod',
-  'KvkkRequest',
-  'ScormAttempt',
-  'DepartmentTrainingRule',
-  'AccreditationReport',
-
-  // SMG (sürekli mesleki gelişim) — ayrı modül, henüz backup scope'unda değil
-  'SmgActivity',
-  'SmgPeriod',
-  'SmgCategory',
-  'SmgTarget',
-
-  // Oyunlaştırma Faz 1 (Günün Soruları) — yeni modül, henüz backup scope'unda değil.
-  // DailyReview cron ile geçilen sınavlardan yeniden seed edilir (regenerable);
-  // DailySubmission Faz 1'de puan/idempotency snapshot'ıdır. Faz 2'de puan kullanıcıya
-  // görünür olunca INCLUDED_MODELS'a taşı + BACKUP_SCHEMA_VERSION artır.
-  'DailyReview',
-  'DailySubmission',
-
-  // Oyunlaştırma Faz 2 (Puan/Streak/Rozet) — yeni modül, henüz backup scope'unda değil.
-  // Badge global katalog (org-bağımsız, migration seed'i). PointLedger/UserStreak/UserBadge
-  // per-org engagement verisi; puan kullanıcıya görünür olunca INCLUDED'a taşı + schemaVersion artır.
+  // Oyunlaştırma Faz 2 (Puan/Streak/Rozet) — kullanıcıya görünür puan henüz yok (internal).
+  // Görünür olunca INCLUDED_MODELS'a taşı + BACKUP_SCHEMA_VERSION artır.
   'PointLedger',
   'UserStreak',
-  'Badge',
   'UserBadge',
 
-  // Yetkinlik değerlendirme modülü (yeni feature — henüz backup scope'unda değil)
-  'CompetencyForm',
-  'CompetencyCategory',
-  'CompetencyItem',
-  'CompetencyEvaluation',
-  'CompetencyAnswer',
-
-  // Push bildirim aboneliği (cihaz-spesifik, restore edilmez — kullanıcı yeniden subscribe olur)
+  // Cihaz-spesifik — restore edilmez (kullanıcı yeniden subscribe olur / cihazı yeniden güvenilir kılar)
   'PushSubscription',
   'ExpoPushToken',
   'ExpoPushTicket',
-
-  // Eğitim geri bildirim formları (yeni feature — henüz backup scope'unda değil)
-  'TrainingFeedbackForm',
-  'TrainingFeedbackCategory',
-  'TrainingFeedbackItem',
-  'TrainingFeedbackResponse',
-  'TrainingFeedbackAnswer',
-
-  // MFA güvenlik (cihaz-spesifik trust token, restore edilmez)
   'TrustedDevice',
 
   // Davet (geçici/expire eden link, restore edilmemeli — sahte invite'ı reanimate eder)
@@ -196,6 +204,25 @@ describe('Backup Snapshot — Schema Drift Guard', () => {
     expect(result.organizationName).toBe('Test Hastanesi')
     expect(result.schemaVersion).toBe(BACKUP_SCHEMA_VERSION)
     expect(typeof result.exportedAt).toBe('string')
+  })
+
+  it('v4 payload 27 kapsam modelinin TAMAMINI içerir + schemaVersion=4', async () => {
+    const result = await buildBackupSnapshot('org-1') as Record<string, unknown>
+    const v4Keys = [
+      'mediaAssets', 'trainingCategories', 'trainingPeriods', 'scormAttempts',
+      'trainingFeedbackForms', 'trainingFeedbackCategories', 'trainingFeedbackItems',
+      'trainingFeedbackResponses', 'trainingFeedbackAnswers',
+      'smgPeriods', 'smgCategories', 'smgActivities', 'smgTargets',
+      'accreditationStandards', 'accreditationReports', 'departmentTrainingRules',
+      'questionBanks', 'questionBankOptions',
+      'competencyForms', 'competencyCategories', 'competencyItems', 'competencyEvaluations', 'competencyAnswers',
+      'examAttemptRequests', 'kvkkRequests', 'dailyReviews', 'dailySubmissions',
+    ]
+    expect(v4Keys).toHaveLength(27)
+    for (const k of v4Keys) {
+      expect(result[k], `v4 model ${k} snapshot payload'ında eksik`).toBeDefined()
+    }
+    expect(result.schemaVersion).toBe(4)
   })
 
   it('training.findMany nested videos/questions/options include eder (nested drift\'i de yakala)', async () => {
