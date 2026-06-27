@@ -17,7 +17,8 @@ import path from 'path'
  */
 
 const prismaMock = vi.hoisted(() => ({
-  organization: { findUnique: vi.fn().mockResolvedValue(null) },
+  // dataRetentionDays: 200 → auditLog cutoff'unun org ayarından okunduğunu doğrular (eskiden 90g sabitti)
+  organization: { findUnique: vi.fn().mockResolvedValue({ dataRetentionDays: 200 }) },
   organizationSubscription: { findUnique: vi.fn().mockResolvedValue(null) },
   user: { findMany: vi.fn().mockResolvedValue([]) },
   department: { findMany: vi.fn().mockResolvedValue([]) },
@@ -29,6 +30,8 @@ const prismaMock = vi.hoisted(() => ({
   notification: { findMany: vi.fn().mockResolvedValue([]) },
   certificate: { findMany: vi.fn().mockResolvedValue([]) },
   auditLog: { findMany: vi.fn().mockResolvedValue([]) },
+  // auth.users raw sorgusu (includeAuthUsers=true iken)
+  $queryRaw: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
@@ -209,7 +212,7 @@ describe('Backup Snapshot — Schema Drift Guard', () => {
     expect(questionsInclude).toHaveProperty('options')
   })
 
-  it('auditLog 90 günlük cutoff ile çekiliyor', async () => {
+  it('auditLog cutoff org dataRetentionDays\'ten okunur (90g sabit DEĞİL)', async () => {
     await buildBackupSnapshot('org-1')
 
     const call = prismaMock.auditLog.findMany.mock.calls[0]?.[0] as
@@ -219,8 +222,28 @@ describe('Backup Snapshot — Schema Drift Guard', () => {
     expect(call?.where?.createdAt?.gte).toBeInstanceOf(Date)
 
     const cutoff = call!.where!.createdAt!.gte!.getTime()
-    const expected = Date.now() - 90 * 24 * 60 * 60 * 1000
+    // Mock org.dataRetentionDays = 200 → cutoff 200 gün önce (eskiden hardcoded 90g idi)
+    const expected = Date.now() - 200 * 24 * 60 * 60 * 1000
     expect(Math.abs(cutoff - expected)).toBeLessThan(5000) // ±5s tolerans
+  })
+
+  it('includeAuthUsers=true → authUsers payload\'a eklenir + auth.users sorgusu çalışır', async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      { id: 'u1', email: 'a@b.c', encrypted_password: '$2a$hash' },
+    ])
+    const result = await buildBackupSnapshot('org-1', { includeAuthUsers: true }) as Record<string, unknown>
+
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1)
+    expect(result.authUsers).toBeDefined()
+    expect(Array.isArray(result.authUsers)).toBe(true)
+    expect((result.authUsers as unknown[]).length).toBe(1)
+  })
+
+  it('includeAuthUsers verilmezse authUsers payload\'a EKLENMEZ + auth.users sorgusu çalışmaz', async () => {
+    const result = await buildBackupSnapshot('org-1') as Record<string, unknown>
+
+    expect(prismaMock.$queryRaw).not.toHaveBeenCalled()
+    expect('authUsers' in result).toBe(false)
   })
 
   it('exportedAt opsiyonu pas edildiğinde aynen kullanılır (test/fallback determinism)', async () => {

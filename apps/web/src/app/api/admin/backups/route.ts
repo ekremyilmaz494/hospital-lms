@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { uploadBuffer, backupKey } from '@/lib/s3'
 import { encryptBackup, stringifyBackup } from '@/lib/backup-crypto'
+import { buildBackupSnapshot } from '@/lib/backup/snapshot'
 import { checkRateLimit } from '@/lib/redis'
 import { sendEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
@@ -93,45 +94,12 @@ export const POST = withAdminRoute(async ({ dbUser, organizationId, audit }) => 
   const allowed = await checkRateLimit(`manual-backup:${dbUser.id}`, 5, 3600)
   if (!allowed) return errorResponse('Çok fazla manuel yedek isteği. Saatte en fazla 5 yedek alınabilir.', 429)
 
-  const auditLogCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-
-  const [organization, subscription, users, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates, auditLogs] = await Promise.all([
-    prisma.organization.findUnique({ where: { id: orgId } }),
-    prisma.organizationSubscription.findUnique({ where: { organizationId: orgId } }),
-    prisma.user.findMany({ where: { organizationId: orgId } }),
-    prisma.department.findMany({ where: { organizationId: orgId } }),
-    prisma.training.findMany({
-      where: { organizationId: orgId },
-      include: { videos: true, questions: { include: { options: true } } },
-    }),
-    prisma.trainingAssignment.findMany({ where: { training: { organizationId: orgId } } }),
-    prisma.examAttempt.findMany({ where: { training: { organizationId: orgId } } }),
-    prisma.examAnswer.findMany({ where: { attempt: { training: { organizationId: orgId } } } }),
-    prisma.videoProgress.findMany({ where: { attempt: { training: { organizationId: orgId } } } }),
-    prisma.notification.findMany({ where: { organizationId: orgId } }),
-    prisma.certificate.findMany({ where: { training: { organizationId: orgId } } }),
-    prisma.auditLog.findMany({ where: { organizationId: orgId, createdAt: { gte: auditLogCutoff } } }),
-  ])
-
-  // Yedek dosyası restore kaynağı olarak kullanılır; PII maskelenmez.
-  // Koruma: S3 at-rest encryption + AES-256-GCM (encryptBackup) + IAM.
-  const backupData = {
-    organization,
-    subscription,
-    users,
-    departments,
-    trainings,
-    assignments,
-    attempts,
-    examAnswers,
-    videoProgress,
-    notifications,
-    certificates,
-    auditLogs,
-    exportedAt: new Date().toISOString(),
-    organizationId: orgId,
-    schemaVersion: 2,
-  }
+  // Yedek payload'ı TEK assembler'dan (buildBackupSnapshot) — cron/manuel/download aynı
+  // kaynağı kullanır (drift yok). includeAuthUsers: restore'da parola geri-yükleme için
+  // auth.users dahil edilir → manuel yedek artık schemaVersion 3 + authUsers içerir
+  // (eskiden v2 idi, authUsers'sızdı → bu yedekten restore personeli kilitliyordu).
+  // Yedek ham veri içerir; KVKK koruması S3 at-rest encryption + AES-256-GCM + IAM.
+  const backupData = await buildBackupSnapshot(orgId, { includeAuthUsers: true })
   const jsonBlob = stringifyBackup(backupData)
 
   // AES-256-GCM ile sifreleme (BACKUP_ENCRYPTION_KEY varsa)
