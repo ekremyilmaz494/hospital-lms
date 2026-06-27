@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import crypto from 'crypto'
-import { encryptBackup, decryptBackup, maskUsersPII } from '../backup-crypto'
+import { encryptBackup, decryptBackup, maskUsersPII, stringifyBackup } from '../backup-crypto'
 
 // 32 byte (64 hex) deterministik test anahtarı
 const TEST_KEY = 'a'.repeat(64)
@@ -192,5 +192,35 @@ describe('backup-crypto', () => {
       maskUsersPII(users)
       expect(users[0].phone).toBe('05321234567')
     })
+  })
+})
+
+describe('stringifyBackup (BigInt-güvenli yedek serialization)', () => {
+  it('BigInt içeren veriyi fırlatmadan serialize eder', () => {
+    expect(() => stringifyBackup({ a: BigInt(123) })).not.toThrow()
+  })
+
+  it('düz JSON.stringify BigInt\'te fırlatır (regresyonun kanıtı)', () => {
+    // Bu, 14.05.2026 prod yedek crash\'inin tam nedeni — stringifyBackup bunu çözer.
+    expect(() => JSON.stringify({ a: BigInt(123) })).toThrow()
+  })
+
+  it('nested fileSizeBytes → string; restore BigInt() ile geri çevirir', () => {
+    const data = { trainings: [{ videos: [{ id: 'v1', fileSizeBytes: BigInt(4567890123) }] }] }
+    const parsed = JSON.parse(stringifyBackup(data))
+    const fsb = parsed.trainings[0].videos[0].fileSizeBytes
+    expect(typeof fsb).toBe('string')
+    expect(fsb).toBe('4567890123')
+    expect(BigInt(fsb)).toBe(BigInt(4567890123)) // restore route\'undaki coercion
+  })
+
+  it('BigInt olmayan değerleri olduğu gibi bırakır', () => {
+    const data = { n: 5, s: 'x', b: true, nil: null, arr: [1, 2] }
+    expect(JSON.parse(stringifyBackup(data))).toEqual(data)
+  })
+
+  it('null fileSizeBytes (eski yedek) korunur', () => {
+    const parsed = JSON.parse(stringifyBackup({ videos: [{ fileSizeBytes: null }] }))
+    expect(parsed.videos[0].fileSizeBytes).toBeNull()
   })
 })

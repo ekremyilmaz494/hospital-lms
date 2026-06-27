@@ -18,6 +18,22 @@ export interface EncryptResult {
 }
 
 /**
+ * Yedek verisini BigInt-GÜVENLİ JSON'a serialize eder.
+ *
+ * `JSON.stringify` BigInt'i serialize edemez ("Do not know how to serialize a BigInt").
+ * Yedek verisinde `TrainingVideo.fileSizeBytes` gibi `BigInt` alanlar bulunur; düz
+ * `JSON.stringify(backupData)` bu yüzden fırlatıp tüm yedeği başarısız kılıyordu
+ * (Devakent prod: 14.05.2026'dan beri 0 başarılı yedek). BigInt → string'e çevrilir
+ * (kayıpsız); restore tarafı `BigInt(...)` ile geri çevirir. Cron + manuel yedek
+ * BU fonksiyonu kullanmalı — `JSON.stringify`'ı doğrudan çağırmamalı.
+ */
+export function stringifyBackup(data: unknown): string {
+  return JSON.stringify(data, (_key, value) =>
+    typeof value === 'bigint' ? value.toString() : value,
+  )
+}
+
+/**
  * AES-256-GCM ile plaintext şifreler.
  *
  * GÜVENLİK (KVKK): Plaintext fallback artık NODE_ENV'e değil, AÇIK opt-in'e bağlı.
