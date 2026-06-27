@@ -1,14 +1,17 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { getOrgStorageBytes } from '@/lib/s3'
 import type { UserRole } from '@/types/database'
+
+const BYTES_PER_GB = 1024 * 1024 * 1024
 
 /**
  * GET /api/admin/subscription
  * Hastane admini kendi abonelik durumunu ve faturalarini gorur
  */
 export const GET = withAdminRoute(async ({ organizationId }) => {
-  const [subscription, org, staffCount, trainingCount] = await Promise.all([
+  const [subscription, org, staffCount, trainingCount, storageBytes] = await Promise.all([
     prisma.organizationSubscription.findUnique({
       where: { organizationId },
       include: {
@@ -30,7 +33,10 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     }),
     prisma.user.count({ where: { organizationId, role: 'staff' satisfies UserRole } }),
     prisma.training.count({ where: { organizationId } }),
+    getOrgStorageBytes(organizationId),
   ])
+
+  const storageUsedGb = Number((storageBytes / BYTES_PER_GB).toFixed(2))
 
   if (!subscription) {
     return jsonResponse({
@@ -79,6 +85,9 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       trainingCount,
       trainingLimit: plan.maxTrainings,
       trainingPercent: plan.maxTrainings ? Math.round((trainingCount / plan.maxTrainings) * 100) : 0,
+      storageUsedGb,
+      storageLimit: plan.maxStorageGb,
+      storagePercent: plan.maxStorageGb ? Math.round((storageBytes / (plan.maxStorageGb * BYTES_PER_GB)) * 100) : 0,
     },
     invoices: subscription.invoices.map(inv => ({
       id: inv.id,
@@ -88,6 +97,16 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       periodStart: inv.periodStart,
       periodEnd: inv.periodEnd,
       issuedAt: inv.issuedAt,
+    })),
+    // Ödeme yöntemi geçmişi (son 5 başarılı ödeme) — kart markası/son 4 hane
+    payments: subscription.payments.map(p => ({
+      id: p.id,
+      paidAt: p.paidAt,
+      amount: Number(p.amount),
+      currency: p.currency,
+      paymentMethod: p.paymentMethod,
+      cardBrand: p.cardBrand,
+      cardLastFour: p.cardLastFour,
     })),
     availablePlans: await prisma.subscriptionPlan.findMany({
       where: { isActive: true },

@@ -43,6 +43,7 @@ interface CategoryItem {
   value: string;
   label: string;
   icon: string;
+  color?: string | null;
   order: number;
   isDefault: boolean;
 }
@@ -89,7 +90,7 @@ export default function CategoriesPage() {
       const res = await fetch('/api/admin/training-categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: newLabel.trim(), icon: newIcon }),
+        body: JSON.stringify({ label: newLabel.trim(), icon: newIcon, color: newColor }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -489,8 +490,8 @@ function CategoryCard({
   onMove: (cat: CategoryItem, dir: 'up' | 'down') => void;
   onDelete: (cat: CategoryItem) => void;
 }) {
-  // Renk: kategori ikonuna semantik renk dağıt (sıraya göre döngüsel)
-  const accent = ICON_COLORS[index % ICON_COLORS.length];
+  // Renk önceliği: admin'in seçtiği kayıtlı renk → yoksa sıraya göre döngüsel palet
+  const accent = cat.color ?? ICON_COLORS[index % ICON_COLORS.length];
 
   return (
     <article

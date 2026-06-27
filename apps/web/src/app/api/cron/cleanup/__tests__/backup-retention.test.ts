@@ -28,6 +28,8 @@ const { prismaMock, s3Mock, cryptoMock, emailMock } = vi.hoisted(() => ({
       findMany: vi.fn().mockResolvedValue([]),
     },
     auditLog: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    organization: { findMany: vi.fn().mockResolvedValue([]) },
+    trustedDevice: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     expoPushTicket: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     certificate: { findMany: vi.fn().mockResolvedValue([]) },
     organizationSubscription: { findMany: vi.fn().mockResolvedValue([]) },
@@ -97,7 +99,7 @@ function makeOldBackup(overrides: Partial<{
 describe('Cron Cleanup — Backup Retention (verify-before-delete)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    process.env.CRON_SECRET = 'test-secret'
+    process.env.CRON_SECRET = 'test-secret' // secret-scanner-disable-line
     prismaMock.dbBackup.findMany.mockReset()
     prismaMock.dbBackup.update.mockResolvedValue({})
     // Gerçek davranışı taklit et — silinen kayıt sayısı = girdideki id sayısı.

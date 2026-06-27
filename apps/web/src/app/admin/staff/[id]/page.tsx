@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus } from 'lucide-react';
+import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download } from 'lucide-react';
 import { AssignTrainingModal } from '../assign-training-modal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useFetch } from '@/hooks/use-fetch';
@@ -217,6 +217,30 @@ export default function StaffDetailPage() {
             <Edit className="h-4 w-4" />
             <span>Düzenle</span>
           </Link>
+          <a
+            href={`/api/admin/staff/${staff.id}/export`}
+            className="sd-btn"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              height: 42,
+              padding: '0 18px',
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: 'none',
+              background: '#ffffff',
+              color: '#44403c',
+              border: '1.5px solid #c9c4be',
+              fontFamily: K.FONT_DISPLAY,
+              whiteSpace: 'nowrap',
+            }}
+            title="KVKK / GDPR — bu personelin tüm verisini JSON olarak indir"
+          >
+            <Download className="h-4 w-4" />
+            <span>KVKK Dışa Aktar</span>
+          </a>
           <button
             className="sd-btn"
             onClick={() => setAssignModalOpen(true)}

@@ -104,6 +104,14 @@ model Organization {
   smsMfaEnabled       Boolean   @default(false) @map("sms_mfa_enabled")
   smsMfaEnforcedAt    DateTime? @map("sms_mfa_enforced_at") @db.Timestamptz
 
+  // Veri saklama süreleri (KVKK) — cron/cleanup org-bazında okur (yoksa sabit default).
+  dataRetentionDays         Int     @default(365) @map("data_retention_days")
+  notificationRetentionDays Int     @default(90)  @map("notification_retention_days")
+  backupRetentionDays       Int     @default(90)  @map("backup_retention_days")
+  // IP allowlist — açıksa middleware yalnız bu CIDR/IP listesinden erişime izin verir.
+  ipAllowlistEnabled        Boolean @default(false) @map("ip_allowlist_enabled")
+  ipAllowlist               Json    @default("[]")   @map("ip_allowlist")
+
   // Centralized email (AWS SES klinovax.com) — per-org override sadece display
   // name + reply-to. Şifre/host yok; platform tek IP'den gönderir, deliverability
   // tek tek hastane SMTP'lerinden çok daha iyi.
@@ -1265,6 +1273,7 @@ model TrainingCategory {
   value          String   @db.VarChar(100)
   label          String   @db.VarChar(100)
   icon           String   @db.VarChar(30)
+  color          String?  @db.VarChar(9)
   order          Int      @default(0)
   isDefault      Boolean  @default(false) @map("is_default")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz

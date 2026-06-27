@@ -1,6 +1,7 @@
 import { z } from 'zod/v4'
 import { isValidTcKimlik, normalizeTcKimlik } from './tc'
 import { Sector } from '@/generated/prisma/enums'
+import { passwordSchema } from './password-policy'
 
 // ── Self-Service Kayıt ──
 export const selfRegisterSchema = z.object({
@@ -17,12 +18,7 @@ export const selfRegisterSchema = z.object({
   firstName: z.string().min(2, 'Ad en az 2 karakter olmalıdır').max(100, 'Ad en fazla 100 karakter olabilir'),
   lastName: z.string().min(2, 'Soyad en az 2 karakter olmalıdır').max(100, 'Soyad en fazla 100 karakter olabilir'),
   email: z.email('Geçerli bir e-posta adresi girin'),
-  password: z.string()
-    .min(8, 'Şifre en az 8 karakter olmalıdır')
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
-      'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
-    ),
+  password: passwordSchema,
 })
 
 // ── Organization ──
@@ -103,10 +99,7 @@ export const createUserSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   // Opsiyonel — boş bırakılırsa backend güvenli şifre üretir + hoş geldiniz maili ile gönderir
-  password: z.string().min(8).max(128).regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/,
-    'Şifre en az bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir'
-  ).optional(),
+  password: passwordSchema.optional(),
   role: z.enum(['admin', 'staff']),
   organizationId: z.string().uuid({ message: 'Geçersiz organizasyon kimliği' }).optional(),
   phone: z.string().max(20).optional(),
@@ -215,19 +208,12 @@ export const createStaffSchema = z.discriminatedUnion('mode', [
 
 /** Davet kabul: kullanıcı kendi şifresini kurar + KVKK onaylar */
 export const acceptInvitationSchema = z.object({
-  password: z.string()
-    .min(8, 'Şifre en az 8 karakter olmalıdır')
-    .max(128, 'Şifre en fazla 128 karakter olabilir')
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      'Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir'
-    ),
+  password: passwordSchema,
   kvkkAccepted: z.literal(true, { error: 'KVKK aydınlatma metnini onaylamanız gereklidir' }),
 }).strict()
 
-export const passwordSchema = z.string()
-  .min(8, 'Şifre en az 8 karakter olmalıdır')
-  .max(128, 'Şifre en fazla 128 karakter olabilir')
+// Merkezi parola politikası — tek doğruluk kaynağı `lib/password-policy.ts`.
+export { passwordSchema }
 
 // ── Training ──
 const trainingBaseSchema = z.object({
@@ -557,12 +543,14 @@ export const submitEvaluationSchema = z.object({
 export const createTrainingCategorySchema = z.object({
   label: z.string().min(1, 'Kategori adı zorunludur').max(30, 'Kategori adı en fazla 30 karakter olabilir'),
   icon:  z.string().min(1, 'İkon zorunludur').max(30),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Geçerli bir hex renk kodu girin').optional(),
   order: z.coerce.number().int().min(0).optional(),
 })
 
 export const updateTrainingCategorySchema = z.object({
   label: z.string().min(1).max(30).optional(),
   icon:  z.string().min(1).max(30).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Geçerli bir hex renk kodu girin').optional(),
   order: z.coerce.number().int().min(0).optional(),
 })
 

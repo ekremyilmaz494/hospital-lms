@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import {
   CreditCard, Users, GraduationCap, Calendar, CheckCircle2, AlertTriangle,
-  Clock, ArrowUpRight, TrendingUp, FileText, Zap,
+  Clock, ArrowUpRight, TrendingUp, FileText, Zap, Download,
 } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/shared/page-header';
@@ -58,6 +58,9 @@ interface UsageData {
   trainingCount: number;
   trainingLimit: number | null;
   trainingPercent: number;
+  storageUsedGb: number;
+  storageLimit: number | null;
+  storagePercent: number;
 }
 
 interface Invoice {
@@ -70,6 +73,16 @@ interface Invoice {
   issuedAt: string;
 }
 
+interface PaymentInfo {
+  id: string;
+  paidAt: string | null;
+  amount: number;
+  currency: string;
+  paymentMethod: string | null;
+  cardBrand: string | null;
+  cardLastFour: string | null;
+}
+
 interface SubscriptionResponse {
   hasSubscription: boolean;
   organization: string;
@@ -77,6 +90,7 @@ interface SubscriptionResponse {
   plan?: PlanData;
   usage?: UsageData;
   invoices?: Invoice[];
+  payments?: PaymentInfo[];
 }
 
 // ── Yardımcı bileşenler ────────────────────────────────────────────────────────
@@ -180,7 +194,8 @@ export default function SubscriptionPage() {
     );
   }
 
-  const { subscription, plan, usage, invoices } = data;
+  const { subscription, plan, usage, invoices, payments } = data;
+  const lastPayment = payments?.[0];
   const isActivePlan = subscription!.status === 'active' || subscription!.status === 'trial';
 
   return (
@@ -348,18 +363,12 @@ export default function SubscriptionPage() {
                 limit={usage!.trainingLimit}
                 label="Eğitim İçeriği"
               />
-              {plan!.maxStorageGb && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium" style={{ color: K.TEXT_SECONDARY }}>Depolama</span>
-                    <span className="text-sm font-bold" style={{ color: K.TEXT_PRIMARY }}>
-                      {plan!.maxStorageGb} GB dahil
-                    </span>
-                  </div>
-                  <div className="rounded-xl px-4 py-3 text-sm" style={{ backgroundColor: K.BG, color: K.TEXT_SECONDARY }}>
-                    Gerçek zamanlı depolama kullanımı yakında gösterilecek.
-                  </div>
-                </div>
+              {plan!.maxStorageGb != null && (
+                <UsageBar
+                  value={usage!.storageUsedGb}
+                  limit={usage!.storageLimit}
+                  label="Depolama (GB)"
+                />
               )}
             </div>
 
@@ -391,6 +400,15 @@ export default function SubscriptionPage() {
             <div className="px-6 py-4 border-b flex items-center gap-3" style={{ borderColor: K.BORDER_LIGHT }}>
               <FileText className="w-5 h-5" style={{ color: K.PRIMARY }} />
               <h3 style={{ color: K.TEXT_PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 18, fontWeight: 700 }}>Fatura Geçmişi</h3>
+              {lastPayment && (
+                <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: K.TEXT_MUTED }}>
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Son ödeme:{' '}
+                  {lastPayment.cardBrand
+                    ? `${lastPayment.cardBrand.toUpperCase()} •••• ${lastPayment.cardLastFour ?? '----'}`
+                    : (lastPayment.paymentMethod ?? 'Bilinmiyor')}
+                </span>
+              )}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -400,6 +418,7 @@ export default function SubscriptionPage() {
                     <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Dönem</th>
                     <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tarih</th>
                     <th className="px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>Tutar</th>
+                    <th className="px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: K.TEXT_MUTED }}>PDF</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -415,6 +434,19 @@ export default function SubscriptionPage() {
                       <td className="px-6 py-3.5 text-sm" style={{ color: K.TEXT_SECONDARY }}>{formatDate(inv.issuedAt)}</td>
                       <td className="px-6 py-3.5 text-sm font-bold text-right" style={{ color: K.TEXT_PRIMARY }}>
                         {formatCurrency(inv.totalAmount)}
+                      </td>
+                      <td className="px-6 py-3.5 text-right">
+                        <a
+                          href={`/api/admin/invoices/${inv.id}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-2.5 py-1.5 transition-colors"
+                          style={{ color: K.PRIMARY, backgroundColor: K.PRIMARY_LIGHT }}
+                          aria-label={`${inv.invoiceNumber} numaralı faturayı PDF indir`}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          İndir
+                        </a>
                       </td>
                     </tr>
                   ))}

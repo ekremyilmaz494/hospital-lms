@@ -31,6 +31,8 @@ const { prismaMock, s3Mock, cryptoMock, emailMock } = vi.hoisted(() => ({
       findMany: vi.fn().mockResolvedValue([]),
     },
     auditLog: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    organization: { findMany: vi.fn().mockResolvedValue([]) },
+    trustedDevice: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     expoPushTicket: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     certificate: { findMany: vi.fn().mockResolvedValue([]) },
     organizationSubscription: { findMany: vi.fn().mockResolvedValue([]) },
@@ -82,7 +84,7 @@ const OUT_KEY = 'videos/org-1/training-1/abc-uuid_720p.mp4'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  process.env.CRON_SECRET = 'test-secret'
+  process.env.CRON_SECRET = 'test-secret' // secret-scanner-disable-line
   // default no-op değerlerini geri yükle (clearAllMocks impl'i de siler)
   s3Mock.verifyS3Object.mockResolvedValue(null)
   prismaMock.trainingVideo.findMany.mockResolvedValue([])

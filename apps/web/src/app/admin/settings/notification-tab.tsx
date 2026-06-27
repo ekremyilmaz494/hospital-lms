@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail, CalendarClock, Target } from 'lucide-react';
+import { Mail, CalendarClock, Target, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -121,6 +121,20 @@ export default function NotificationTab({ settings, setSettings }: Props) {
             label: 'E-posta Bildirimleri',
             desc: 'Önemli olaylarda personele otomatik e-posta gönderilir',
             color: 'var(--k-info)',
+          },
+          {
+            key: 'notifyOnComplete' as const,
+            icon: CheckCircle2,
+            label: 'Eğitim Tamamlama Bildirimi',
+            desc: 'Personel bir eğitimi başarıyla tamamladığında yöneticiye e-posta gönderilir',
+            color: '#0d9668',
+          },
+          {
+            key: 'notifyOnFail' as const,
+            icon: AlertTriangle,
+            label: 'Sınav Başarısızlık Bildirimi',
+            desc: 'Personel bir sınavda başarısız olduğunda yöneticiye e-posta gönderilir',
+            color: '#f59e0b',
           },
         ].map((item) => (
           <div

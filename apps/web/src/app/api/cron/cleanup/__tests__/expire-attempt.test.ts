@@ -31,6 +31,8 @@ const { prismaMock, s3Mock, cryptoMock, emailMock } = vi.hoisted(() => ({
       findMany: vi.fn().mockResolvedValue([]),
     },
     auditLog: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    organization: { findMany: vi.fn().mockResolvedValue([]) },
+    trustedDevice: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     expoPushTicket: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     certificate: { findMany: vi.fn().mockResolvedValue([]) },
     organizationSubscription: { findMany: vi.fn().mockResolvedValue([]) },
@@ -81,7 +83,7 @@ function authedRequest(): Request {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  process.env.CRON_SECRET = 'test-secret'
+  process.env.CRON_SECRET = 'test-secret' // secret-scanner-disable-line
 })
 
 describe('Cron Cleanup — Stale Exam Attempt Expire (Devakent incident regression)', () => {

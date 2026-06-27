@@ -114,4 +114,23 @@ describe('resolveCategoryMeta', () => {
     expect(meta.color).toBe('#ef4444') // renk yine yerleşik markadan
     expect(meta.isOrphan).toBe(false)
   })
+
+  it('DB rengi yerleşik markayı geçersiz kılar (admin renk seçimi)', () => {
+    const db = [{ value: 'enfeksiyon', label: 'Enfeksiyon', color: '#123456' }]
+    const meta = resolveCategoryMeta('enfeksiyon', db)
+    expect(meta.color).toBe('#123456') // kayıtlı renk öncelikli
+    expect(meta.isOrphan).toBe(false)
+  })
+
+  it('özel kategori DB rengi taşıyorsa slug-hash yerine onu kullanır', () => {
+    const db = [{ value: 'kardiyoloji', label: 'Kardiyoloji', color: '#abcdef' }]
+    const meta = resolveCategoryMeta('kardiyoloji', db)
+    expect(meta.color).toBe('#abcdef')
+    expect(meta.isOrphan).toBe(false)
+  })
+
+  it('DB rengi null ise yerleşik/slug-hash rengine düşer (geriye dönük uyum)', () => {
+    const db = [{ value: 'enfeksiyon', label: 'Enfeksiyon', color: null }]
+    expect(resolveCategoryMeta('enfeksiyon', db).color).toBe('#ef4444')
+  })
 })

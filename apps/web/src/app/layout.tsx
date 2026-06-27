@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { CrispWidget } from "@/components/providers/crisp-widget";
+import { SessionTimeoutManager } from "@/components/providers/session-timeout-provider";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -122,6 +123,7 @@ export default async function RootLayout({
                 {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
                 <CookieConsent />
                 <CrispWidget />
+                <SessionTimeoutManager />
               </ErrorBoundary>
             </ToastProvider>
           </AuthProvider>

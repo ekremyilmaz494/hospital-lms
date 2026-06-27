@@ -171,31 +171,34 @@ export default function AdminSettingsPage() {
               );
             })}
 
-            {/* Save button in sidebar */}
-            <div className="pt-4 mt-4" style={{ borderTop: '1px solid var(--k-border)' }}>
-              <button
-                onClick={handleSave}
-                disabled={saving || saved}
-                className="k-btn k-btn-primary w-full justify-center"
-              >
-                {saving ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Kaydediliyor...
-                  </>
-                ) : saved ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    Kaydedildi
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Kaydet
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Save button in sidebar — E-posta sekmesi kendi "Kaydet"ine sahip olduğundan
+                orada genel Kaydet gizlenir (yanlış sekmeye basıp kaydetmedim sanma karışıklığı). */}
+            {activeTab !== 'email' && (
+              <div className="pt-4 mt-4" style={{ borderTop: '1px solid var(--k-border)' }}>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || saved}
+                  className="k-btn k-btn-primary w-full justify-center"
+                >
+                  {saving ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Kaydediliyor...
+                    </>
+                  ) : saved ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Kaydedildi
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Kaydet
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </nav>
         </BlurFade>
 
