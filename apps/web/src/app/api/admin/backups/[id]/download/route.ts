@@ -3,7 +3,8 @@ import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
-import { decryptBackup, stripSensitiveBackupFields } from '@/lib/backup-crypto'
+import { decryptBackup, stripSensitiveBackupFields, stringifyBackup } from '@/lib/backup-crypto'
+import { buildBackupSnapshot } from '@/lib/backup/snapshot'
 import { logger } from '@/lib/logger'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
@@ -53,28 +54,16 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationI
     }
   }
 
-  // Local yedek veya S3 erişimi başarısız — DB'den yeniden oluştur
-  const orgId = organizationId
-  const [users, departments, trainings, assignments, attempts, examAnswers, videoProgress, notifications, certificates] = await Promise.all([
-    prisma.user.findMany({ where: { organizationId: orgId } }),
-    prisma.department.findMany({ where: { organizationId: orgId } }),
-    prisma.training.findMany({
-      where: { organizationId: orgId },
-      include: { videos: true, questions: { include: { options: true } } },
-    }),
-    prisma.trainingAssignment.findMany({ where: { training: { organizationId: orgId } } }),
-    prisma.examAttempt.findMany({ where: { training: { organizationId: orgId } } }),
-    prisma.examAnswer.findMany({ where: { attempt: { training: { organizationId: orgId } } } }),
-    prisma.videoProgress.findMany({ where: { attempt: { training: { organizationId: orgId } } } }),
-    prisma.notification.findMany({ where: { organizationId: orgId } }),
-    prisma.certificate.findMany({ where: { training: { organizationId: orgId } } }),
-  ])
+  // Local yedek veya S3 erişimi başarısız — DB'den TEK assembler ile yeniden oluştur.
+  // includeAuthUsers: false → indirme dosyasına parola hash'i HİÇ yazılmaz (S3 yolundaki
+  // stripSensitiveBackupFields ile aynı koruma; "defense in depth"). Eskiden bu fallback
+  // organization/subscription/auditLogs/schemaVersion/organizationId alanlarını atlıyordu
+  // (restore'da sessiz veri kaybı) + BigInt video boyutunda JSON.stringify crash veriyordu;
+  // buildBackupSnapshot + stringifyBackup ikisini de düzeltir.
+  const backupData = await buildBackupSnapshot(organizationId, {
+    exportedAt: backup.createdAt,
+    includeAuthUsers: false,
+  })
 
-  const backupData = {
-    users, departments, trainings, assignments, attempts,
-    examAnswers, videoProgress, notifications, certificates,
-    exportedAt: backup.createdAt.toISOString(),
-  }
-
-  return new Response(JSON.stringify(backupData, null, 2), { headers })
+  return new Response(stringifyBackup(backupData), { headers })
 }, { strict: true, requireOrganization: true })

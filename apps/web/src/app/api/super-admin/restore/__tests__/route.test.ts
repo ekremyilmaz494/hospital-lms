@@ -24,7 +24,9 @@ const { prismaMock, s3Mock, cryptoMock, redisMock, apiHelpersMock } = vi.hoisted
     decryptBackup: vi.fn(),
   },
   redisMock: {
-    checkRateLimit: vi.fn().mockResolvedValue(true),
+    // Restore artık PEEK (getRateLimitCount) + başarıda CONSUME (incrementRateLimit) kullanır.
+    getRateLimitCount: vi.fn().mockResolvedValue(0),
+    incrementRateLimit: vi.fn().mockResolvedValue(undefined),
   },
   apiHelpersMock: {
     createAuditLog: vi.fn().mockResolvedValue(undefined),
@@ -130,7 +132,7 @@ describe('POST /api/super-admin/restore', () => {
       })
       await fn(tx)
     })
-    redisMock.checkRateLimit.mockResolvedValue(true)
+    redisMock.getRateLimitCount.mockResolvedValue(0)
   })
 
   // ─── Body validation ───
@@ -196,6 +198,7 @@ describe('POST /api/super-admin/restore', () => {
       expect(data.counts.users).toBe(1)
       expect(data.counts.hasOrganization).toBe(0) // validBackupData.organization yok
       expect(data.counts.auditLogs).toBe(0)
+      expect(data.counts.authUsers).toBe(0) // v2 backup → authUsers yok
 
       expect(prismaMock.$transaction).not.toHaveBeenCalled()
       expect(apiHelpersMock.createAuditLog).toHaveBeenCalledWith(
@@ -207,11 +210,11 @@ describe('POST /api/super-admin/restore', () => {
       )
     })
 
-    it('rate limit\'e takılmaz (preview destructive değil)', async () => {
-      redisMock.checkRateLimit.mockResolvedValue(false)
+    it('rate limit PEEK\'ine bile takılmaz (preview destructive değil)', async () => {
+      redisMock.getRateLimitCount.mockResolvedValue(5)
       const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
       expect(res.status).toBe(200)
-      expect(redisMock.checkRateLimit).not.toHaveBeenCalled()
+      expect(redisMock.getRateLimitCount).not.toHaveBeenCalled()
     })
   })
 
@@ -290,21 +293,27 @@ describe('POST /api/super-admin/restore', () => {
 
   // ─── Rate limit ───
   describe('rate limiting (confirm=true)', () => {
-    it('429: 1 restore/saat aşıldı', async () => {
-      redisMock.checkRateLimit.mockResolvedValue(false)
+    it('429: 1 restore/saat aşıldı (peek >= 1) — budget tüketilmez', async () => {
+      redisMock.getRateLimitCount.mockResolvedValue(1)
       const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
       expect(res.status).toBe(429)
       expect(prismaMock.$transaction).not.toHaveBeenCalled()
+      expect(redisMock.incrementRateLimit).not.toHaveBeenCalled()
     })
 
-    it('rate limit anahtarı kullanıcıya göre namespace\'lenir', async () => {
-      redisMock.checkRateLimit.mockResolvedValue(true)
+    it('anahtar kullanıcıya göre namespace\'lenir + budget yalnız başarılı restore\'da tüketilir', async () => {
+      redisMock.getRateLimitCount.mockResolvedValue(0)
       await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
-      expect(redisMock.checkRateLimit).toHaveBeenCalledWith(
-        expect.stringMatching(/^restore:/),
-        1,
-        3600,
-      )
+      expect(redisMock.getRateLimitCount).toHaveBeenCalledWith(expect.stringMatching(/^restore:/))
+      expect(redisMock.incrementRateLimit).toHaveBeenCalledWith(expect.stringMatching(/^restore:/), 3600)
+    })
+
+    it('restore başarısızsa (org bulunamadı) budget tüketilmez (operatör kilitlenmez)', async () => {
+      redisMock.getRateLimitCount.mockResolvedValue(0)
+      prismaMock.organization.findUnique.mockResolvedValue(null)
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(400)
+      expect(redisMock.incrementRateLimit).not.toHaveBeenCalled()
     })
   })
 
@@ -351,6 +360,61 @@ describe('POST /api/super-admin/restore', () => {
       // maxWait — pool tıkalıyken hızlı patlasın (sessizce uzun süre asılı kalmasın)
       expect(txOptions?.maxWait, 'restore tx maxWait set olmalı (connection pool guard)')
         .toBeGreaterThan(0)
+    })
+  })
+
+  // ─── v3: authUsers restore + schemaVersion guard (KRİTİK #1/#2) ───
+  describe('v3 authUsers restore + schemaVersion guard', () => {
+    it('400: schemaVersion desteklenenden büyük (ileri-sürüm yedek) → sessiz veri kaybı önlenir', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({ ...validBackupData, schemaVersion: 99 }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toMatch(/daha yeni|güncelleyin/i)
+      expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('v3 backup: authUsers varsa public.users\'tan ÖNCE tx.$executeRaw ile auth.users INSERT edilir', async () => {
+      const executeRaw = vi.fn().mockResolvedValue(1)
+      prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+        const tx = new Proxy({}, {
+          get: (_t, prop) =>
+            prop === '$executeRaw'
+              ? executeRaw
+              : new Proxy({}, { get: () => vi.fn().mockResolvedValue({ count: 0 }) }),
+        })
+        await fn(tx)
+      })
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 3,
+        authUsers: [{ id: 'user-1', email: 'a@b.com', encrypted_password: '$2a$hash' }],
+      }))
+
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect(executeRaw).toHaveBeenCalledTimes(1)
+      // INSERT hedefi auth.users + idempotent ON CONFLICT DO NOTHING olmalı (clobber yok)
+      const sql = (executeRaw.mock.calls[0][0] as string[]).join('')
+      expect(sql).toContain('auth.users')
+      expect(sql).toMatch(/ON CONFLICT \(id\) DO NOTHING/)
+    })
+
+    it('v2 backup (authUsers yok): auth.users INSERT çalışmaz', async () => {
+      const executeRaw = vi.fn().mockResolvedValue(1)
+      prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+        const tx = new Proxy({}, {
+          get: (_t, prop) =>
+            prop === '$executeRaw'
+              ? executeRaw
+              : new Proxy({}, { get: () => vi.fn().mockResolvedValue({ count: 0 }) }),
+        })
+        await fn(tx)
+      })
+      // validBackupData: authUsers yok, schemaVersion 2 → $executeRaw çağrılmamalı
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect(executeRaw).not.toHaveBeenCalled()
     })
   })
 })
