@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import crypto from 'crypto'
-import { encryptBackup, decryptBackup, maskUsersPII, stringifyBackup } from '../backup-crypto'
+import { encryptBackup, decryptBackup, maskUsersPII, stringifyBackup, stripSensitiveBackupFields } from '../backup-crypto'
 
 // 32 byte (64 hex) deterministik test anahtarı
 const TEST_KEY = 'a'.repeat(64)
@@ -222,5 +222,30 @@ describe('stringifyBackup (BigInt-güvenli yedek serialization)', () => {
   it('null fileSizeBytes (eski yedek) korunur', () => {
     const parsed = JSON.parse(stringifyBackup({ videos: [{ fileSizeBytes: null }] }))
     expect(parsed.videos[0].fileSizeBytes).toBeNull()
+  })
+})
+
+describe('stripSensitiveBackupFields (indirme parola/PII koruması)', () => {
+  it('authUsers (parola hash) çıkarılır, diğer veri korunur', () => {
+    const json = JSON.stringify({
+      users: [{ id: 'u1' }],
+      authUsers: [{ id: 'u1', encrypted_password: 'bcrypt$xyz' }],
+      schemaVersion: 3,
+    })
+    const out = JSON.parse(stripSensitiveBackupFields(json))
+    expect(out.authUsers).toBeUndefined()
+    expect(out.users).toEqual([{ id: 'u1' }])
+    expect(out.schemaVersion).toBe(3)
+  })
+
+  it('authUsers yoksa veri aynen döner', () => {
+    const json = JSON.stringify({ users: [{ id: 'u1' }] })
+    expect(JSON.parse(stripSensitiveBackupFields(json))).toEqual({ users: [{ id: 'u1' }] })
+  })
+
+  it('parse edilemeyen girdi ham veriyi SIZDIRMAZ', () => {
+    const out = stripSensitiveBackupFields('bcrypt-leak{{{NOT-JSON')
+    expect(out).not.toContain('bcrypt-leak')
+    expect(JSON.parse(out).error).toBe('backup_unreadable')
   })
 })
