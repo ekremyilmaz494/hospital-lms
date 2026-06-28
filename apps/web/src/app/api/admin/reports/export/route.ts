@@ -8,6 +8,7 @@ import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
 import type { UserRole } from '@/types/database'
+import { resolveReportFilters, type ResolvedFilters } from '../_shared'
 
 // ── Sabitler ──
 // Vercel serverless RAM guard — 5000 eğitim + 5000 personel güvenli üst sınır.
@@ -337,34 +338,27 @@ function truncate(s: string, n: number): string {
 
 // ── Data fetcher ──
 
-async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
-  const assignmentDateFilter = dateFrom || dateTo ? {
-    assignedAt: {
-      ...(dateFrom ? { gte: dateFrom } : {}),
-      ...(dateTo ? { lte: dateTo } : {}),
-    },
-  } : {}
+async function fetchReportData(filters: ResolvedFilters) {
+  const { orgId, trainingScope, userDeptFilter, assignmentDateFilter, assignmentPeriodFilter, attemptDateFilter, attemptPeriodFilter, departmentId } = filters
 
-  const attemptDateFilter = dateFrom || dateTo ? {
-    createdAt: {
-      ...(dateFrom ? { gte: dateFrom } : {}),
-      ...(dateTo ? { lte: dateTo } : {}),
-    },
-  } : {}
+  // Ekrandaki sekmelerle AYNI popülasyon: tarih + dönem birlikte, aktif eğitim scope'u,
+  // departman subtree. Bu sayede export sayıları ekrandakiyle birebir tutar.
+  const assignmentWhere = { ...assignmentDateFilter, ...assignmentPeriodFilter }
+  const activeTrainingFilter = { isActive: true, publishStatus: { not: 'archived' } as const }
 
   const [org, staffCount, totalTrainings, totalStaff, trainings, staff, departments, avgScoreResult] = await Promise.all([
     prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
-    prisma.training.count({ where: { organizationId: orgId } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true, ...userDeptFilter } }),
+    prisma.training.count({ where: trainingScope }),
+    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter } }),
     prisma.training.findMany({
-      where: { organizationId: orgId },
+      where: trainingScope,
       select: {
         id: true,
         title: true,
         examDurationMinutes: true,
         assignments: {
-          where: { ...assignmentDateFilter },
+          where: { user: { ...userDeptFilter }, ...assignmentWhere },
           select: {
             status: true,
             user: { select: { firstName: true, lastName: true, departmentRel: { select: { name: true } } } },
@@ -387,12 +381,12 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
       take: REPORT_TRAINING_CAP,
     }),
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' satisfies UserRole },
+      where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter },
       select: {
         firstName: true,
         lastName: true,
         assignments: {
-          where: { ...assignmentDateFilter },
+          where: { ...assignmentWhere, training: activeTrainingFilter },
           select: {
             status: true,
             training: { select: { title: true } },
@@ -409,14 +403,14 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
       take: REPORT_STAFF_CAP,
     }),
     prisma.department.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, ...(departmentId ? { id: departmentId } : {}) },
       select: {
         name: true,
         users: {
-          where: { role: 'staff' satisfies UserRole, isActive: true },
+          where: { role: 'staff' satisfies UserRole, isActive: true, ...userDeptFilter },
           select: {
             assignments: {
-              where: { ...assignmentDateFilter },
+              where: { ...assignmentWhere, training: activeTrainingFilter },
               select: {
                 status: true,
                 examAttempts: {
@@ -431,7 +425,7 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
       },
     }),
     prisma.examAttempt.aggregate({
-      where: { training: { organizationId: orgId }, postExamScore: { not: null }, ...attemptDateFilter },
+      where: { training: trainingScope, postExamScore: { not: null }, user: { ...userDeptFilter }, ...attemptDateFilter, ...attemptPeriodFilter },
       _avg: { postExamScore: true },
     }),
   ])
@@ -441,7 +435,10 @@ async function fetchReportData(orgId: string, dateFrom?: Date, dateTo?: Date) {
     staff: totalStaff > REPORT_STAFF_CAP ? { shown: staff.length, total: totalStaff } : null,
   }
 
-  return { org, staffCount, trainings, staff, departments, avgScoreResult, truncated }
+  // Seçili departman adı (etiket için) — departmentId verildiğinde liste tek dept döner.
+  const selectedDeptName = departmentId ? (departments[0]?.name ?? null) : null
+
+  return { org, staffCount, trainings, staff, departments, avgScoreResult, truncated, selectedDeptName }
 }
 
 // ── Rapor handler ──
@@ -453,18 +450,21 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
   const { searchParams } = new URL(request.url)
   const format = (searchParams.get('format') ?? 'xlsx') as 'pdf' | 'xlsx'
   const section = (searchParams.get('section') ?? 'overview') as ReportSection
-  const fromParam = searchParams.get('from')
-  const toParam = searchParams.get('to')
-  const dateFrom = fromParam ? new Date(fromParam) : undefined
-  const dateTo = toParam ? new Date(toParam) : undefined
 
   if (!SECTION_TITLES[section]) {
     return errorResponse('Geçersiz rapor bölümü', 400)
   }
 
+  // Ekrandaki filtrelerin AYNISI (tarih + departman + dönem) — export ekranla birebir tutsun.
+  const resolved = await resolveReportFilters(request, orgId)
+  if (resolved.error) return resolved.error
+  const filters = resolved.filters
+  const dateFrom = filters.dateFrom
+  const dateTo = filters.dateTo
+
   try {
-    const { org, staffCount, trainings, staff, departments, avgScoreResult, truncated } =
-      await fetchReportData(orgId, dateFrom, dateTo)
+    const { org, staffCount, trainings, staff, departments, avgScoreResult, truncated, selectedDeptName } =
+      await fetchReportData(filters)
 
     const orgName = org?.name ?? 'Organizasyon'
     const sectionTitle = SECTION_TITLES[section]
@@ -474,12 +474,17 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
     })
 
     // ── Filtre & uyarı etiketleri ──
-    let filterLabel: string | null = null
+    // Filtre etiketi: tarih + departman + dönem — kullanıcı neyi indirdiğini görsün,
+    // ekrandaki filtrelerle aynı kapsam olduğunu doğrulayabilsin.
+    const filterParts: string[] = []
     if (dateFrom || dateTo) {
       const f = dateFrom ? dateFrom.toLocaleDateString('tr-TR') : '…'
       const t = dateTo ? dateTo.toLocaleDateString('tr-TR') : '…'
-      filterLabel = `Filtre: ${f} – ${t}`
+      filterParts.push(`${f} – ${t}`)
     }
+    if (selectedDeptName) filterParts.push(`Departman: ${selectedDeptName}`)
+    if (filters.targetPeriod) filterParts.push(`Dönem: ${filters.targetPeriod.label}`)
+    const filterLabel: string | null = filterParts.length > 0 ? `Filtre: ${filterParts.join(' · ')}` : null
     let truncationLabel: string | null = null
     if (truncated.trainings || truncated.staff) {
       const parts: string[] = []
@@ -537,9 +542,10 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
     }).sort((a, b) => b.rate - a.rate)
 
     // Failure rows
+    // Ekrandaki Başarısızlık sekmesiyle aynı popülasyon: failed + locked.
     const failureRows = staff.flatMap(s =>
       s.assignments
-        .filter(a => a.status === 'failed')
+        .filter(a => a.status === 'failed' || a.status === 'locked')
         .map(a => ({
           name: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim(),
           dept: s.departmentRel?.name ?? '-',

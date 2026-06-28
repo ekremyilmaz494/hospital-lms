@@ -73,6 +73,17 @@ function translateAuditAction(raw: string): string {
   return `"${normalized}" işlemi gerçekleştirdi`
 }
 
+/**
+ * Uyum alarmı durumu — son teslim tarihine kalan güne göre.
+ * `overdue` = süresi geçmiş (eskiden hiç gösterilmiyordu; frontend "Süre Doldu!" render eder).
+ */
+export function complianceAlertStatus(daysLeft: number): 'overdue' | 'critical' | 'warning' | 'ok' {
+  if (daysLeft <= 0) return 'overdue'
+  if (daysLeft <= 7) return 'critical'
+  if (daysLeft <= 30) return 'warning'
+  return 'ok'
+}
+
 async function fetchStats(orgId: string) {
   const cacheKey = `dashboard:stats:${orgId}`
   const cached = await getCached<object>(cacheKey)
@@ -110,11 +121,16 @@ async function fetchStats(orgId: string) {
       _count: true,
     }),
     // Geciken eğitim: süresi dolmuş, henüz tamamlanmamış. Failed = tamamlandı (kaldı), overdue değil.
+    // Atamanın kendi dueDate override'ı ÖNCELİKLİ (örn. 2. tur yeni teslim tarihi);
+    // dueDate yoksa eğitimin endDate'ine düşer. Sadece endDate bakmak yeni turları yanlış geciken sayardı.
     prisma.trainingAssignment.count({
       where: {
         ...periodFilter,
-        training: { ...trainingScope, endDate: { lt: new Date() } },
         status: { notIn: ['passed', 'failed'] },
+        OR: [
+          { dueDate: { lt: new Date() }, training: trainingScope },
+          { dueDate: null, training: { ...trainingScope, endDate: { lt: new Date() } } },
+        ],
       },
     }),
   ])
@@ -147,8 +163,11 @@ async function fetchStats(orgId: string) {
   const complianceRate = hasCompliance ? Math.round((compulsoryCompletedCount / compulsoryAssignmentCount) * 100) : 0
   const complianceValue: number | string = hasCompliance ? `%${complianceRate}` : '—'
 
+  // Süresi GEÇMİŞ zorunlu eğitimleri de göster — eskiden `> now` ile eleniyordu, bu da
+  // tam tehlikeli (deadline geçmiş, uyum düşük) eğitimleri admin'den gizliyordu.
+  // daysLeft <= 0 → status 'overdue' (frontend "Süre Doldu!" olarak kırmızı render eder).
   const complianceAlerts = compulsoryTrainings
-    .filter(t => t.complianceDeadline && new Date(t.complianceDeadline) > now)
+    .filter(t => t.complianceDeadline)
     .map(t => {
       const daysLeft = Math.ceil((new Date(t.complianceDeadline!).getTime() - now.getTime()) / 86400000)
       const totals = compulsoryTotalsByTraining.get(t.id) ?? { total: 0, passed: 0 }
@@ -157,7 +176,7 @@ async function fetchStats(orgId: string) {
         regulatoryBody: t.regulatoryBody ?? '',
         daysLeft,
         complianceRate: totals.total > 0 ? Math.round((totals.passed / totals.total) * 100) : 0,
-        status: daysLeft <= 7 ? 'critical' : daysLeft <= 30 ? 'warning' : 'ok',
+        status: complianceAlertStatus(daysLeft),
       }
     })
     .sort((a, b) => a.daysLeft - b.daysLeft)

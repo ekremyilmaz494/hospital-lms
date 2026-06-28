@@ -3,7 +3,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS, TRAINING_CAP } from '../_shared'
-import { findActivePeriod, getPeriodById, getEffectiveStartDate } from '@/lib/training-periods'
+import { getEffectiveStartDate } from '@/lib/training-periods'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
 /**
@@ -15,19 +15,10 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
 
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
-  const { trainingScope, userDeptFilter, assignmentDateFilter, periodId: requestedPeriodId } = resolved.filters
+  // Dönem çözümü _shared'da merkezi: assignmentPeriodFilter + targetPeriod hazır gelir.
+  const { trainingScope, userDeptFilter, assignmentDateFilter, assignmentPeriodFilter, targetPeriod } = resolved.filters
 
   try {
-    // Period scope: explicit periodId varsa onu kullan, yoksa aktif period.
-    // Aktif period yoksa scope filter'ı uygulanmaz (defansif — boş rapor yerine eski davranış).
-    const targetPeriod = requestedPeriodId
-      ? await getPeriodById(requestedPeriodId, orgId).catch(() => null)
-      : await findActivePeriod(orgId)
-
-    const periodAssignmentFilter: Record<string, unknown> = targetPeriod
-      ? { periodId: targetPeriod.id }
-      : {}
-
     const [trainings, trainingCount] = await Promise.all([
       prisma.training.findMany({
         where: trainingScope,
@@ -40,7 +31,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
             where: {
               user: { ...userDeptFilter },
               ...assignmentDateFilter,
-              ...periodAssignmentFilter,
+              ...assignmentPeriodFilter,
             },
             select: {
               id: true,

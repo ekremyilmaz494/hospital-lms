@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
+import { findActivePeriod, getPeriodById } from '@/lib/training-periods'
 import { z } from 'zod/v4'
 
 const periodIdSchema = z.string().uuid()
@@ -27,6 +28,18 @@ export interface ResolvedFilters extends ReportFilters {
   attemptDateFilter: Record<string, unknown>
   userDeptFilter: Record<string, unknown>
   trainingScope: { organizationId: string; isActive: true; publishStatus: { not: 'archived' } }
+  /**
+   * Dönem (TrainingPeriod) çözümü — TÜM rapor endpoint'leri burayı kullanır ki
+   * dönem filtresi tutarlı uygulansın. `periodId` verilmemişse aktif döneme düşer;
+   * geçersiz/yabancı periodId getPeriodById ile elenip null'a düşer (tüm dönemler).
+   */
+  resolvedPeriodId: string | null
+  /** Çözülen dönem nesnesi (effectiveStartDate için startDate, export etiketi için label). */
+  targetPeriod: { id: string; startDate: Date; label: string } | null
+  /** assignment.where için: `{ periodId }` veya `{}`. */
+  assignmentPeriodFilter: Record<string, unknown>
+  /** examAttempt.where için: `{ assignment: { periodId } }` veya `{}`. */
+  attemptPeriodFilter: Record<string, unknown>
 }
 
 /**
@@ -50,17 +63,19 @@ export async function resolveReportFilters(
   const periodIdParsed = periodIdParam ? periodIdSchema.safeParse(periodIdParam) : null
   const periodId = periodIdParsed?.success ? periodIdParsed.data : undefined
 
-  let validatedDeptId: string | undefined
-  if (departmentId) {
-    const dept = await prisma.department.findFirst({
-      where: { id: departmentId, organizationId: orgId },
-      select: { id: true },
-    })
-    if (!dept) {
-      return { filters: null, error: errorResponse('Departman bulunamadı veya bu organizasyona ait değil', 403) }
-    }
-    validatedDeptId = dept.id
+  // Departman doğrulama + dönem çözümü paralel (birbirinden bağımsız sorgular).
+  const [deptRow, targetPeriod] = await Promise.all([
+    departmentId
+      ? prisma.department.findFirst({ where: { id: departmentId, organizationId: orgId }, select: { id: true } })
+      : Promise.resolve(null),
+    // periodId verilmişse org-guard'lı çek (yabancı/yok → null), yoksa aktif dönem.
+    periodId ? getPeriodById(periodId, orgId).catch(() => null) : findActivePeriod(orgId),
+  ])
+
+  if (departmentId && !deptRow) {
+    return { filters: null, error: errorResponse('Departman bulunamadı veya bu organizasyona ait değil', 403) }
   }
+  const validatedDeptId = deptRow?.id
 
   // Subtree expansion: parent dept seçildiğinde child dept'lerdeki staff'ı da kapsa.
   // Staff listesi, dashboard, wizard ile aynı semantik — raporun mantığı kopmasın.
@@ -92,6 +107,10 @@ export async function resolveReportFilters(
     },
   } : {}
 
+  const resolvedPeriodId = targetPeriod?.id ?? null
+  const assignmentPeriodFilter: Record<string, unknown> = resolvedPeriodId ? { periodId: resolvedPeriodId } : {}
+  const attemptPeriodFilter: Record<string, unknown> = resolvedPeriodId ? { assignment: { periodId: resolvedPeriodId } } : {}
+
   return {
     filters: {
       orgId,
@@ -103,6 +122,10 @@ export async function resolveReportFilters(
       attemptDateFilter,
       userDeptFilter,
       trainingScope: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
+      resolvedPeriodId,
+      targetPeriod: targetPeriod ? { id: targetPeriod.id, startDate: targetPeriod.startDate, label: targetPeriod.label } : null,
+      assignmentPeriodFilter,
+      attemptPeriodFilter,
     },
     error: null,
   }
