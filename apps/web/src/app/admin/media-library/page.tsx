@@ -34,7 +34,6 @@ interface MediaAssetItem {
   title: string;
   description: string | null;
   mediaType: 'video' | 'audio';
-  s3Key: string;
   durationSeconds: number | null;
   fileSizeBytes: number | null;
   usageCount: number;
@@ -152,7 +151,7 @@ export default function MediaLibraryPage() {
         return;
       }
       const { results } = (await res.json()) as {
-        results: Array<{ fileName: string; uploadUrl?: string; error?: string }>;
+        results: Array<{ id?: string; fileName: string; uploadUrl?: string; error?: string }>;
       };
 
       // 3) Her dosyayı presigned URL'e PUT et (progress XHR ile).
@@ -164,6 +163,15 @@ export default function MediaLibraryPage() {
             return Promise.resolve();
           }
           return new Promise<void>((resolve) => {
+            // S3 yüklemesi başarısız olursa az önce oluşturulan DB kaydını geri al
+            // (hayalet kayıt önleme): aksi halde önizlemesi boş, sihirbazda seçilirse
+            // eğitimi bozan bir kayıt kalırdı. Yeni kayıt hiçbir eğitimde kullanılmadığı
+            // için DELETE referans-kontrolünden temiz geçer (S3'te zaten dosya yok).
+            const rollback = () => {
+              if (r.id) {
+                fetch(`/api/admin/media-library/${r.id}`, { method: 'DELETE' }).catch(() => {});
+              }
+            };
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', r.uploadUrl!);
             xhr.setRequestHeader('Content-Type', meta.file.type);
@@ -180,11 +188,17 @@ export default function MediaLibraryPage() {
                 toast(`${r.fileName} yüklendi`, 'success');
               } else {
                 toast(`${r.fileName} S3'e yüklenemedi`, 'error');
+                rollback();
               }
               resolve();
             };
             xhr.onerror = () => {
               toast(`${r.fileName} yüklenemedi — bağlantı hatası`, 'error');
+              rollback();
+              resolve();
+            };
+            xhr.onabort = () => {
+              rollback();
               resolve();
             };
             xhr.send(meta.file);
