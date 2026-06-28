@@ -6,7 +6,7 @@
  * Dil: cream + ink + gold + serif display + mono caps + radial dot bg.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
@@ -95,6 +95,23 @@ export default function TrainingDetailPage() {
 
   const [reasonText, setReasonText] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
+
+  // Talep onaylanınca training fetch'i bayat 'failed' kalabilir (aktif attempt yokken cache'li,
+  // CLAUDE.md N4: no-store sadece aktif attempt varken). Bir kez taze çek (refetch `cache:'reload'`
+  // ile HTTP cache'ini de atlar) → durum 'assigned'a döner, "Haklar tükendi" bölümü kapanır ve
+  // normal "Yeniden Dene" akışı görünür. Tek-atış ref guard'ı döngüyü önler (Auth-loop kuralı #6).
+  const approvedRefetchRef = useRef(false);
+  useEffect(() => {
+    if (myRequest?.status === 'approved' && training?.status === 'failed' && !approvedRefetchRef.current) {
+      approvedRefetchRef.current = true;
+      refetch();
+    }
+    if (myRequest?.status !== 'approved') {
+      approvedRefetchRef.current = false;
+    }
+    // refetch bilinçli olarak deps'te değil (stabil useCallback; Strict Mode döngü koruması).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myRequest?.status, training?.status]);
 
   const submitAttemptRequest = async () => {
     if (!training?.id || reasonText.trim().length < 10) {
@@ -810,6 +827,34 @@ export default function TrainingDetailPage() {
 
             {/* Talep durumu / formu */}
             <div className="mt-4 w-full" style={{ maxWidth: 520 }}>
+              {myRequest?.status === 'approved' && (
+                <div
+                  className="px-3 py-2.5 text-[12px]"
+                  style={{
+                    background: '#eef5ef', color: OLIVE,
+                    border: `1px solid rgba(26, 58, 40, 0.28)`, borderRadius: 4,
+                  }}
+                >
+                  <strong className="block mb-0.5">Talebin onaylandı</strong>
+                  {myRequest.grantedAttempts != null
+                    ? `${myRequest.grantedAttempts} ek deneme hakkı verildi — yeniden deneyebilirsin.`
+                    : 'Ek deneme hakkı verildi — yeniden deneyebilirsin.'}
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                    style={{
+                      background: OLIVE, color: CREAM,
+                      border: `1px solid ${OLIVE}`, borderRadius: 2,
+                      fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                    }}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Yeniden Dene
+                  </button>
+                </div>
+              )}
+
               {myRequest?.status === 'pending' && (
                 <div
                   className="px-3 py-2.5 text-[12px]"

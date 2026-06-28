@@ -16,7 +16,11 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useFetch } from '@/hooks/use-fetch';
 import type { NavGroup } from './sidebar-config';
+
+/** Bekleyen ek-hak talepleri rozetinin bağlandığı admin alt-link. */
+const ATTEMPT_REQUESTS_HREF = '/admin/trainings/attempt-requests';
 
 /* ─── Editorial palette ───
  * Desktop sidebar is intentionally a fixed dark "masthead" (gazete mast başlığı),
@@ -45,14 +49,14 @@ function NavItemActive({ href, childHrefs, render }: {
 }
 
 /** Submenu child item */
-function ChildNavLink({ href, title, onClick }: { href: string; title: string; onClick?: () => void }) {
+function ChildNavLink({ href, title, onClick, badge }: { href: string; title: string; onClick?: () => void; badge?: number }) {
   const pathname = usePathname();
   const active = pathname === href || pathname.startsWith(href + '/');
   return (
     <Link
       href={href}
       onClick={onClick}
-      className="relative group block px-3 py-1.5 text-[12px]"
+      className="relative group flex items-center px-3 py-1.5 text-[12px]"
       style={{
         color: active ? CREAM : TEXT_DIM,
         fontWeight: active ? 600 : 400,
@@ -70,7 +74,16 @@ function ChildNavLink({ href, title, onClick }: { href: string; title: string; o
           style={{ width: 3, height: 14, backgroundColor: GOLD, borderRadius: '1px' }}
         />
       )}
-      <span className="ml-1">{title}</span>
+      <span className="ml-1 flex-1 truncate">{title}</span>
+      {badge != null && badge > 0 && (
+        <span
+          className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold tabular-nums shrink-0"
+          style={{ color: INK, backgroundColor: GOLD, borderRadius: '2px', fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+          aria-label={`${badge} bekleyen talep`}
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -102,6 +115,17 @@ export const AppSidebar = memo(function AppSidebar({
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Yöneticiye bekleyen ek-hak taleplerini bildir. Link kullanıcının nav'ında yoksa
+  // (admin değil) fetch atlanır. Badge bir "nudge" — birebir realtime gerekmez; useFetch
+  // cache'i (~60s) tekrar çağrıyı önler, hata sessizce yutulur.
+  const canSeeAttemptRequests = navGroups.some(g =>
+    g.items.some(i => i.children?.some(c => c.href === ATTEMPT_REQUESTS_HREF)),
+  );
+  const { data: pendingReqData } = useFetch<{ total: number }>(
+    canSeeAttemptRequests ? '/api/admin/attempt-requests?status=pending&limit=1' : null,
+  );
+  const pendingAttemptRequests = pendingReqData?.total ?? 0;
 
   const toggleExpand = useCallback((href: string) => {
     setExpandedItems(prev =>
@@ -215,6 +239,13 @@ export const AppSidebar = memo(function AppSidebar({
                         />
                       )}
                       <Icon className="h-[18px] w-[18px]" />
+                      {pendingAttemptRequests > 0 && item.children?.some(c => c.href === ATTEMPT_REQUESTS_HREF) && (
+                        <span
+                          aria-hidden
+                          className="absolute top-1.5 right-1.5 rounded-full"
+                          style={{ width: 7, height: 7, backgroundColor: GOLD, border: `1.5px solid ${INK}` }}
+                        />
+                      )}
                     </TooltipTrigger>
                     <TooltipContent side="right">{item.title}</TooltipContent>
                   </Tooltip>
@@ -470,7 +501,13 @@ export const AppSidebar = memo(function AppSidebar({
                                   style={{ borderLeft: `1px solid ${HAIRLINE}` }}
                                 >
                                   {item.children!.map(child => (
-                                    <ChildNavLink key={child.href} href={child.href} title={child.title} onClick={closeSidebar} />
+                                    <ChildNavLink
+                                      key={child.href}
+                                      href={child.href}
+                                      title={child.title}
+                                      onClick={closeSidebar}
+                                      badge={child.href === ATTEMPT_REQUESTS_HREF ? pendingAttemptRequests : undefined}
+                                    />
                                   ))}
                                 </div>
                               </div>

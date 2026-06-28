@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { grantAttempts, AttemptGrantError } from '@/lib/attempt-grants'
 import { z } from 'zod/v4'
 
 const reviewSchema = z.discriminatedUnion('action', [
@@ -51,28 +52,23 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
       if (req.status !== 'pending') throw new Error('ALREADY_REVIEWED')
 
       if (parsed.data.action === 'approve') {
-        // ExamAttemptRequest yalnız trainingId+userId taşır; @@unique([trainingId,userId,
-        // periodId,round]) nedeniyle aynı eğitim için birden çok atama (Yeniden Ata round'u)
-        // olabilir. orderBy'sız findFirst non-deterministik bir round seçip ek deneme hakkını
-        // YANLIŞ (eski terminal) round'a yazabilir → personel yine sınava giremez (N1 sınıfı).
-        // resolveExamFlowState ile aynı sıralama: en yeni round'u deterministik seç.
-        const assignment = await tx.trainingAssignment.findFirst({
-          where: { trainingId: req.trainingId, userId: req.userId, organizationId },
-          orderBy: [{ round: 'desc' }, { assignedAt: 'desc' }],
-          select: { id: true, maxAttempts: true, status: true },
-        })
-        if (!assignment) throw new Error('ASSIGNMENT_NOT_FOUND')
-        if (assignment.status === 'passed') throw new Error('ALREADY_PASSED')
+        // Discriminated union'ı closure'a taşımadan önce narrow'lanan değeri yakala.
+        const grantedAttempts = parsed.data.grantedAttempts
+        const reviewNote = parsed.data.note ?? null
 
-        const newMaxAttempts = assignment.maxAttempts + parsed.data.grantedAttempts
-
-        await tx.trainingAssignment.update({
-          where: { id: assignment.id },
-          data: {
-            status: 'assigned',
-            maxAttempts: newMaxAttempts,
-            completedAt: null,
+        // Ortak helper: en yeni round'u deterministik çöz (N1 koruması), state-machine ile
+        // doğrula (passed/locked reddi), maxAttempts'i artır, personele bildir. Bu talebin
+        // kendisini aşağıda 'approved' işaretliyoruz → reconcile gerekmez.
+        const grant = await grantAttempts(tx, {
+          organizationId,
+          reviewerId: dbUser.id,
+          target: { trainingId: req.trainingId, userId: req.userId },
+          computeNewMax: (a) => a.maxAttempts + grantedAttempts,
+          notify: {
+            title: 'Ek deneme talebiniz onaylandı',
+            message: (title) => `"${title}" eğitimi için ${grantedAttempts} ek deneme hakkı verildi.`,
           },
+          reconcilePendingRequest: false,
         })
 
         await tx.examAttemptRequest.update({
@@ -81,23 +77,12 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
             status: 'approved',
             reviewedById: dbUser.id,
             reviewedAt: new Date(),
-            grantedAttempts: parsed.data.grantedAttempts,
-            reviewNote: parsed.data.note ?? null,
+            grantedAttempts,
+            reviewNote,
           },
         })
 
-        await tx.notification.create({
-          data: {
-            userId: req.userId,
-            organizationId,
-            title: 'Ek deneme talebiniz onaylandı',
-            message: `"${req.training.title}" eğitimi için ${parsed.data.grantedAttempts} ek deneme hakkı verildi.`,
-            type: 'assignment',
-            relatedTrainingId: req.trainingId,
-          },
-        })
-
-        return { action: 'approved' as const, grantedAttempts: parsed.data.grantedAttempts, newMaxAttempts }
+        return { action: 'approved' as const, grantedAttempts, newMaxAttempts: grant.newMaxAttempts }
       }
 
       // reject
@@ -134,13 +119,14 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
 
     return jsonResponse({ success: true, ...result })
   } catch (err) {
+    if (err instanceof AttemptGrantError) {
+      return errorResponse(err.message, err.code === 'ASSIGNMENT_NOT_FOUND' ? 404 : 400)
+    }
     if (err instanceof Error) {
       switch (err.message) {
         case 'NOT_FOUND': return errorResponse('Talep bulunamadı', 404)
         case 'FORBIDDEN': return errorResponse('Yetkisiz erişim', 403)
         case 'ALREADY_REVIEWED': return errorResponse('Bu talep zaten değerlendirilmiş', 400)
-        case 'ASSIGNMENT_NOT_FOUND': return errorResponse('Atama bulunamadı', 404)
-        case 'ALREADY_PASSED': return errorResponse('Personel bu eğitimi zaten geçmiş', 400)
       }
     }
     logger.error('AdminAttemptRequests', 'Talep güncellenemedi', err)
