@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { prismaMock, txMock, checkRateLimitMock } = vi.hoisted(() => {
   const txMock = {
-    examAttemptRequest: { findUnique: vi.fn(), update: vi.fn().mockResolvedValue({}) },
+    examAttemptRequest: { findUnique: vi.fn(), update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     trainingAssignment: { findFirst: vi.fn(), update: vi.fn().mockResolvedValue({}) },
     notification: { create: vi.fn().mockResolvedValue({}) },
   };
@@ -82,7 +82,10 @@ beforeEach(() => {
 
 describe('Admin attempt-requests PATCH approve — ek deneme en yeni round\'a yazılır', () => {
   it('atama resolver sıralaması + organizationId ile çözülür ve hak SEÇİLEN round\'a yazılır', async () => {
-    txMock.trainingAssignment.findFirst.mockResolvedValue({ id: 'asgn-round2', maxAttempts: 3, status: 'failed' });
+    txMock.trainingAssignment.findFirst.mockResolvedValue({
+      id: 'asgn-round2', maxAttempts: 3, currentAttempt: 3, originalMaxAttempts: 3, status: 'failed',
+      userId: 'user-1', trainingId: 'tr-1', training: { title: 'Test Eğitim' }, user: { firstName: 'Ali', lastName: 'Veli' },
+    });
 
     const res = await PATCH(patchRequest({ action: 'approve', grantedAttempts: 2 }), { params: Promise.resolve({ id: 'req-1' }) });
     expect(res.status).toBe(200);
@@ -104,8 +107,11 @@ describe('Admin attempt-requests PATCH approve — ek deneme en yeni round\'a ya
     expect(updateCall.data.maxAttempts).toBe(5);
   });
 
-  it('seçilen en yeni round zaten passed → ALREADY_PASSED (400), hak yazılmaz', async () => {
-    txMock.trainingAssignment.findFirst.mockResolvedValue({ id: 'asgn-round2', maxAttempts: 3, status: 'passed' });
+  it('seçilen en yeni round zaten passed → reddedilir (400), hak yazılmaz', async () => {
+    txMock.trainingAssignment.findFirst.mockResolvedValue({
+      id: 'asgn-round2', maxAttempts: 3, currentAttempt: 3, originalMaxAttempts: 3, status: 'passed',
+      userId: 'user-1', trainingId: 'tr-1', training: { title: 'Test Eğitim' }, user: { firstName: 'Ali', lastName: 'Veli' },
+    });
 
     const res = await PATCH(patchRequest({ action: 'approve', grantedAttempts: 1 }), { params: Promise.resolve({ id: 'req-1' }) });
     expect(res.status).toBe(400);

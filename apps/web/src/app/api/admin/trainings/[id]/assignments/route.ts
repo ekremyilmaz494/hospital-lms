@@ -7,6 +7,14 @@ import { sendEmail, trainingAssignedEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { getOrCreateActivePeriodForAssignment, findActivePeriod } from '@/lib/training-periods'
+import { grantAttempts, AttemptGrantError } from '@/lib/attempt-grants'
+import { z } from 'zod/v4'
+
+/** PATCH gövdesi — yöneticinin personel sayfasından "Yeni Hak" ile verdiği ek deneme. */
+const grantAttemptsSchema = z.object({
+  userId: z.string().uuid('Geçersiz kullanıcı kimliği'),
+  additionalAttempts: z.number().int().min(1).max(10).default(1),
+})
 
 export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
   const { id } = params
@@ -351,53 +359,56 @@ async function sendAssignmentEmails(params: {
   }
 }
 
-/** PATCH — Yönetici: başarısız eğitimi yeniden aç + ek deneme hakkı ver */
-export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, organizationId, audit }) => {
+/**
+ * PATCH — Yönetici: başarısız eğitimi yeniden aç + ek deneme hakkı ver ("Yeni Hak").
+ * Ortak `grantAttempts` helper'ı: en yeni round'u deterministik çözer (N1 koruması — eski
+ * findFirst orderBy'sızdı ve yanlış round'a yazıyordu), state-machine ile doğrular
+ * (passed/locked reddi), bekleyen ek-hak talebini de 'approved' yapar (yetim talep / çift-hak
+ * önlenir).
+ */
+export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
   const { id: trainingId } = params
 
-  const body = await parseBody<{ userId: string; additionalAttempts?: number }>(request)
-  if (!body?.userId) return errorResponse('userId zorunludur')
+  const allowed = await checkRateLimit(`assignment:grant:${dbUser.id}`, 30, 60)
+  if (!allowed) return errorResponse('Çok fazla istek. Lütfen bekleyin.', 429)
 
-  const assignment = await prisma.trainingAssignment.findFirst({
-    where: { trainingId, userId: body.userId },
-    include: { training: { select: { title: true, organizationId: true } } },
-  })
+  const body = await parseBody<unknown>(request)
+  if (!body) return errorResponse('Geçersiz istek', 400)
+  const parsed = grantAttemptsSchema.safeParse(body)
+  if (!parsed.success) return errorResponse(parsed.error.issues.map(i => i.message).join(', '), 400)
+  const { userId, additionalAttempts } = parsed.data
 
-  if (!assignment) return errorResponse('Atama bulunamadı', 404)
-  if (assignment.training.organizationId !== organizationId) return errorResponse('Yetkisiz erişim', 403)
-  if (assignment.status === 'passed') return errorResponse('Bu personel zaten başarılı olmuş')
+  try {
+    const result = await prisma.$transaction((tx) =>
+      grantAttempts(tx, {
+        organizationId,
+        reviewerId: dbUser.id,
+        target: { trainingId, userId },
+        computeNewMax: (a) => a.maxAttempts + additionalAttempts,
+        notify: {
+          title: 'Eğitim Yeniden Açıldı',
+          message: (title) => `"${title}" eğitimi için ${additionalAttempts} ek deneme hakkı verildi.`,
+        },
+        reconcilePendingRequest: true,
+        grantedAttemptsForReconcile: additionalAttempts,
+      }),
+    )
 
-  const additionalAttempts = Math.min(Math.max(body.additionalAttempts ?? 1, 1), 10)
-  const newMaxAttempts = assignment.maxAttempts + additionalAttempts
+    await audit({
+      action: 'reopen_assignment',
+      entityType: 'training_assignment',
+      entityId: result.assignmentId,
+      newData: { userId, additionalAttempts, newMaxAttempts: result.newMaxAttempts },
+    })
 
-  await prisma.trainingAssignment.update({
-    where: { id: assignment.id },
-    data: {
-      status: 'assigned',
-      maxAttempts: newMaxAttempts,
-      completedAt: null,
-    },
-  })
-
-  await prisma.notification.create({
-    data: {
-      userId: body.userId,
-      organizationId: organizationId,
-      title: 'Eğitim Yeniden Açıldı',
-      message: `"${assignment.training.title}" eğitimi için ${additionalAttempts} ek deneme hakkı verildi.`,
-      type: 'assignment',
-      relatedTrainingId: trainingId,
-    },
-  })
-
-  await audit({
-    action: 'reopen_assignment',
-    entityType: 'training_assignment',
-    entityId: assignment.id,
-    newData: { userId: body.userId, additionalAttempts, newMaxAttempts },
-  })
-
-  return jsonResponse({ success: true, newMaxAttempts })
+    return jsonResponse({ success: true, newMaxAttempts: result.newMaxAttempts })
+  } catch (err) {
+    if (err instanceof AttemptGrantError) {
+      return errorResponse(err.message, err.code === 'ASSIGNMENT_NOT_FOUND' ? 404 : 400)
+    }
+    logger.error('Admin Trainings', 'Ek deneme hakkı verilemedi', err)
+    return errorResponse('İşlem sırasında hata oluştu', 500)
+  }
 }, { requireOrganization: true })
 
 /**

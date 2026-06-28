@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { Inbox, Check, X, Clock, User, GraduationCap } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import { StatusChip, type StatusChipVariant } from '@/components/shared/status-chip';
+import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 
 const K = {
   PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
@@ -48,6 +51,22 @@ interface AttemptRequest {
 
 const PAGE_LIMIT = 20;
 
+/** Atama durumu → Türkçe etiket + StatusChip varyantı (ham İngilizce enum göstermemek için). */
+const ASSIGNMENT_STATUS: Record<string, { label: string; variant: StatusChipVariant }> = {
+  assigned: { label: 'Atandı', variant: 'assigned' },
+  in_progress: { label: 'Devam ediyor', variant: 'in_progress' },
+  passed: { label: 'Başarılı', variant: 'passed' },
+  failed: { label: 'Başarısız', variant: 'failed' },
+  locked: { label: 'Kilitli', variant: 'locked' },
+};
+
+/** Talep durumu → StatusChip varyantı + etiket. */
+const REQUEST_STATUS: Record<AttemptRequest['status'], { label: string; variant: StatusChipVariant }> = {
+  pending: { label: 'Bekliyor', variant: 'warning' },
+  approved: { label: 'Onaylandı', variant: 'success' },
+  rejected: { label: 'Reddedildi', variant: 'error' },
+};
+
 export default function AttemptRequestsPage() {
   const [filter, setFilter] = useState<Filter>('pending');
   const [page, setPage] = useState(1);
@@ -59,6 +78,11 @@ export default function AttemptRequestsPage() {
     limit: number;
     totalPages: number;
   }>(`/api/admin/attempt-requests?status=${filter}&page=${page}&limit=${PAGE_LIMIT}`);
+
+  // Filtre/sayfa değişiminde tam-sayfa loader flash'ı yerine önceki listeyi koru + ince üst bar.
+  const lastDataRef = useRef<typeof data>(null);
+  if (data) lastDataRef.current = data;
+  const shownData = data ?? lastDataRef.current;
 
   // Filtre degistiginde 1. sayfaya don
   useEffect(() => { setPage(1); }, [filter]);
@@ -102,9 +126,11 @@ export default function AttemptRequestsPage() {
     }
   };
 
-  if (isLoading) return <PageLoading />;
+  // İlk yüklemede (henüz hiç veri yok) tam-sayfa loader; sonraki yüklemelerde liste korunur.
+  if (!shownData && isLoading) return <PageLoading />;
 
-  const requests = data?.items ?? [];
+  const requests = shownData?.items ?? [];
+  const refreshing = isLoading && !!shownData;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, fontFamily: K.FONT_DISPLAY }}>
@@ -150,6 +176,9 @@ export default function AttemptRequestsPage() {
         ))}
       </div>
 
+      {/* Yenileniyor — tam-sayfa loader yerine ince üst çubuk (bağlam korunur) */}
+      <div aria-hidden style={{ height: 2, borderRadius: 999, background: refreshing ? K.PRIMARY : 'transparent', opacity: refreshing ? 0.6 : 0 }} className={refreshing ? 'animate-pulse' : undefined} />
+
       {error && (
         <div style={{
           padding: 14, borderRadius: 12, background: K.ERROR_BG, color: '#7a1d14',
@@ -174,13 +203,6 @@ export default function AttemptRequestsPage() {
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {requests.map((r) => {
-            const statusBadge =
-              r.status === 'pending'
-                ? { label: 'Bekliyor', bg: K.WARNING_BG, fg: '#b45309', dot: K.WARNING }
-                : r.status === 'approved'
-                ? { label: 'Onaylandı', bg: K.SUCCESS_BG, fg: '#065f46', dot: K.SUCCESS }
-                : { label: 'Reddedildi', bg: K.ERROR_BG, fg: '#b91c1c', dot: K.ERROR };
-
             return (
               <li
                 key={r.id}
@@ -194,9 +216,13 @@ export default function AttemptRequestsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: K.TEXT_MUTED }}>
                       <User className="h-3 w-3" />
-                      <span style={{ fontWeight: 600, color: K.TEXT_SECONDARY }}>
+                      <Link
+                        href={`/admin/staff/${r.userId}`}
+                        className="hover:underline"
+                        style={{ fontWeight: 600, color: K.TEXT_SECONDARY, textDecoration: 'none' }}
+                      >
                         {r.user.firstName} {r.user.lastName}
-                      </span>
+                      </Link>
                       <span>·</span>
                       <span>{r.user.email}</span>
                       {r.user.departmentRel?.name && (
@@ -210,23 +236,24 @@ export default function AttemptRequestsPage() {
                       <GraduationCap className="h-4 w-4" style={{ color: K.PRIMARY }} />
                       {r.training.title}
                     </div>
-                    {r.assignment && (
-                      <div style={{ fontSize: 11, color: K.TEXT_MUTED }}>
-                        Mevcut: {r.assignment.currentAttempt}/{r.assignment.maxAttempts} deneme · Durum: {r.assignment.status}
-                      </div>
-                    )}
+                    {r.assignment && (() => {
+                      const a = ASSIGNMENT_STATUS[r.assignment.status] ?? {
+                        label: r.assignment.status, variant: 'neutral' as StatusChipVariant,
+                      };
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11, color: K.TEXT_MUTED }}>
+                          <span>Mevcut: {r.assignment.currentAttempt}/{r.assignment.maxAttempts} deneme</span>
+                          <StatusChip variant={a.variant} label={a.label} size="sm" />
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  <span
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px',
-                      borderRadius: 999, fontSize: 11, fontWeight: 600,
-                      background: statusBadge.bg, color: statusBadge.fg, whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusBadge.dot }} />
-                    {statusBadge.label}
-                  </span>
+                  <StatusChip
+                    variant={REQUEST_STATUS[r.status].variant}
+                    label={REQUEST_STATUS[r.status].label}
+                    size="sm"
+                  />
                 </div>
 
                 {r.reason && (
@@ -312,13 +339,13 @@ export default function AttemptRequestsPage() {
       )}
 
       {/* Sayfalama */}
-      {!isLoading && !error && (data?.totalPages ?? 0) > 1 && (
+      {!error && (shownData?.totalPages ?? 0) > 1 && (
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           marginTop: 16, paddingTop: 12, borderTop: `1px solid ${K.BORDER_LIGHT}`,
         }}>
           <span style={{ fontSize: 13, color: K.TEXT_MUTED }}>
-            {(page - 1) * PAGE_LIMIT + 1}–{Math.min(page * PAGE_LIMIT, data?.total ?? 0)} / {data?.total ?? 0}
+            {(page - 1) * PAGE_LIMIT + 1}–{Math.min(page * PAGE_LIMIT, shownData?.total ?? 0)} / {shownData?.total ?? 0}
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -336,17 +363,17 @@ export default function AttemptRequestsPage() {
               ← Önceki
             </button>
             <span style={{ fontSize: 13, color: K.TEXT_MUTED, alignSelf: 'center', padding: '0 6px' }}>
-              {page} / {data?.totalPages ?? 1}
+              {page} / {shownData?.totalPages ?? 1}
             </span>
             <button
               type="button"
-              disabled={page >= (data?.totalPages ?? 1)}
+              disabled={page >= (shownData?.totalPages ?? 1)}
               onClick={() => setPage(p => p + 1)}
               style={{
                 padding: '6px 14px', fontSize: 13, borderRadius: 8,
                 border: `1px solid ${K.BORDER}`, background: K.SURFACE,
-                color: page >= (data?.totalPages ?? 1) ? K.TEXT_MUTED : K.TEXT_PRIMARY,
-                cursor: page >= (data?.totalPages ?? 1) ? 'not-allowed' : 'pointer',
+                color: page >= (shownData?.totalPages ?? 1) ? K.TEXT_MUTED : K.TEXT_PRIMARY,
+                cursor: page >= (shownData?.totalPages ?? 1) ? 'not-allowed' : 'pointer',
                 transition: 'background-color 160ms ease, border-color 160ms ease',
               }}
             >
@@ -356,47 +383,51 @@ export default function AttemptRequestsPage() {
         </div>
       )}
 
-      {/* Review modal */}
+      {/* Review modal — PremiumModal: focus-trap + Escape + focus restore + aria-modal hazır gelir */}
       {reviewing && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !submitting && setReviewing(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 60, padding: 16,
-          }}
+        <PremiumModal
+          isOpen={!!reviewing}
+          onClose={() => !submitting && setReviewing(null)}
+          eyebrow="Ek Hak Talebi"
+          title={reviewing.mode === 'approve' ? 'Talebi onayla' : 'Talebi reddet'}
+          subtitle={`${reviewing.req.user.firstName} ${reviewing.req.user.lastName} · ${reviewing.req.training.title}`}
+          size="md"
+          disableEscape={submitting}
+          footer={
+            <PremiumModalFooter
+              actions={
+                <>
+                  <PremiumButton variant="ghost" onClick={() => setReviewing(null)} disabled={submitting}>
+                    Vazgeç
+                  </PremiumButton>
+                  <PremiumButton
+                    onClick={submitReview}
+                    loading={submitting}
+                    disabled={reviewing.mode === 'reject' && note.trim().length < 3}
+                    icon={reviewing.mode === 'approve' ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                  >
+                    {reviewing.mode === 'approve' ? `${grantedAttempts} hak ver` : 'Reddet'}
+                  </PremiumButton>
+                </>
+              }
+            />
+          }
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: 460, background: K.SURFACE,
-              borderRadius: 16, border: `1px solid ${K.BORDER}`,
-              boxShadow: K.SHADOW_CARD, padding: 24,
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: K.TEXT_PRIMARY }}>
-              {reviewing.mode === 'approve' ? 'Talebi onayla' : 'Talebi reddet'}
-            </h3>
-            <p style={{ marginTop: 8, fontSize: 13, color: K.TEXT_MUTED, lineHeight: 1.5 }}>
-              <strong style={{ color: K.TEXT_SECONDARY }}>{reviewing.req.user.firstName} {reviewing.req.user.lastName}</strong> ·
-              <strong style={{ color: K.TEXT_SECONDARY }}> {reviewing.req.training.title}</strong>
-            </p>
-
             {reviewing.mode === 'approve' && (
-              <div style={{ marginTop: 18 }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED, marginBottom: 8 }}>
+              <div>
+                <label htmlFor="granted-attempts" style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED, marginBottom: 8 }}>
                   Verilecek ek deneme sayısı
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button
                     type="button"
+                    aria-label="Azalt"
                     onClick={() => setGrantedAttempts((c) => Math.max(1, c - 1))}
                     disabled={submitting || grantedAttempts <= 1}
                     style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${K.BORDER}`, background: K.SURFACE, fontSize: 18, fontWeight: 700, cursor: 'pointer', color: K.TEXT_SECONDARY, opacity: grantedAttempts <= 1 ? 0.4 : 1 }}
                   >−</button>
                   <input
+                    id="granted-attempts"
                     type="number"
                     min={1}
                     max={10}
@@ -409,6 +440,7 @@ export default function AttemptRequestsPage() {
                   />
                   <button
                     type="button"
+                    aria-label="Artır"
                     onClick={() => setGrantedAttempts((c) => Math.min(10, c + 1))}
                     disabled={submitting || grantedAttempts >= 10}
                     style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${K.BORDER}`, background: K.SURFACE, fontSize: 18, fontWeight: 700, cursor: 'pointer', color: K.TEXT_SECONDARY, opacity: grantedAttempts >= 10 ? 0.4 : 1 }}
@@ -417,11 +449,12 @@ export default function AttemptRequestsPage() {
               </div>
             )}
 
-            <div style={{ marginTop: 18 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED, marginBottom: 8 }}>
+            <div style={{ marginTop: reviewing.mode === 'approve' ? 18 : 0 }}>
+              <label htmlFor="review-note" style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED, marginBottom: 8 }}>
                 {reviewing.mode === 'approve' ? 'Not (opsiyonel)' : 'Red gerekçesi (zorunlu)'}
               </label>
               <textarea
+                id="review-note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
@@ -436,37 +469,7 @@ export default function AttemptRequestsPage() {
               <p style={{ marginTop: 6, fontSize: 10, color: K.TEXT_MUTED }}>{note.length}/500</p>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setReviewing(null)}
-                disabled={submitting}
-                style={{ height: 38, padding: '0 16px', borderRadius: 999, border: `1px solid ${K.BORDER}`, background: K.SURFACE, fontSize: 13, fontWeight: 600, color: K.TEXT_SECONDARY, cursor: 'pointer' }}
-              >
-                Vazgeç
-              </button>
-              <button
-                type="button"
-                onClick={submitReview}
-                disabled={submitting || (reviewing.mode === 'reject' && note.trim().length < 3)}
-                style={{
-                  height: 38, padding: '0 18px', borderRadius: 999,
-                  background: reviewing.mode === 'approve' ? K.PRIMARY : K.ERROR,
-                  color: '#fff',
-                  border: `1px solid ${reviewing.mode === 'approve' ? K.PRIMARY : K.ERROR}`,
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  opacity: submitting ? 0.6 : 1,
-                }}
-              >
-                {submitting
-                  ? 'İşleniyor…'
-                  : reviewing.mode === 'approve'
-                  ? `${grantedAttempts} hak ver`
-                  : 'Reddet'}
-              </button>
-            </div>
-          </div>
-        </div>
+        </PremiumModal>
       )}
     </div>
   );
