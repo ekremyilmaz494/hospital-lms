@@ -7,6 +7,7 @@ import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 import { Field } from './field';
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc';
+import { passwordSchema } from '@/lib/password-policy';
 import type { Department } from '../_types';
 
 interface SuccessState {
@@ -45,7 +46,12 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       e.email = 'Geçerli bir e-posta girin';
     }
-    if (form.sifre.trim() && form.sifre.length < 8) e.sifre = 'Şifre en az 8 karakter olmalıdır';
+    // Şifre opsiyonel; girildiyse sunucuyla AYNI politika (passwordSchema) uygulanır —
+    // böylece zayıf şifre modaldan geçip sunucuda 500/400'e düşmez (drift önlenir).
+    if (form.sifre.trim()) {
+      const pw = passwordSchema.safeParse(form.sifre.trim());
+      if (!pw.success) e.sifre = pw.error.issues[0]?.message ?? 'Geçersiz şifre';
+    }
     if (form.telefon && !/^0\d{10}$/.test(form.telefon.replace(/\s/g, ''))) e.telefon = 'Geçerli telefon formatı: 05XX XXX XX XX';
     if (!form.departman) e.departman = 'Departman zorunludur';
     if (!form.unvan.trim()) e.unvan = 'Unvan zorunludur';
@@ -62,7 +68,11 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      // A11y: ilk hatalı alana odaklan (re-render sonrası aria-invalid set olunca)
+      setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(), 0);
+      return;
+    }
     setSaving(true);
     try {
       const tcNorm = normalizeTcKimlik(form.tc);

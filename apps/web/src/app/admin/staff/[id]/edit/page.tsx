@@ -1,29 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useId, cloneElement, isValidElement, type ReactElement } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, User, Building2, Phone, Mail, Briefcase, Check, CalendarDays } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useFetch } from '@/hooks/use-fetch';
+import { useFetch, invalidateFetchCache } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
-
-// ── Klinova palette ──
-const K = {
-  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
-  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
-  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
-  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
-  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
-  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
-  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
-  INFO: '#3b82f6', INFO_BG: '#dbeafe',
-  ACCENT: '#a855f7',
-  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
-  FONT_DISPLAY: 'var(--font-display, system-ui)',
-};
+import { K } from '../../_lib/palette';
 
 interface StaffEditData {
   id: string;
@@ -94,7 +80,11 @@ export default function EditStaffPage() {
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      // A11y: ilk hatalı alana odaklan (re-render sonrası aria-invalid set olunca)
+      setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(), 0);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/staff/${id}`, {
@@ -118,6 +108,9 @@ export default function EditStaffPage() {
       }
       setSaved(true);
       toast('Değişiklikler kaydedildi', 'success');
+      // Liste + detay client cache'ini temizle — geri dönüldüğünde useFetch'in
+      // STALE_TIME (60s) penceresinde eski veriyi servis etmesini engeller.
+      invalidateFetchCache('/api/admin/staff');
       setTimeout(() => router.push('/admin/staff'), 900);
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
@@ -624,6 +617,12 @@ function inputStyle(err?: string): React.CSSProperties {
 }
 
 // ── Field helper ──
+type FieldControlProps = {
+  id?: string;
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
+};
+
 function Field({
   label, icon, error, hint, children,
 }: {
@@ -633,9 +632,24 @@ function Field({
   hint?: string;
   children: React.ReactNode;
 }) {
+  const autoId = useId();
+  const childEl = isValidElement(children) ? (children as ReactElement<FieldControlProps>) : null;
+  const controlId = childEl?.props.id ?? autoId;
+  const errorId = `${autoId}-error`;
+  const hintId = `${autoId}-hint`;
+  const describedBy = error ? errorId : hint ? hintId : undefined;
+
+  const control = childEl
+    ? cloneElement(childEl, {
+        id: controlId,
+        'aria-invalid': error ? true : childEl.props['aria-invalid'],
+        'aria-describedby': describedBy ?? childEl.props['aria-describedby'],
+      })
+    : children;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <Label style={{
+      <Label htmlFor={controlId} style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
@@ -649,11 +663,11 @@ function Field({
         {icon && <span style={{ color: K.TEXT_MUTED, display: 'inline-flex' }}>{icon}</span>}
         {label}
       </Label>
-      {children}
+      {control}
       {error ? (
-        <p style={{ fontSize: 11, color: K.ERROR, margin: 0, fontWeight: 500 }}>{error}</p>
+        <p id={errorId} role="alert" style={{ fontSize: 11, color: K.ERROR, margin: 0, fontWeight: 500 }}>{error}</p>
       ) : hint ? (
-        <p style={{ fontSize: 11, color: K.TEXT_MUTED, margin: 0, fontStyle: 'italic' }}>{hint}</p>
+        <p id={hintId} style={{ fontSize: 11, color: K.TEXT_MUTED, margin: 0, fontStyle: 'italic' }}>{hint}</p>
       ) : null}
     </div>
   );

@@ -5,21 +5,7 @@ import { Search, Loader2, BookOpen, Check } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
-
-// ── Klinova palette ──
-const K = {
-  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
-  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
-  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
-  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
-  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
-  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
-  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
-  INFO: '#3b82f6', INFO_BG: '#dbeafe',
-  ACCENT: '#a855f7',
-  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
-  FONT_DISPLAY: 'var(--font-display, system-ui)',
-};
+import { K } from './_lib/palette';
 
 interface Training {
   id: string;
@@ -32,18 +18,28 @@ interface TrainingsResponse {
 }
 
 interface Props {
-  staffId: string;
-  staffName: string;
+  /** Tek personel atama (geriye uyumlu). */
+  staffId?: string;
+  staffName?: string;
+  /** Toplu atama — birden çok personel. Verilirse staffId yerine bu kullanılır. */
+  userIds?: string[];
+  /** Toplu modda başlık/özet etiketi (örn. "5 personel"). */
+  targetLabel?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
 /**
- * Belirli bir personele mevcut eğitimlerden seçim yaparak atama yapar.
- * POST /api/admin/bulk-assign
+ * Bir veya birden çok personele mevcut eğitimlerden seçim yaparak atama yapar.
+ * POST /api/admin/bulk-assign (userIds dizisi).
  */
-export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, onSuccess }: Props) {
+export function AssignTrainingModal({ staffId, staffName, userIds, targetLabel, open, onOpenChange, onSuccess }: Props) {
+  const effectiveUserIds = useMemo(
+    () => (userIds && userIds.length > 0 ? userIds : (staffId ? [staffId] : [])),
+    [userIds, staffId],
+  );
+  const label = targetLabel ?? staffName ?? `${effectiveUserIds.length} personel`;
   const { toast } = useToast();
   const { data, isLoading } = useFetch<TrainingsResponse>(
     open ? '/api/admin/trainings?limit=500&publishStatus=published' : null
@@ -110,6 +106,10 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
       toast('Lütfen en az bir eğitim seçin', 'error');
       return;
     }
+    if (effectiveUserIds.length === 0) {
+      toast('Atanacak personel bulunamadı', 'error');
+      return;
+    }
 
     setAssigning(true);
     try {
@@ -118,7 +118,7 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trainingIds: selectedTrainings,
-          userIds: [staffId],
+          userIds: effectiveUserIds,
           maxAttempts: 3,
         }),
       });
@@ -128,7 +128,7 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
         throw new Error(body.error || 'Atama işlemi başarısız');
       }
 
-      toast(`${staffName} için eğitim ataması tamamlandı`, 'success');
+      toast(`${label} için eğitim ataması tamamlandı`, 'success');
       onSuccess?.();
       onOpenChange(false);
     } catch (err: unknown) {
@@ -144,7 +144,7 @@ export function AssignTrainingModal({ staffId, staffName, open, onOpenChange, on
       onClose={() => { if (!assigning) onOpenChange(false); }}
       eyebrow="Eğitim Ataması"
       title="Eğitim ata"
-      subtitle={`${staffName} için yayındaki eğitimlerden seç.`}
+      subtitle={`${label} için yayındaki eğitimlerden seç.`}
       size="lg"
       disableEscape={assigning}
       footer={

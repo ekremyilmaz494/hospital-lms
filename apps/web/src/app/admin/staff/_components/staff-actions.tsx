@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
-  MoreHorizontal, Eye, Edit, GraduationCap, Mail, Trash2, KeyRound,
+  MoreHorizontal, Eye, Edit, GraduationCap, Mail, Trash2, KeyRound, UserMinus, UserCheck,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -28,6 +28,31 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [statusChanging, setStatusChanging] = useState(false);
+
+  const isPassive = staff.status === 'Pasif';
+
+  // Doğrudan pasifleştir/aktifleştir — kırmızı "Sil" modalına girmeden (geri alınabilir işlem).
+  const handleSetActive = async (active: boolean) => {
+    setStatusChanging(true);
+    try {
+      const res = active
+        ? await fetch(`/api/admin/staff/${staff.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive: true }),
+          })
+        : await fetch(`/api/admin/staff/${staff.id}`, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'İşlem başarısız');
+      toast(active ? `${staff.name} aktifleştirildi` : `${staff.name} pasifleştirildi`, 'success');
+      onChanged();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'İşlem başarısız', 'error');
+    } finally {
+      setStatusChanging(false);
+    }
+  };
 
   const handleDelete = async (purge: boolean) => {
     setDeleting(true);
@@ -102,6 +127,25 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
             <KeyRound className="h-4 w-4" /> Şifre Sıfırla
           </DropdownMenuItem>
           <DropdownMenuSeparator style={{ background: K.BORDER_LIGHT, margin: '4px 0' }} />
+          {isPassive ? (
+            <DropdownMenuItem
+              className="gap-2"
+              disabled={statusChanging}
+              onClick={() => handleSetActive(true)}
+              style={{ borderRadius: 8, color: K.PRIMARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+            >
+              <UserCheck className="h-4 w-4" /> Aktifleştir
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              className="gap-2"
+              disabled={statusChanging}
+              onClick={() => handleSetActive(false)}
+              style={{ borderRadius: 8, color: K.TEXT_SECONDARY, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 500 }}
+            >
+              <UserMinus className="h-4 w-4" /> Pasifleştir
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             className="gap-2"
             onClick={() => setConfirmDelete(true)}
@@ -117,6 +161,7 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
         staffName={staff.name}
         open={assignTrainingOpen}
         onOpenChange={setAssignTrainingOpen}
+        onSuccess={onChanged}
       />
 
       <ResetPasswordModal

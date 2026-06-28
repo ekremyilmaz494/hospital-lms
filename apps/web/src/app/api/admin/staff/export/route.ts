@@ -4,15 +4,24 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { BRAND } from '@/lib/brand'
 import { decryptTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 import { isSyntheticEmail } from '@/lib/synthetic-email'
+import { turkishSearchIds } from '@/lib/turkish-search'
+import { buildDepartmentHierarchy, expandDepartmentSubtree } from '@/app/api/admin/reports/_shared'
 import { logger } from '@/lib/logger'
+import type { Prisma } from '@/generated/prisma/client'
+
+/** Toplu "Excel İndir" için id listesi üst sınırı (DoS koruması). */
+const EXPORT_IDS_CAP = 5000
 
 /**
  * Personel listesini "Toplu Yükleme" şablonuyla bire bir aynı sütun yapısında
  * Excel olarak dışa aktarır. İndirilen dosya doğrudan /api/admin/bulk-import'a
  * geri yüklenebilir (round-trip).
  *
- * Kapsam: kurumdaki tüm staff (aktif + pasif) — pasifler italik/gri.
- * Şifre sütunu BOŞ — hash decrypt edilemez; re-import'ta sistem geçici şifre üretir.
+ * Kapsam (query param):
+ *  - param yok → kurumdaki TÜM staff (aktif + pasif) — round-trip şablon (varsayılan)
+ *  - ?ids=a,b,c → yalnız seçili personel (tablodan toplu "Excel İndir")
+ *  - ?department=<id>[&search=][&isActive=] → filtreli/scoped export ("Bu departmanı indir")
+ *  Pasifler italik/gri. Şifre sütunu BOŞ — hash decrypt edilemez; re-import'ta sistem geçici şifre üretir.
  *
  * KVKK:
  *  - TC açık metin yazılır → her dışa aktarımda AuditLog (action=STAFF_EXPORT)
@@ -22,36 +31,58 @@ import { logger } from '@/lib/logger'
  * SENKRONİZASYON: Sütun başlıkları/sırası ŞABLONLA aynı tutulmalı.
  * Şablon: src/app/api/admin/bulk-import/template/route.ts:39
  */
-export const GET = withAdminRoute(async ({ organizationId, audit }) => {
+export const GET = withAdminRoute(async ({ request, organizationId, audit }) => {
   const orgId = organizationId
+  const { searchParams } = new URL(request.url)
+  const idsParam = searchParams.get('ids')
+  const departmentParam = searchParams.get('department')
+  const searchParam = searchParams.get('search')
+  const isActiveParam = searchParams.get('isActive')
 
-  const [staff, departments] = await Promise.all([
-    prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        title: true,
-        tcEncrypted: true,
-        isActive: true,
-        departmentRel: {
-          select: {
-            name: true,
-            parent: { select: { name: true } },
-          },
+  // Departmanlar önce: hem workbook dropdown'ları hem de departman subtree filtresi için.
+  const departments = await prisma.department.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, name: true, parentId: true, parent: { select: { name: true } } },
+    orderBy: { name: 'asc' },
+  })
+
+  // Filtre kapsamını çöz (ids öncelikli; yoksa department/search/isActive).
+  const where: Prisma.UserWhereInput = { organizationId: orgId, role: 'staff' }
+  if (idsParam) {
+    const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, EXPORT_IDS_CAP)
+    where.id = { in: ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000'] }
+  } else {
+    if (isActiveParam === 'true' || isActiveParam === 'false') where.isActive = isActiveParam === 'true'
+    if (departmentParam) {
+      const hierarchy = buildDepartmentHierarchy(departments.map(d => ({ id: d.id, parentId: d.parentId })))
+      const subtree = expandDepartmentSubtree(hierarchy, [departmentParam])
+      where.departmentId = subtree.length > 0 ? { in: subtree } : departmentParam
+    }
+    if (searchParam) {
+      where.id = { in: await turkishSearchIds('users', ['first_name', 'last_name', 'email', 'title'], searchParam, orgId) }
+    }
+  }
+
+  const staff = await prisma.user.findMany({
+    where,
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      title: true,
+      tcEncrypted: true,
+      isActive: true,
+      departmentRel: {
+        select: {
+          name: true,
+          parent: { select: { name: true } },
         },
       },
-      orderBy: [{ isActive: 'desc' }, { lastName: 'asc' }, { firstName: 'asc' }],
-    }),
-    prisma.department.findMany({
-      where: { organizationId: orgId },
-      select: { name: true, parentId: true, parent: { select: { name: true } } },
-      orderBy: { name: 'asc' },
-    }),
-  ])
+    },
+    orderBy: [{ isActive: 'desc' }, { lastName: 'asc' }, { firstName: 'asc' }],
+  })
 
   const rootDeptNames = departments.filter(d => !d.parentId).map(d => d.name)
   const altDeptLabels = departments

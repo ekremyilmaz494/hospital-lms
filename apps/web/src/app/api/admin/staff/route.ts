@@ -14,7 +14,8 @@ import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
-import { findActivePeriod, getEffectiveStartDate } from '@/lib/training-periods'
+import { UUID_RE, buildStaffOrderBy } from './_query-helpers'
+import { getPeriodById, getEffectiveStartDate } from '@/lib/training-periods'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
 import { buildDepartmentHierarchy, expandDepartmentSubtree } from '@/app/api/admin/reports/_shared'
 import {
@@ -30,8 +31,15 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { page, limit, search, skip } = safePagination(searchParams)
   const department = searchParams.get('department')
   const isActive = searchParams.get('isActive')
+  // Dönem (training period) filtresi — UUID ise o döneme scope'la; yoksa/geçersizse
+  // tüm dönemler. PeriodSelector includeAll ile "Tüm Dönemler" = periodId gönderilmez.
+  const periodIdParam = searchParams.get('periodId')
+  const requestedPeriodId = periodIdParam && UUID_RE.test(periodIdParam) ? periodIdParam : null
+  // Sunucu-taraflı sıralama (yalnız doğrudan kolonlar; bkz. buildStaffOrderBy)
+  const sortParam = searchParams.get('sort')
+  const orderParam: 'asc' | 'desc' = searchParams.get('order') === 'asc' ? 'asc' : 'desc'
 
-  const cacheKey = `cache:${orgId}:staff:${page}:${limit}:${search}:${department || ''}:${isActive || ''}`
+  const cacheKey = `cache:${orgId}:staff:${page}:${limit}:${search}:${department || ''}:${isActive || ''}:${requestedPeriodId || 'all'}:${sortParam || ''}:${orderParam}`
 
   const data = await withCache(cacheKey, 120, async () => {
     const where: Record<string, unknown> = {
@@ -47,20 +55,30 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     }
     if (isActive !== null && isActive !== undefined) where.isActive = isActive === 'true'
 
-    // Departmanları önce çek — hem hiyerarşik staffCount toplamı hem de
-    // department filter'ında descendant id'lerini çözmek için gerekli.
-    const rawDepartments = await prisma.department.findMany({
-      where: { organizationId: orgId },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        description: true,
-        parentId: true,
-        _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } },
-      },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    })
+    // Departmanları + seçili dönemi paralel çek — departmanlar hem hiyerarşik
+    // staffCount toplamı hem de department filter'ında descendant id'lerini çözmek
+    // için gerekli; dönem (requestedPeriodId UUID ise) org-guard'lı çekilir, yok/yabancı
+    // → null = tüm dönemler. Aynı dönem semantiği wave-1/wave-2'de paylaşılır.
+    const [rawDepartments, selectedPeriod] = await Promise.all([
+      prisma.department.findMany({
+        where: { organizationId: orgId },
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          description: true,
+          parentId: true,
+          _count: { select: { users: { where: { role: 'staff' satisfies UserRole, isActive: true } } } },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      requestedPeriodId ? getPeriodById(requestedPeriodId, orgId).catch(() => null) : Promise.resolve(null),
+    ])
+
+    // examAttempt → dönem ilişkisi assignment üzerinden (reports/_shared ile aynı semantik)
+    const attemptPeriodFilter: Record<string, unknown> = selectedPeriod
+      ? { assignment: { periodId: selectedPeriod.id } }
+      : {}
 
     // Departman hiyerarşisini tek pass build et — hem filter hem rollup kullanır.
     const deptHierarchy = buildDepartmentHierarchy(rawDepartments)
@@ -78,8 +96,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       }
     }
 
-    // 1. dalga — sayfa listesi + global stat'lar + aktif period paralel
-    const [staff, total, activeStaff, overallAvgAgg, activePeriod] = await Promise.all([
+    // 1. dalga — sayfa listesi + global stat'lar paralel (dönem zaten çözüldü)
+    const [staff, total, activeStaff, overallAvgAgg] = await Promise.all([
       prisma.user.findMany({
         where,
         select: {
@@ -94,24 +112,24 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
           hireDate: true,
           _count: { select: { assignments: true, examAttempts: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: buildStaffOrderBy(sortParam, orderParam),
         skip,
         take: limit,
       }),
       prisma.user.count({ where }),
       prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
-      // Tüm org için tek sayı — groupBy yerine aggregate (tek satır döner, ucuz)
+      // Tüm org için tek sayı — groupBy yerine aggregate (tek satır döner, ucuz).
+      // Seçili dönem varsa KPI ortalaması da o döneme scope'lanır (satır/KPI tutarlılığı).
       prisma.examAttempt.aggregate({
-        where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, isPassed: true },
+        where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, isPassed: true, ...attemptPeriodFilter },
         _avg: { postExamScore: true },
       }),
-      findActivePeriod(orgId),
     ])
 
     // 2. dalga — sadece bu sayfadaki userId'ler için per-user metrikler.
     // Aktif period scope'u: passed atamaları period bazlı say, effectiveStart sonrası.
     const pageUserIds = staff.map(s => s.id)
-    const periodScope: Record<string, unknown> = activePeriod ? { periodId: activePeriod.id } : {}
+    const periodScope: Record<string, unknown> = selectedPeriod ? { periodId: selectedPeriod.id } : {}
 
     const [completedAssignmentsRaw, avgScores, periodAssignedCounts] = pageUserIds.length > 0
       ? await Promise.all([
@@ -126,13 +144,13 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
           }),
           prisma.examAttempt.groupBy({
             by: ['userId'],
-            where: { userId: { in: pageUserIds }, isPassed: true },
+            where: { userId: { in: pageUserIds }, isPassed: true, ...attemptPeriodFilter },
             _avg: { postExamScore: true },
           }),
-          // Aktif period içindeki toplam atama (assignedTrainings karşılığı)
-          activePeriod
+          // Seçili dönem içindeki toplam atama (assignedTrainings karşılığı)
+          selectedPeriod
             ? prisma.trainingAssignment.findMany({
-                where: { userId: { in: pageUserIds }, periodId: activePeriod.id },
+                where: { userId: { in: pageUserIds }, periodId: selectedPeriod.id },
                 select: { userId: true, assignedAt: true },
               })
             : Promise.resolve([] as { userId: string; assignedAt: Date }[]),
@@ -142,13 +160,13 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     // Effective start filtresi
     const userById = new Map(staff.map(s => [s.id, s]))
     const completedMap = new Map<string, number>()
-    if (activePeriod) {
+    if (selectedPeriod) {
       for (const row of completedAssignmentsRaw) {
         const u = userById.get(row.userId)
         if (!u) continue
         const eff = getEffectiveStartDate(
           { hireDate: u.hireDate, createdAt: u.createdAt },
-          { startDate: activePeriod.startDate },
+          { startDate: selectedPeriod.startDate },
         )
         if (new Date(row.assignedAt) >= eff) {
           completedMap.set(row.userId, (completedMap.get(row.userId) ?? 0) + 1)
@@ -161,13 +179,13 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     }
 
     const assignedMap = new Map<string, number>()
-    if (activePeriod) {
+    if (selectedPeriod) {
       for (const row of periodAssignedCounts) {
         const u = userById.get(row.userId)
         if (!u) continue
         const eff = getEffectiveStartDate(
           { hireDate: u.hireDate, createdAt: u.createdAt },
-          { startDate: activePeriod.startDate },
+          { startDate: selectedPeriod.startDate },
         )
         if (new Date(row.assignedAt) >= eff) {
           assignedMap.set(row.userId, (assignedMap.get(row.userId) ?? 0) + 1)
@@ -215,8 +233,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       department: departments.find(d => d.id === s.departmentId)?.name || '',
       departmentId: s.departmentId,
       title: s.title || '',
-      // Aktif period varsa period scope'lu sayım, yoksa toplam atama (geri uyum)
-      assignedTrainings: activePeriod
+      // Seçili dönem varsa period scope'lu sayım, yoksa toplam atama (tüm dönemler)
+      assignedTrainings: selectedPeriod
         ? (assignedMap.get(s.id) ?? 0)
         : (s._count.assignments || 0),
       completedTrainings: completedMap.get(s.id) ?? 0,
@@ -474,8 +492,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateDashboardCache(orgId) } catch { /* cache invalidation best-effort */ }
-  try { await invalidateOrgCache(orgId, 'staff') } catch { /* cache invalidation best-effort */ }
+  try { await invalidateDashboardCache(orgId) } catch (err) { logger.warn('Admin Staff', 'dashboard cache invalidation basarisiz', err instanceof Error ? err.message : err) }
+  try { await invalidateOrgCache(orgId, 'staff') } catch (err) { logger.warn('Admin Staff', 'org cache invalidation basarisiz', err instanceof Error ? err.message : err) }
 
   // Hoş geldiniz maili — fire-and-forget, hesap oluşumunu bloklamaz.
   // Sentetik adresler için mail gönderilmez (gerçek inbox değil).

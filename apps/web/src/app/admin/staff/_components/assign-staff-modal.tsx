@@ -1,28 +1,46 @@
 'use client';
 
-import { useState } from 'react';
-import { Users, Search, UserPlus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Users, Search, UserPlus, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/components/shared/toast';
+import { useFetch } from '@/hooks/use-fetch';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
-import type { Staff } from '../_types';
+import type { StaffPageData } from '../_types';
 import { isSyntheticEmail } from '@/lib/synthetic-email';
 
-export function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved }: {
-  deptId: string; deptName: string; allStaff: Staff[]; onClose: () => void; onSaved: () => void;
+/**
+ * Bir departmana personel atama modalı.
+ *
+ * Aday listesi parent'ın SAYFALANMIŞ (≤10) listesinden DEĞİL, kendi sunucu-taraflı
+ * aramasından gelir — böylece 10'dan fazla personeli olan kurumda ve farklı
+ * departmanlardaki kişiler de bulunup atanabilir. Arama 300ms debounce'lu.
+ */
+export function AssignStaffModal({ deptId, deptName, onClose, onSaved }: {
+  deptId: string; deptName: string; onClose: () => void; onSaved: () => void;
 }) {
   const { toast } = useToast();
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  const available = allStaff.filter(s =>
-    s.departmentId !== deptId &&
-    (search === '' ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase()) ||
-      (s.department || '').toLowerCase().includes(search.toLowerCase()))
+  // Debounce — kullanıcı yazarken sunucuya 300ms'de bir git
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [searchInput]);
+
+  // Sunucu taraflı aday arama — limit=50: aramayla daraltılmış makul aday penceresi.
+  // Departman filtresi GEÇİLMEZ; başka departmandaki/departmansız kişiler de aday olsun.
+  const { data, isLoading } = useFetch<StaffPageData>(
+    `/api/admin/staff?isActive=true&limit=50${search ? `&search=${encodeURIComponent(search)}` : ''}`
   );
+
+  // Zaten bu departmanda olanlar aday değildir.
+  const available = (data?.staff ?? []).filter(s => s.departmentId !== deptId);
 
   const toggle = (id: string) => setSelected(prev => {
     const next = new Set(prev);
@@ -90,15 +108,20 @@ export function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved 
           <Search size={15} />
           <input
             placeholder="İsim veya e-posta ile ara…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             aria-label="Personel ara"
             autoFocus
           />
         </div>
 
         <div className="flex flex-col gap-1.5 max-h-80 overflow-y-auto pr-1">
-          {available.length === 0 ? (
+          {isLoading && !data ? (
+            <div className="flex flex-col items-center gap-2 py-10" style={{ color: 'var(--k-text-muted)' }}>
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <p className="text-sm">Yükleniyor…</p>
+            </div>
+          ) : available.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10" style={{ color: 'var(--k-text-muted)' }}>
               <Users className="h-7 w-7" />
               <p className="text-sm">{search ? 'Sonuç bulunamadı' : 'Eklenebilecek personel yok'}</p>
@@ -108,6 +131,8 @@ export function AssignStaffModal({ deptId, deptName, allStaff, onClose, onSaved 
             return (
               <button
                 key={s.id}
+                type="button"
+                aria-pressed={isSelected}
                 onClick={() => toggle(s.id)}
                 className="flex items-center gap-3 p-2.5 rounded-xl border transition-all text-left"
                 style={{
