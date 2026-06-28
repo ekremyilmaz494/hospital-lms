@@ -134,7 +134,7 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
       // Medya kütüphanesi lookup'ları paralel toplanır (sıralı await yerine Promise.all).
       if (videos && videos.length > 0) {
         const assetIds = videos
-          .map(v => (v as Record<string, unknown>).sourceMediaAssetId as string | undefined)
+          .map(v => v.sourceMediaAssetId)
           .filter((id): id is string => !!id)
         const assets = assetIds.length > 0
           ? await tx.mediaAsset.findMany({
@@ -159,18 +159,20 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
 
             // Kütüphaneden seçildiyse asset'in s3Key'ini PAYLAŞARAK kopyala
             // (fiziksel S3 kopyası yok) + soft geri-bağ kur.
-            const sourceMediaAssetId = (v as Record<string, unknown>).sourceMediaAssetId as string | undefined
+            const sourceMediaAssetId = v.sourceMediaAssetId
             if (sourceMediaAssetId) {
               const asset = assetMap.get(sourceMediaAssetId)
-              if (asset?.s3Key) {
-                url = asset.s3Key
-                ct = (asset.mediaType as typeof ct) || 'video'
-                duration = asset.durationSeconds || duration
-                videoTitle = videoTitle || asset.title
-              }
+              // Güvenlik (güven sınırı): asset kendi kurumunda bulunamazsa öğe
+              // ATLANIR (return null); client'ın gönderdiği url'e fallback YOK.
+              if (!asset?.s3Key) return null
+              url = asset.s3Key
+              ct = (asset.mediaType as typeof ct) || 'video'
+              duration = asset.durationSeconds || duration
+              videoTitle = videoTitle || asset.title
             }
 
-            if (!url) return null
+            // Savunma: çözümlenmemiş kütüphane sentinel'i (library://...) ASLA videoKey olmaz.
+            if (!url || url.startsWith('library://')) return null
             const defaultTitle = url.split('/').pop()?.replace(/\.[^.]+$/, '') || (ct === 'pdf' ? `Doküman ${idx + 1}` : `Video ${idx + 1}`)
             return {
               trainingId: t.id,

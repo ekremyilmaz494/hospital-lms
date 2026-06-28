@@ -255,6 +255,12 @@ const trainingVideoInputSchema = z.object({
   contentType: z.enum(['video', 'pdf', 'audio']).default('video'),
   pageCount: z.number().int().positive().optional(),
   documentKey: z.string().optional(),
+  // Medya Kütüphanesinden seçim. KRİTİK: zod v4 z.object() bilinmeyen anahtarları
+  // SİLER — bu alan şemada tanımlı olmazsa create/publish route'ları client'ın
+  // gönderdiği sourceMediaAssetId'yi HİÇ görmez; asset'ten videoKey çözümü çalışmaz
+  // ve kütüphane seçimi bozulur (ya da güvensiz client url'ine düşerdi). 2026-06-28
+  // regresyon koruması — bu alanı kaldırma (validations.test.ts ile kilitlendi).
+  sourceMediaAssetId: z.string().uuid().optional(),
 })
 
 const trainingQuestionInputSchema = z.object({
