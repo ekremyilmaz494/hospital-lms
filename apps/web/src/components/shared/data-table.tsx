@@ -9,10 +9,12 @@ import {
   getPaginationRowModel,
   useReactTable,
   type SortingState,
+  type RowSelectionState,
 } from '@tanstack/react-table';
-import React, { useState, useMemo, memo, type ReactNode } from 'react';
+import React, { useState, useMemo, useEffect, memo, type ReactNode } from 'react';
 import { useMobile } from '@/hooks/use-mobile';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -42,10 +44,31 @@ interface DataTableProps<TData, TValue> {
   pageCount?: number;
   /** Server-side pagination: current page (1-based) */
   currentPage?: number;
+  /** Server-side pagination: rows per page (limit). Doğru "X-Y arası" etiketi için gerekli;
+   *  verilmezse totalCount/pageCount'tan tahmin edilir (son sayfa dolu değilse kayar). */
+  pageSize?: number;
   /** Server-side pagination: called when page changes (1-based) */
   onPageChange?: (page: number) => void;
   /** Server-side search: called when search text changes */
   onSearchChange?: (query: string) => void;
+  /** Arama kutusunun başlangıç değeri (URL'den restore için). */
+  defaultSearch?: string;
+  /** Server-side sorting: kontrollü sorting state. Verilince tablo manualSorting moduna geçer. */
+  sorting?: SortingState;
+  /** Server-side sorting: başlık tıklanınca yeni sorting state ile çağrılır (API'ye çevir). */
+  onSortingChange?: (sorting: SortingState) => void;
+  /** Satır çoklu-seçimi: verilince başa checkbox kolonu eklenir (varsayılan kapalı). */
+  enableRowSelection?: boolean;
+  /** Seçim değişince seçili (orijinal) satırlarla çağrılır. */
+  onSelectionChange?: (rows: TData[]) => void;
+  /** Stabil satır kimliği — seçim için (örn. (s) => s.id). */
+  getRowId?: (row: TData) => string;
+  /** Değeri değişince seçim sıfırlanır — parent'ın "seçimi temizle" tetiği. */
+  selectionResetKey?: number | string;
+  /** Sayfa boyutu seçenekleri (örn. [10,25,50,100]). onPageSizeChange ile birlikte footer'da seçici gösterir. */
+  pageSizeOptions?: number[];
+  /** Sayfa boyutu değişince çağrılır (limit'i güncelle, sayfayı 1'e al). */
+  onPageSizeChange?: (size: number) => void;
 }
 
 export const DataTable = memo(function DataTable<TData, TValue>({
@@ -58,40 +81,107 @@ export const DataTable = memo(function DataTable<TData, TValue>({
   totalCount,
   pageCount: serverPageCount,
   currentPage,
+  pageSize: pageSizeProp,
   onPageChange,
   onSearchChange,
+  defaultSearch,
+  sorting: sortingProp,
+  onSortingChange,
+  enableRowSelection = false,
+  onSelectionChange,
+  getRowId,
+  selectionResetKey,
+  pageSizeOptions,
+  onPageSizeChange,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [internalSorting, setInternalSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState(defaultSearch ?? '');
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const isMobile = useMobile();
 
   const isServerPagination = onPageChange !== undefined && currentPage !== undefined;
+  // Server-side sorting: parent kontrollü sorting verdiyse manualSorting moduna geç.
+  const isServerSort = onSortingChange !== undefined;
+  const sorting = sortingProp ?? internalSorting;
 
   const stableData = useMemo(() => data, [data]);
-  const stableColumns = useMemo(() => columns, [columns]);
+  // Seçim aktifken başa checkbox kolonu enjekte et (opt-in; diğer tablolar etkilenmez).
+  const stableColumns = useMemo(() => {
+    if (!enableRowSelection) return columns;
+    const selectColumn: ColumnDef<TData, TValue> = {
+      id: 'select',
+      size: 44,
+      enableSorting: false,
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          indeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Tüm satırları seç"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Satırı seç"
+        />
+      ),
+    };
+    return [selectColumn, ...columns];
+  }, [columns, enableRowSelection]);
 
   const table = useReactTable({
     data: stableData,
     columns: stableColumns,
+    ...(getRowId ? { getRowId } : {}),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     // Server-side arama aktifken client-side filtre yapma — API zaten filtrelenmiş veri döndürüyor
     ...(isServerPagination && onSearchChange ? {} : { getFilteredRowModel: getFilteredRowModel() }),
     // Server-side pagination: tablo client-side bölmesin, API zaten sayfalamış
     ...(isServerPagination ? {} : { getPaginationRowModel: getPaginationRowModel() }),
-    onSortingChange: setSorting,
+    enableRowSelection,
+    onRowSelectionChange: setRowSelection,
+    onSortingChange: (updater) => {
+      const next = typeof updater === 'function' ? updater(sorting) : updater;
+      if (onSortingChange) onSortingChange(next);
+      else setInternalSorting(next);
+    },
     onGlobalFilterChange: setGlobalFilter,
     state: {
       sorting,
       globalFilter,
+      rowSelection,
       ...(isServerPagination ? { pagination: { pageIndex: 0, pageSize: 99999 } } : {}),
     },
+    ...(isServerSort ? { manualSorting: true } : {}),
     ...(isServerPagination ? {
       manualPagination: true,
       pageCount: serverPageCount ?? -1,
     } : {}),
     initialState: isServerPagination ? undefined : { pagination: { pageSize: 10 } },
   });
+
+  // Seçim değişince seçili orijinal satırları parent'a bildir.
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    onSelectionChange(table.getSelectedRowModel().rows.map((r) => r.original));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowSelection]);
+
+  // Sayfa değişimi / refetch (data referansı değişince) seçimi sıfırla —
+  // bayat çapraz-sayfa seçim ve toplu işlem sonrası kalıntı seçimi önler.
+  useEffect(() => {
+    if (enableRowSelection) setRowSelection({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stableData]);
+
+  // Parent "seçimi temizle" tetiği (selectionResetKey değişince).
+  useEffect(() => {
+    if (enableRowSelection) setRowSelection({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionResetKey]);
 
   return (
     <div>
@@ -221,15 +311,16 @@ export const DataTable = memo(function DataTable<TData, TValue>({
                   }}
                 >
                   {headerGroup.headers.map((header) => {
-                    const isActionsCol = header.column.id === 'actions';
+                    const isNarrowCol = header.column.id === 'actions' || header.column.id === 'select';
+                    const sortDir = header.column.getIsSorted();
                     return (
                     <TableHead
                       key={header.id}
-                      className={`text-[11px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap${isActionsCol ? ' w-px' : ''}`}
+                      className={`text-[11px] font-semibold uppercase tracking-[0.08em] whitespace-nowrap${isNarrowCol ? ' w-px' : ''}`}
                       style={{
                         color: 'var(--color-text-muted)',
                         fontFamily: 'var(--font-body)',
-                        padding: isActionsCol ? '14px 4px' : '14px 16px',
+                        padding: isNarrowCol ? '14px 4px' : '14px 16px',
                         ...(header.getSize() !== 150 ? { width: header.getSize(), minWidth: header.getSize() } : {}),
                       }}
                     >
@@ -241,10 +332,18 @@ export const DataTable = memo(function DataTable<TData, TValue>({
                               : ''
                           }
                           onClick={header.column.getToggleSortingHandler()}
+                          role={header.column.getCanSort() ? 'button' : undefined}
+                          aria-label={header.column.getCanSort()
+                            ? `${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : ''} sütununa göre sırala`
+                            : undefined}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {header.column.getCanSort() && (
-                            <ArrowUpDown className="h-3 w-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
+                            sortDir === 'asc'
+                              ? <ArrowUp className="h-3 w-3" style={{ color: 'var(--color-primary)' }} />
+                              : sortDir === 'desc'
+                                ? <ArrowDown className="h-3 w-3" style={{ color: 'var(--color-primary)' }} />
+                                : <ArrowUpDown className="h-3 w-3" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
                           )}
                         </div>
                       )}
@@ -265,14 +364,15 @@ export const DataTable = memo(function DataTable<TData, TValue>({
                   >
                     {row.getVisibleCells().map((cell) => {
                       const isActionsCell = cell.column.id === 'actions';
+                      const isNarrowCell = isActionsCell || cell.column.id === 'select';
                       return (
                       <TableCell
                         key={cell.id}
-                        className={isActionsCell ? 'w-px' : ''}
-                        onClick={isActionsCell && onRowClick ? (e) => e.stopPropagation() : undefined}
+                        className={isNarrowCell ? 'w-px' : ''}
+                        onClick={isNarrowCell && onRowClick ? (e) => e.stopPropagation() : undefined}
                         style={{
                           color: 'var(--color-text-primary)',
-                          padding: isActionsCell ? '14px 4px' : '14px 16px',
+                          padding: isNarrowCell ? '14px 4px' : '14px 16px',
                           fontSize: '14px',
                           ...(cell.column.getSize() !== 150 ? { width: cell.column.getSize(), minWidth: cell.column.getSize() } : {}),
                         }}
@@ -286,7 +386,7 @@ export const DataTable = memo(function DataTable<TData, TValue>({
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length}
+                    colSpan={stableColumns.length}
                     className="h-32 text-center"
                     style={{ color: 'var(--color-text-muted)' }}
                   >
@@ -314,7 +414,7 @@ export const DataTable = memo(function DataTable<TData, TValue>({
           ? (serverPageCount ?? 1)
           : table.getPageCount();
         const pageSize = isServerPagination
-          ? (totalRows > 0 && totalPages > 0 ? Math.ceil(totalRows / totalPages) : data.length)
+          ? (pageSizeProp ?? (totalRows > 0 && totalPages > 0 ? Math.ceil(totalRows / totalPages) : data.length))
           : table.getState().pagination.pageSize;
         const activePageIdx = isServerPagination ? srvPage - 1 : table.getState().pagination.pageIndex;
         const canPrev = isServerPagination ? srvPage > 1 : table.getCanPreviousPage();
@@ -325,25 +425,45 @@ export const DataTable = memo(function DataTable<TData, TValue>({
           else table.setPageIndex(p - 1);
         };
 
-        const rangeStart = isServerPagination
-          ? (srvPage - 1) * pageSize + 1
-          : activePageIdx * pageSize + 1;
+        // rangeEnd: server-pagination'da o sayfada GERÇEKTEN gösterilen satır sayısına
+        // dayan (son sayfa dolu değilse etiket kaymasın); totalRows ile sınırla.
+        const rangeStart = totalRows === 0
+          ? 0
+          : (isServerPagination ? (srvPage - 1) * pageSize + 1 : activePageIdx * pageSize + 1);
         const rangeEnd = isServerPagination
-          ? Math.min(srvPage * pageSize, totalRows)
+          ? Math.min(rangeStart > 0 ? rangeStart + data.length - 1 : 0, totalRows)
           : Math.min((activePageIdx + 1) * pageSize, totalRows);
 
         return (
           <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <p className="text-xs text-center md:text-left" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
-              <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-                {totalRows}
-              </span>{' '}
-              kayıttan{' '}
-              <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-                {rangeStart}-{rangeEnd}
-              </span>{' '}
-              arası
-            </p>
+            <div className="flex flex-col items-center gap-2 sm:flex-row">
+              <p className="text-xs text-center md:text-left" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                  {totalRows}
+                </span>{' '}
+                kayıttan{' '}
+                <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                  {rangeStart}-{rangeEnd}
+                </span>{' '}
+                arası
+              </p>
+              {pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && (
+                <label className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  <span>Sayfa başına</span>
+                  <select
+                    value={pageSizeProp ?? pageSize}
+                    onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                    aria-label="Sayfa başına satır sayısı"
+                    className="rounded-lg border px-2 py-1 text-xs outline-none"
+                    style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  >
+                    {pageSizeOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-1.5" role="navigation" aria-label="Sayfa gezintisi">
                 <Button

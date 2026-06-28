@@ -6,21 +6,7 @@ import { Input } from '@/components/ui/input';
 import { BRAND } from '@/lib/brand';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton, type PremiumModalStep } from '@/components/shared/premium-modal';
-
-// ── Klinova palette ──
-const K = {
-  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
-  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
-  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
-  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
-  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
-  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
-  ERROR: '#ef4444', ERROR_BG: '#fee2e2', ERROR_TEXT: '#b91c1c',
-  INFO: '#3b82f6', INFO_BG: '#dbeafe',
-  ACCENT: '#a855f7',
-  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
-  FONT_DISPLAY: 'var(--font-display, system-ui)',
-};
+import { K } from './_lib/palette';
 
 type Stage = 'idle' | 'uploading' | 'preview' | 'importing' | 'done';
 
@@ -466,7 +452,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
 
       {stage === 'preview' && preview && (
         <div className="bid-review">
-          <div className="bid-stats">
+          <div className="bid-stats" aria-live="polite">
             <StatTile label="Toplam" value={preview.total} tone="neutral" />
             <StatTile label="Geçerli" value={validCount} tone="ok" icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
             <StatTile label="Hatalı" value={errorCount} tone="err" icon={<AlertCircle className="h-3.5 w-3.5" />} />
@@ -519,26 +505,29 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                     return (
                       <tr key={idx} className={isError ? 'bid-row-err' : ''}>
                         <td className="bid-rowidx">{row.rowIndex}</td>
-                        <td><CellInput value={row.firstName} onChange={(v) => updateRow(idx, { firstName: v })} /></td>
-                        <td><CellInput value={row.lastName} onChange={(v) => updateRow(idx, { lastName: v })} /></td>
+                        <td><CellInput ariaLabel={`Ad — satır ${row.rowIndex}`} value={row.firstName} onChange={(v) => updateRow(idx, { firstName: v })} /></td>
+                        <td><CellInput ariaLabel={`Soyad — satır ${row.rowIndex}`} value={row.lastName} onChange={(v) => updateRow(idx, { lastName: v })} /></td>
                         <td>
                           <CellInput
+                            ariaLabel={`TC Kimlik No — satır ${row.rowIndex}`}
                             value={row.tcKimlik || ''}
                             onChange={(v) => updateRow(idx, { tcKimlik: v.replace(/\D/g, '').slice(0, 11) })}
                           />
                         </td>
-                        <td><CellInput value={row.email} onChange={(v) => updateRow(idx, { email: v.toLowerCase() })} /></td>
+                        <td><CellInput ariaLabel={`E-posta — satır ${row.rowIndex}`} value={row.email} onChange={(v) => updateRow(idx, { email: v.toLowerCase() })} /></td>
                         <td>
                           <PasswordCellInput
+                            ariaLabel={`Şifre — satır ${row.rowIndex}`}
                             value={row.password}
                             onChange={(v) => updateRow(idx, { password: v })}
                           />
                         </td>
-                        <td><CellInput value={row.phone} onChange={(v) => updateRow(idx, { phone: v })} /></td>
+                        <td><CellInput ariaLabel={`Telefon — satır ${row.rowIndex}`} value={row.phone} onChange={(v) => updateRow(idx, { phone: v })} /></td>
                         <td>
                           <select
                             value={row.deptId || ''}
                             onChange={(e) => updateRow(idx, { deptId: e.target.value || undefined })}
+                            aria-label={`Departman — satır ${row.rowIndex}`}
                             className={`bid-sel ${row.deptMatch === 'ambiguous' || row.deptMatch === 'none' || row.deptMatch === 'empty' ? 'bid-sel-err' : ''}`}
                           >
                             <option value="">— {row.deptName || 'Seçin'}</option>
@@ -551,11 +540,12 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                           {/* Alt departman ünvan gibi serbest metin: yazılan ad mevcut child'a uyarsa
                               ID'ye bağlanır, yoksa import sırasında parent altına yaratılır. */}
                           <CellInput
+                            ariaLabel={`Alt Departman — satır ${row.rowIndex}`}
                             value={row.subDeptName}
                             onChange={(v) => updateRow(idx, { subDeptName: v })}
                           />
                         </td>
-                        <td><CellInput value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></td>
+                        <td><CellInput ariaLabel={`Unvan — satır ${row.rowIndex}`} value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></td>
                         <td>
                           {isError ? (
                             <span className="bid-status-err" title={err}>
@@ -575,6 +565,58 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Mobil (≤767px): yatay-scroll tablo yerine satır başına yığılmış kart.
+              Masaüstü tablosuyla aynı updateRow handler'ları + aynı kontroller. */}
+          <div className="bid-mobile-rows">
+            {editedRows.map((row, idx) => {
+              const err = errorByRowIndex.get(row.rowIndex);
+              const isError = !!err;
+              return (
+                <div key={idx} className={`bid-mrow ${isError ? 'bid-row-err' : ''}`}>
+                  <div className="bid-mrow-head">
+                    <span className="bid-mrow-idx">Satır {row.rowIndex}</span>
+                    {isError ? (
+                      <span className="bid-status-err" title={err}>
+                        <AlertCircle className="h-3 w-3" /><span>{err}</span>
+                      </span>
+                    ) : (
+                      <span className="bid-status-ok"><CheckCircle2 className="h-3 w-3" /> Geçerli</span>
+                    )}
+                  </div>
+                  <div className="bid-mfield"><label>Ad *</label>
+                    <CellInput ariaLabel={`Ad — satır ${row.rowIndex}`} value={row.firstName} onChange={(v) => updateRow(idx, { firstName: v })} /></div>
+                  <div className="bid-mfield"><label>Soyad *</label>
+                    <CellInput ariaLabel={`Soyad — satır ${row.rowIndex}`} value={row.lastName} onChange={(v) => updateRow(idx, { lastName: v })} /></div>
+                  <div className="bid-mfield"><label>TC Kimlik No *</label>
+                    <CellInput ariaLabel={`TC Kimlik No — satır ${row.rowIndex}`} value={row.tcKimlik || ''} onChange={(v) => updateRow(idx, { tcKimlik: v.replace(/\D/g, '').slice(0, 11) })} /></div>
+                  <div className="bid-mfield"><label>E-posta</label>
+                    <CellInput ariaLabel={`E-posta — satır ${row.rowIndex}`} value={row.email} onChange={(v) => updateRow(idx, { email: v.toLowerCase() })} /></div>
+                  <div className="bid-mfield"><label>Şifre</label>
+                    <PasswordCellInput ariaLabel={`Şifre — satır ${row.rowIndex}`} value={row.password} onChange={(v) => updateRow(idx, { password: v })} /></div>
+                  <div className="bid-mfield"><label>Telefon</label>
+                    <CellInput ariaLabel={`Telefon — satır ${row.rowIndex}`} value={row.phone} onChange={(v) => updateRow(idx, { phone: v })} /></div>
+                  <div className="bid-mfield"><label>Departman *</label>
+                    <select
+                      value={row.deptId || ''}
+                      onChange={(e) => updateRow(idx, { deptId: e.target.value || undefined })}
+                      aria-label={`Departman — satır ${row.rowIndex}`}
+                      className={`bid-sel ${row.deptMatch === 'ambiguous' || row.deptMatch === 'none' || row.deptMatch === 'empty' ? 'bid-sel-err' : ''}`}
+                    >
+                      <option value="">— {row.deptName || 'Seçin'}</option>
+                      {departments.filter(d => !d.parentId).map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="bid-mfield"><label>Alt Departman</label>
+                    <CellInput ariaLabel={`Alt Departman — satır ${row.rowIndex}`} value={row.subDeptName} onChange={(v) => updateRow(idx, { subDeptName: v })} /></div>
+                  <div className="bid-mfield"><label>Unvan *</label>
+                    <CellInput ariaLabel={`Unvan — satır ${row.rowIndex}`} value={row.title} onChange={(v) => updateRow(idx, { title: v })} /></div>
+                </div>
+              );
+            })}
           </div>
 
           {errorCount > 0 && (
@@ -798,6 +840,45 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         .bid-warn :global(svg) { flex-shrink: 0; margin-top: 2px; color: #f59e0b; }
         .bid-warn strong { color: #78350f; }
 
+        /* Mobil kart düzeni — varsayılan gizli; ≤767px'de tablo yerine görünür. */
+        .bid-mobile-rows { display: none; flex-direction: column; gap: 12px; }
+        .bid-mrow {
+          border: 1.5px solid #c9c4be;
+          border-radius: 14px;
+          background: #ffffff;
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .bid-mrow.bid-row-err { border-color: #ef4444; background: #fef2f2; }
+        .bid-mrow-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding-bottom: 8px;
+          border-bottom: 1px dashed #e7e5e4;
+        }
+        .bid-mrow-idx {
+          font-family: var(--font-display, system-ui);
+          font-size: 12px;
+          font-weight: 700;
+          color: #44403c;
+        }
+        .bid-mfield { display: flex; flex-direction: column; gap: 4px; }
+        .bid-mfield label {
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #78716c;
+        }
+        @media (max-width: 767px) {
+          .bid-table-wrap { display: none; }
+          .bid-mobile-rows { display: flex; }
+        }
+
         .bid-table-wrap {
           border: 1.5px solid #c9c4be;
           border-radius: 14px;
@@ -966,11 +1047,12 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
   );
 }
 
-function CellInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CellInput({ value, onChange, ariaLabel }: { value: string; onChange: (v: string) => void; ariaLabel?: string }) {
   return (
     <Input
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      aria-label={ariaLabel}
       className="h-9 text-sm px-2.5"
       style={{ background: K.SURFACE, borderColor: K.BORDER_LIGHT }}
     />
@@ -982,7 +1064,7 @@ function CellInput({ value, onChange }: { value: string; onChange: (v: string) =
  * Boş bırakılırsa satır invite mode'a düşer (Mod sütunu otomatik DAVET gösterir);
  * doluysa direct mode (ŞİFRE) — backend `validateRows` 8+ karakter kontrol eder.
  */
-function PasswordCellInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PasswordCellInput({ value, onChange, ariaLabel }: { value: string; onChange: (v: string) => void; ariaLabel?: string }) {
   const [reveal, setReveal] = useState(false);
   return (
     <div className="bid-pwd-wrap">
@@ -991,6 +1073,7 @@ function PasswordCellInput({ value, onChange }: { value: string; onChange: (v: s
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Boş = otomatik"
+        aria-label={ariaLabel}
         className="h-9 text-sm pl-2.5 pr-8"
         autoComplete="new-password"
         spellCheck={false}
@@ -1001,7 +1084,6 @@ function PasswordCellInput({ value, onChange }: { value: string; onChange: (v: s
         className="bid-pwd-eye"
         aria-label={reveal ? 'Şifreyi gizle' : 'Şifreyi göster'}
         onClick={() => setReveal(r => !r)}
-        tabIndex={-1}
       >
         {reveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
       </button>

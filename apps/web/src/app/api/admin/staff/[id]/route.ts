@@ -256,8 +256,8 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateDashboardCache(orgId) } catch { /* best-effort */ }
-  try { await invalidateOrgCache(orgId, 'staff') } catch { /* best-effort */ }
+  try { await invalidateDashboardCache(orgId) } catch (err) { logger.warn('admin-staff', 'dashboard cache invalidation basarisiz', err instanceof Error ? err.message : err) }
+  try { await invalidateOrgCache(orgId, 'staff') } catch (err) { logger.warn('admin-staff', 'org cache invalidation basarisiz', err instanceof Error ? err.message : err) }
 
   return jsonResponse(staff)
 }, { requireOrganization: true })
@@ -315,8 +315,8 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
 
   revalidatePath('/admin/staff')
 
-  try { await invalidateDashboardCache(orgId) } catch { /* best-effort */ }
-  try { await invalidateOrgCache(orgId, 'staff') } catch { /* best-effort */ }
+  try { await invalidateDashboardCache(orgId) } catch (err) { logger.warn('admin-staff', 'dashboard cache invalidation basarisiz', err instanceof Error ? err.message : err) }
+  try { await invalidateOrgCache(orgId, 'staff') } catch (err) { logger.warn('admin-staff', 'org cache invalidation basarisiz', err instanceof Error ? err.message : err) }
 
   return jsonResponse({ success: true, purged: purge })
 }, { requireOrganization: true })

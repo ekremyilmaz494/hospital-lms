@@ -1,30 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download } from 'lucide-react';
+import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download, KeyRound } from 'lucide-react';
 import { AssignTrainingModal } from '../assign-training-modal';
+import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useFetch } from '@/hooks/use-fetch';
 import { isSyntheticEmail } from '@/lib/synthetic-email';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
-
-// ── Klinova palette ──
-const K = {
-  PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
-  SURFACE: '#ffffff', SURFACE_HOVER: '#f5f5f4', BG: '#fafaf9',
-  BORDER: '#c9c4be', BORDER_LIGHT: '#e7e5e4',
-  TEXT_PRIMARY: '#1c1917', TEXT_SECONDARY: '#44403c', TEXT_MUTED: '#78716c',
-  SUCCESS: '#10b981', SUCCESS_BG: '#d1fae5',
-  WARNING: '#f59e0b', WARNING_BG: '#fef3c7',
-  ERROR: '#ef4444', ERROR_BG: '#fee2e2',
-  INFO: '#3b82f6', INFO_BG: '#dbeafe',
-  ACCENT: '#a855f7',
-  SHADOW_CARD: '0 2px 4px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04)',
-  FONT_DISPLAY: 'var(--font-display, system-ui)',
-};
+import { K } from '../_lib/palette';
 
 interface StaffDetail {
   id: string;
@@ -39,7 +26,7 @@ interface StaffDetail {
 }
 
 const statusMap: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  passed:      { label: 'Başarılı',     bg: K.PRIMARY_LIGHT, text: K.PRIMARY,    dot: K.PRIMARY },
+  passed:      { label: 'Başarılı',     bg: K.PRIMARY_LIGHT, text: '#065f46',    dot: K.PRIMARY },
   failed:      { label: 'Başarısız',    bg: K.ERROR_BG,      text: '#b91c1c',    dot: K.ERROR },
   in_progress: { label: 'Devam Ediyor', bg: K.WARNING_BG,    text: '#b45309',    dot: K.WARNING },
   assigned:    { label: 'Atandı',       bg: K.INFO_BG,       text: '#1e40af',    dot: K.INFO },
@@ -53,9 +40,18 @@ export default function StaffDetailPage() {
   const { toast } = useToast();
   const { data: staff, isLoading, error, refetch } = useFetch<StaffDetail>(id ? `/api/admin/staff/${id}` : null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const [grantTarget, setGrantTarget] = useState<{ trainingId: string; title: string } | null>(null);
   const [grantCount, setGrantCount] = useState(1);
   const [granting, setGranting] = useState(false);
+
+  // Ek-deneme dialogu için Escape ile kapatma (a11y).
+  useEffect(() => {
+    if (!grantTarget) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !granting) setGrantTarget(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [grantTarget, granting]);
 
   const handleGrant = async () => {
     if (!grantTarget || !id) return;
@@ -241,6 +237,19 @@ export default function StaffDetailPage() {
             <Download className="h-4 w-4" />
             <span>KVKK Dışa Aktar</span>
           </a>
+          <button
+            className="sd-btn"
+            onClick={() => setResetOpen(true)}
+            style={{
+              background: '#ffffff',
+              color: '#44403c',
+              border: '1.5px solid #c9c4be',
+              fontFamily: K.FONT_DISPLAY,
+            }}
+          >
+            <KeyRound className="h-4 w-4" />
+            <span>Şifre Sıfırla</span>
+          </button>
           <button
             className="sd-btn"
             onClick={() => setAssignModalOpen(true)}
@@ -597,10 +606,20 @@ export default function StaffDetailPage() {
         onSuccess={refetch}
       />
 
+      <ResetPasswordModal
+        isOpen={resetOpen}
+        onClose={() => setResetOpen(false)}
+        userId={staff.id}
+        userName={staff.name}
+        userEmail={staff.email}
+        userRole="staff"
+      />
+
       {grantTarget && (
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="grant-dialog-title"
           onClick={() => !granting && setGrantTarget(null)}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
@@ -617,7 +636,7 @@ export default function StaffDetailPage() {
               fontFamily: K.FONT_DISPLAY,
             }}
           >
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: K.TEXT_PRIMARY }}>
+            <h3 id="grant-dialog-title" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: K.TEXT_PRIMARY }}>
               Ek deneme hakkı ver
             </h3>
             <p style={{ marginTop: 8, fontSize: 13, color: K.TEXT_MUTED, lineHeight: 1.5 }}>
@@ -626,7 +645,7 @@ export default function StaffDetailPage() {
             </p>
 
             <div style={{ marginTop: 20 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED, marginBottom: 8 }}>
+              <label htmlFor="grant-count" style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: K.TEXT_MUTED, marginBottom: 8 }}>
                 Ek deneme sayısı
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -642,9 +661,12 @@ export default function StaffDetailPage() {
                   }}
                 >−</button>
                 <input
+                  id="grant-count"
                   type="number"
                   min={1}
                   max={10}
+                  autoFocus
+                  aria-describedby="grant-count-hint"
                   value={grantCount}
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
@@ -669,7 +691,7 @@ export default function StaffDetailPage() {
                   }}
                 >+</button>
               </div>
-              <p style={{ marginTop: 8, fontSize: 11, color: K.TEXT_MUTED }}>
+              <p id="grant-count-hint" style={{ marginTop: 8, fontSize: 11, color: K.TEXT_MUTED }}>
                 En fazla 10 ek hak verilebilir.
               </p>
             </div>

@@ -85,14 +85,35 @@ export function PremiumModal({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // ESC + body scroll lock + ilk açılışta focus management
+  // ESC + body scroll lock + focus trap + açılışta focus + kapanışta focus geri yükleme
   useEffect(() => {
     if (!isOpen) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Açılışta odaklı elemanı sakla → kapanışta geri ver (a11y: focus body'ye düşmesin).
+    const prevFocused = document.activeElement as HTMLElement | null;
+
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !disableEscape) onCloseRef.current();
+      if (e.key === 'Escape' && !disableEscape) { onCloseRef.current(); return; }
+      // Focus trap — Tab dialog dışına çıkmasın (aria-modal tek başına trap yapmaz).
+      if (e.key === 'Tab') {
+        const root = dialogRef.current;
+        if (!root) return;
+        const nodes = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE))
+          .filter((el) => el.offsetParent !== null || el === document.activeElement);
+        if (nodes.length === 0) return;
+        const first = nodes[0];
+        const last = nodes[nodes.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (active === first || !active || !root.contains(active)) { e.preventDefault(); last.focus(); }
+        } else {
+          if (active === last || !active || !root.contains(active)) { e.preventDefault(); first.focus(); }
+        }
+      }
     };
     document.addEventListener('keydown', onKey);
 
@@ -110,6 +131,8 @@ export function PremiumModal({
     return () => {
       document.body.style.overflow = prevOverflow;
       document.removeEventListener('keydown', onKey);
+      // Focus'u tetikleyen elemana geri ver (varsa ve hâlâ DOM'da ise).
+      if (prevFocused && typeof prevFocused.focus === 'function') prevFocused.focus();
     };
   }, [isOpen, disableEscape]);
 
@@ -226,7 +249,8 @@ export function PremiumModal({
         .pm-dialog {
           position: relative;
           width: 100%;
-          max-height: calc(100vh - 2.5rem);
+          /* dvh: mobil tarayıcı çubuğu açıkken footer kadrajdan kaçmasın (100vh yanıltıcı) */
+          max-height: calc(100dvh - 2.5rem);
           display: flex;
           flex-direction: column;
           background: #fafaf7; /* warm paper */

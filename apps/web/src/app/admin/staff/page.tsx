@@ -3,13 +3,12 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PeriodSelector } from '@/components/shared/period-selector';
-import { type ColumnDef } from '@tanstack/react-table';
+import { type ColumnDef, type SortingState } from '@tanstack/react-table';
 import {
   Users, Plus, Upload, Download, MoreHorizontal, Edit,
   Building2, Trash2, UserPlus, ChevronRight, ChevronDown, X, Save, History, Award,
-  Layers,
+  Layers, GraduationCap, UserMinus,
 } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -24,9 +23,10 @@ import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/sh
 
 import { K } from './_lib/palette';
 import { DEPARTMENT_COLORS, semanticDeptColor } from './_lib/department-colors';
+import { scoreColor, progressVariant } from './_lib/score-color';
 import type { Staff, StaffPageData } from './_types';
 import { Field } from './_components/field';
-import { Kpi } from './_components/kpi';
+import { KStatCard } from '@/components/admin/k-stat-card';
 import { StaffActions } from './_components/staff-actions';
 import { NewStaffModal } from './_components/new-staff-modal';
 import { AssignStaffModal } from './_components/assign-staff-modal';
@@ -36,29 +36,65 @@ const BulkImportDialog = dynamic(
   { ssr: false }
 );
 
+const AssignTrainingModal = dynamic(
+  () => import('./assign-training-modal').then(m => ({ default: m.AssignTrainingModal })),
+  { ssr: false }
+);
+
+/** Personel durum metnini k-badge varyantına çevirir (Aktif/Pasif/Beklemede). */
+function statusVariant(status: string): 'success' | 'warning' | 'error' | 'muted' {
+  const s = status.toLocaleLowerCase('tr-TR');
+  if (s.includes('beklemede') || s.includes('davet') || s.includes('pending')) return 'warning';
+  if (s.includes('pasif') || s.includes('inactive') || s.includes('kilit') || s.includes('locked')) return 'error';
+  if (s.includes('aktif')) return 'success';
+  return 'muted';
+}
+
 export default function StaffPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeView, setActiveView] = useState<'all' | 'departments'>('departments');
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  // Görünüm durumu URL'den başlatılır → detaydan "geri" gelince aynı departman/sayfa/arama korunur.
+  const [currentPage, setCurrentPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isInteger(p) && p > 0 ? p : 1;
+  });
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
+  const [activeView, setActiveView] = useState<'all' | 'departments'>(
+    () => (searchParams.get('view') === 'all' ? 'all' : 'departments'),
+  );
+  const [selectedDept, setSelectedDept] = useState<string | null>(() => searchParams.get('dept'));
   const [periodId, setPeriodId] = useState<string | null>(searchParams.get('periodId'));
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pageSize, setPageSize] = useState(10);
+  // Toplu seçim + toplu işlem
+  const [selectedStaff, setSelectedStaff] = useState<Staff[]>([]);
+  const [selectionResetKey, setSelectionResetKey] = useState(0);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkDeactivateConfirm, setBulkDeactivateConfirm] = useState(false);
+  const [bulkDeactivating, setBulkDeactivating] = useState(false);
+  // Departman silme onayı — window.confirm yerine markalı modal (etkilenen sayıyı gösterir)
+  const [deleteDeptTarget, setDeleteDeptTarget] = useState<{ id: string; name: string; staffCount: number } | null>(null);
 
-  // periodId değişimini URL'e yansıt
+  // Görünüm durumunu (view/dept/arama/sayfa/dönem) URL'e yansıt — geri navigasyonunda
+  // bağlam korunur. Tek bir senkron effect; yalnız fark varsa router.replace yapar.
   useEffect(() => {
-    const current = searchParams.get('periodId');
-    if (periodId === current) return;
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    const params = new URLSearchParams();
+    if (activeView === 'all') params.set('view', 'all');
+    if (selectedDept) params.set('dept', selectedDept);
+    if (searchQuery) params.set('q', searchQuery);
+    if (currentPage > 1) params.set('page', String(currentPage));
     if (periodId) params.set('periodId', periodId);
-    else params.delete('periodId');
     const qs = params.toString();
+    const currentQs = searchParams.toString();
+    if (qs === currentQs) return;
     router.replace(qs ? `?${qs}` : '?', { scroll: false });
-  }, [periodId, router, searchParams]);
+  }, [activeView, selectedDept, searchQuery, currentPage, periodId, router, searchParams]);
 
+  const sortKey = sorting[0]?.id;
+  const sortOrder = sorting[0]?.desc ? 'desc' : 'asc';
   const { data, isLoading, refetch } = useFetch<StaffPageData>(
-    `/api/admin/staff?page=${currentPage}&limit=10&isActive=true${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${periodId ? `&periodId=${periodId}` : ''}`
+    `/api/admin/staff?page=${currentPage}&limit=${pageSize}&isActive=true${selectedDept ? `&department=${selectedDept}` : ''}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${periodId ? `&periodId=${periodId}` : ''}${sortKey ? `&sort=${sortKey}&order=${sortOrder}` : ''}`
   );
   // Mutasyon sonrası: in-memory cache + HTTP cache her ikisini de bypass'la
   const refreshDepartments = useCallback(() => {
@@ -75,6 +111,124 @@ export default function StaffPage() {
       setCurrentPage(1);
     }, 300);
   }, []);
+
+  // Sekme/departman/geri reset'lerinde bekleyen debounce timer'ını da iptal et;
+  // yoksa reset sonrası timer ateşlenip eski arama terimini geri uygular.
+  const resetSearch = useCallback(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    setSearchQuery('');
+  }, []);
+
+  // Son sayfadaki son kayıt silinince/pasifleşince totalPages düşebilir; currentPage'i
+  // sınırla ki aralık-dışı boş sayfada kalınmasın.
+  useEffect(() => {
+    if (data?.totalPages && currentPage > data.totalPages) {
+      setCurrentPage(data.totalPages);
+    }
+  }, [data?.totalPages, currentPage]);
+
+  // Sıralama / sayfa boyutu değişince sayfa 1'e dön (sunucu-taraflı)
+  const handleSortingChange = useCallback((s: SortingState) => {
+    setSorting(s);
+    setCurrentPage(1);
+  }, []);
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  }, []);
+
+  // Seçimi temizle (DataTable'a reset tetiği gönder + parent state'i boşalt)
+  const clearSelection = useCallback(() => {
+    setSelectedStaff([]);
+    setSelectionResetKey(k => k + 1);
+  }, []);
+
+  // Toplu pasifleştir — mevcut DELETE /[id] (soft delete) üzerinden, Promise.all
+  const handleBulkDeactivate = useCallback(async () => {
+    if (selectedStaff.length === 0) return;
+    setBulkDeactivating(true);
+    try {
+      const results = await Promise.all(
+        selectedStaff.map(s => fetch(`/api/admin/staff/${s.id}`, { method: 'DELETE' })),
+      );
+      const failed = results.filter(r => !r.ok).length;
+      const ok = results.length - failed;
+      if (ok > 0) toast(`${ok} personel pasifleştirildi`, 'success');
+      if (failed > 0) toast(`${failed} personel pasifleştirilemedi`, 'error');
+      setBulkDeactivateConfirm(false);
+      clearSelection();
+      refreshDepartments();
+    } catch {
+      toast('Bir hata oluştu', 'error');
+    } finally {
+      setBulkDeactivating(false);
+    }
+  }, [selectedStaff, toast, clearSelection, refreshDepartments]);
+
+  // Seçili personeli Excel olarak indir — export route'una id listesini geçir
+  const handleBulkExport = useCallback(() => {
+    if (selectedStaff.length === 0) return;
+    const ids = selectedStaff.map(s => s.id).join(',');
+    window.location.href = `/api/admin/staff/export?ids=${encodeURIComponent(ids)}`;
+  }, [selectedStaff]);
+
+  // Departman silme — markalı modal onayı (window.confirm yerine)
+  const handleConfirmDeleteDept = useCallback(async () => {
+    const dept = deleteDeptTarget;
+    if (!dept) return;
+    setDeletingDeptId(dept.id);
+    try {
+      const res = await fetch(`/api/admin/departments/${dept.id}`, { method: 'DELETE' });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(resData.error || 'Departman silinemedi');
+      toast('Departman silindi', 'success');
+      if (selectedDept === dept.id) { setSelectedDept(null); setCurrentPage(1); resetSearch(); }
+      setDeleteDeptTarget(null);
+      refreshDepartments();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
+    } finally {
+      setDeletingDeptId(null);
+    }
+  }, [deleteDeptTarget, selectedDept, toast, resetSearch, refreshDepartments]);
+
+  // Seçim varken görünen toplu işlem çubuğu (iki tablo görünümünde de kullanılır)
+  const bulkBar = selectedStaff.length > 0 ? (
+    <div
+      className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border p-3"
+      style={{ borderColor: 'var(--k-primary)', background: 'var(--k-primary-light)' }}
+      role="region"
+      aria-label="Toplu işlemler"
+    >
+      <span className="text-sm font-semibold" style={{ color: 'var(--k-primary)' }}>
+        {selectedStaff.length} personel seçildi
+      </span>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <button type="button" className="k-btn k-btn-ghost" onClick={() => setBulkAssignOpen(true)}>
+          <GraduationCap size={15} /> Eğitim Ata
+        </button>
+        <button type="button" className="k-btn k-btn-ghost" onClick={handleBulkExport}>
+          <Download size={15} /> Excel İndir
+        </button>
+        <button
+          type="button"
+          className="k-btn k-btn-ghost"
+          style={{ color: 'var(--k-error)', borderColor: 'var(--k-error-bg)' }}
+          onClick={() => setBulkDeactivateConfirm(true)}
+        >
+          <UserMinus size={15} /> Pasifleştir
+        </button>
+        <button
+          type="button"
+          className="k-btn k-btn-ghost"
+          onClick={clearSelection}
+          aria-label="Seçimi temizle"
+        >
+          <X size={15} />
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
@@ -127,17 +281,6 @@ export default function StaffPage() {
     () => allDepartments.filter(d => !d.parentId),
     [allDepartments]
   );
-  const staffByDeptMap = useMemo(() => {
-    const map = new Map<string, Staff[]>();
-    for (const s of allStaff) {
-      if (!s.departmentId) continue;
-      const list = map.get(s.departmentId);
-      if (list) list.push(s);
-      else map.set(s.departmentId, [s]);
-    }
-    return map;
-  }, [allStaff]);
-
   // Seçili kök departmanın rengi — null ise "Tüm Personel" tab'ı veya
   // departman seçilmemiş. Tablo cell'lerinde avatar/badge bu rengi alır
   // (kullanıcı kararı: BAŞHEKİMLİK seçince hepsi mor olsun, alt birim
@@ -181,8 +324,10 @@ export default function StaffPage() {
         const ownColor = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
         const color = selectedDeptColor ?? ownColor;
         return (
+          // Renk dot'ta + tint arka planda; metin sabit koyu (var(--k-text-secondary)) →
+          // açık hue'larda (amber/turuncu) okunabilir kalır (WCAG AA kontrast).
           <span className="k-badge k-badge-no-dot"
-                style={{ background: `${color}20`, color }}>
+                style={{ background: `${color}20`, color: 'var(--k-text-secondary)' }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
             {row.getValue('department')}
           </span>
@@ -203,15 +348,16 @@ export default function StaffPage() {
       accessorKey: 'completedTrainings',
       header: 'Eğitim',
       size: 160,
+      // Hesaplanmış kolon — sunucuda tüm-veri sıralaması yapılamaz (bkz. route buildStaffOrderBy)
+      enableSorting: false,
       cell: ({ row }) => {
         const total = row.original.assignedTrainings || 1;
         const done = Number(row.getValue('completedTrainings')) || 0;
         const pct = Math.min(100, Math.round((done / total) * 100));
-        const variant = pct > 80 ? 'success' : pct > 50 ? undefined : 'warning';
         return (
           <div className="flex items-center gap-2">
             <div className="k-progress flex-1">
-              <div className="k-progress-fill" style={{ width: `${pct}%` }} data-variant={variant} />
+              <div className="k-progress-fill" style={{ width: `${pct}%` }} data-variant={progressVariant(pct)} />
             </div>
             <span className="text-xs font-mono tabular-nums w-12 text-right" style={{ color: 'var(--k-text-secondary)' }}>
               {done}/{row.original.assignedTrainings}
@@ -224,55 +370,74 @@ export default function StaffPage() {
       accessorKey: 'avgScore',
       header: 'Ort. Puan',
       size: 90,
+      // Hesaplanmış kolon — sunucuda tüm-veri sıralaması yapılamaz (bkz. route buildStaffOrderBy)
+      enableSorting: false,
       cell: ({ row }) => {
         const score = row.getValue('avgScore') as number;
-        const color = score >= 80 ? 'var(--k-success)' : score >= 60 ? 'var(--k-warning)' : 'var(--k-error)';
-        return <span className="text-sm font-mono font-bold" style={{ color }}>{score}%</span>;
+        return <span className="text-sm font-mono font-bold" style={{ color: scoreColor(score) }}>{score}%</span>;
       },
     },
     {
       accessorKey: 'status',
       header: 'Durum',
       size: 90,
+      // Paylaşılan k-badge varyantları (exams/trainings ile tutarlı) — inline stil + kırılgan
+      // string eşleme yerine. k-badge-success koyu --k-success kullanır → WCAG AA kontrast.
       cell: ({ row }) => {
         const status = row.getValue('status') as string;
-        const s = status.toLocaleLowerCase('tr-TR');
-        let bg = K.SURFACE_HOVER, fg = K.TEXT_MUTED;
-        if (s.includes('aktif') && !s.includes('pas') && !s.includes('in')) {
-          bg = K.PRIMARY_LIGHT; fg = K.PRIMARY;
-        } else if (s.includes('beklemede') || s.includes('pending') || s.includes('davet')) {
-          bg = K.WARNING_BG; fg = '#92400e';
-        } else if (s.includes('pasif') || s.includes('locked') || s.includes('kilit') || s.includes('inactive')) {
-          bg = K.ERROR_BG; fg = K.ERROR_TEXT;
-        }
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '3px 10px',
-              borderRadius: 999,
-              background: bg,
-              color: fg,
-              fontFamily: K.FONT_DISPLAY,
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: '0.01em',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {status}
-          </span>
-        );
+        const variant = statusVariant(status);
+        return <span className={`k-badge k-badge-${variant}`}>{status}</span>;
       },
     },
     {
       id: 'actions',
       header: '',
       size: 50,
-      cell: ({ row }) => <StaffActions staff={row.original} onChanged={refetch} />,
+      cell: ({ row }) => <StaffActions staff={row.original} onChanged={refreshDepartments} />,
     },
-  ], [departmentMap, refetch, selectedDeptColor]);
+  ], [departmentMap, refreshDepartments, selectedDeptColor]);
+
+  // Mobil (≤767px) kart görünümü — auto-render'da progress bar ~0px'e çöküyordu.
+  // İsim/departman/tam-genişlik progress/puan/durum/aksiyon yığılmış kart.
+  const renderMobileStaffCard = useCallback((s: Staff) => {
+    const dept = departmentMap.get(s.departmentId ?? '');
+    const ownColor = dept ? (semanticDeptColor(dept.name) ?? dept.color) : 'var(--k-primary)';
+    const color = selectedDeptColor ?? ownColor;
+    const total = s.assignedTrainings || 1;
+    const done = s.completedTrainings || 0;
+    const pct = Math.min(100, Math.round((done / total) * 100));
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="k-person">
+            <div className="k-person-avatar" style={{ background: color }}>{s.initials}</div>
+            <div className="k-person-meta">
+              <p className="k-person-name">{s.name}</p>
+              <p className="k-person-email">{isSyntheticEmail(s.email) ? '—' : s.email}</p>
+            </div>
+          </div>
+          <StaffActions staff={s} onChanged={refreshDepartments} />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="k-badge k-badge-no-dot" style={{ background: `${color}20`, color: 'var(--k-text-secondary)' }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+            {s.department || 'Departmansız'}
+          </span>
+          <span className={`k-badge k-badge-${statusVariant(s.status)}`}>{s.status}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="k-progress flex-1">
+            <div className="k-progress-fill" style={{ width: `${pct}%` }} data-variant={progressVariant(pct)} />
+          </div>
+          <span className="text-xs font-mono tabular-nums" style={{ color: 'var(--k-text-secondary)' }}>{done}/{s.assignedTrainings}</span>
+        </div>
+        <div className="flex items-center justify-between text-xs" style={{ color: 'var(--k-text-muted)' }}>
+          <span>Ort. Puan</span>
+          <span className="font-mono font-bold" style={{ color: scoreColor(s.avgScore) }}>{s.avgScore}%</span>
+        </div>
+      </div>
+    );
+  }, [departmentMap, selectedDeptColor, refreshDepartments]);
 
   // Sadece initial mount'ta (henüz hiç veri yokken) tam sayfa loading göster.
   // Arama/sayfalama/filtre değişimlerinde data hâlâ var, isLoading true olabilir
@@ -292,6 +457,15 @@ export default function StaffPage() {
 
   return (
     <div className="k-page">
+      {/* Arka plan fetch göstergesi (arama/sayfa/dönem/sıralama) — tam-sayfa flash yerine
+          layout-shift'siz ince üst bar. data zaten var, sadece isLoading=true iken görünür. */}
+      {isLoading && (
+        <div
+          aria-hidden
+          className="fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse"
+          style={{ background: 'var(--k-primary)' }}
+        />
+      )}
       {/* Header */}
       <header className="k-page-header">
         <div>
@@ -337,15 +511,15 @@ export default function StaffPage() {
 
       {/* Eğitim Dönemi seçici — trigger'ın kendi eyebrow'u var, dış label'a gerek yok */}
       <div className="flex flex-wrap">
-        <PeriodSelector value={periodId} onChange={setPeriodId} includeAll />
+        <PeriodSelector value={periodId} onChange={(id) => { setPeriodId(id); setCurrentPage(1); }} includeAll />
       </div>
 
       {/* KPIs */}
       <section className="k-kpi-grid" aria-label="Personel istatistikleri">
-        <Kpi icon={<Users size={18} />} label="Toplam Personel" value={statsData.totalStaff} />
-        <Kpi icon={<Users size={18} />} label="Aktif" value={statsData.activeStaff} />
-        <Kpi icon={<Building2 size={18} />} label="Departman" value={statsData.departmentCount} />
-        <Kpi icon={<Award size={18} />} label="Ort. Başarı" value={statsData.avgScore} suffix="%" />
+        <KStatCard icon={Users} title="Toplam Personel" value={statsData.totalStaff} accentColor="var(--k-primary)" />
+        <KStatCard icon={Users} title="Aktif" value={statsData.activeStaff} accentColor="var(--k-success)" />
+        <KStatCard icon={Building2} title="Departman" value={statsData.departmentCount} accentColor="var(--k-info)" />
+        <KStatCard icon={Award} title="Ort. Başarı" value={`${statsData.avgScore}%`} accentColor="var(--k-warning)" />
       </section>
 
       {/* View toggle */}
@@ -363,7 +537,7 @@ export default function StaffPage() {
                 aria-selected={activeView === v.key}
                 className="k-tab"
                 data-active={activeView === v.key}
-                onClick={() => { setActiveView(v.key); setSelectedDept(null); setCurrentPage(1); setSearchQuery(''); }}
+                onClick={() => { setActiveView(v.key); setSelectedDept(null); setCurrentPage(1); resetSearch(); }}
               >
                 <Icon size={14} />
                 {v.label}
@@ -375,22 +549,21 @@ export default function StaffPage() {
 
       {/* Department grid */}
       {activeView === 'departments' && !selectedDept && (
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', alignItems: 'stretch' }}>
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', alignItems: 'stretch' }}>
           {rootDepartments.map(dept => {
             const deptColor = semanticDeptColor(dept.name) ?? dept.color;
             const children = childrenByParent.get(dept.id) ?? [];
             const isExpanded = expandedDepts.has(dept.id);
+            // A11y: kart artık role="button" DEĞİL (iç içe buton geçersiz ARIA idi).
+            // Açma aksiyonu başlık butonunda; stretched ::after overlay ile tüm-kart
+            // tıklaması korunur. İç kontroller (menü/chevron/alt birim) relative z-10.
             return (
             <article
               key={dept.id}
-              onClick={() => { setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDept(dept.id); setCurrentPage(1); setSearchQuery(''); } }}
-              role="button"
-              tabIndex={0}
-              className="k-card group relative cursor-pointer p-5 transition-all hover:-translate-y-0.5 flex flex-col"
+              className="k-card group relative p-5 transition-all hover:-translate-y-0.5 flex flex-col"
               style={{ borderLeft: `3px solid ${deptColor}`, minHeight: 200 }}
             >
-              <div className="flex items-start justify-between mb-3">
+              <div className="relative z-10 flex items-start justify-between mb-3">
                 <div
                   className="w-9 h-9 rounded-lg flex items-center justify-center"
                   style={{ background: `${deptColor}1f`, color: deptColor }}
@@ -399,7 +572,9 @@ export default function StaffPage() {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-(--k-surface-hover) transition-opacity"
+                    /* Her zaman görünür (eskiden opacity-0 group-hover idi → dokunmada
+                       erişilemiyordu; "Alt Departman Ekle" buranın tek giriş noktası). */
+                    className="w-7 h-7 rounded-lg flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-(--k-surface-hover) transition-opacity"
                     onClick={(e) => e.stopPropagation()}
                     aria-label="Departman işlemleri"
                   >
@@ -447,23 +622,10 @@ export default function StaffPage() {
                       className="gap-2"
                       style={{ borderRadius: 8, color: K.ERROR, fontFamily: K.FONT_DISPLAY, fontSize: 13, fontWeight: 600 }}
                       disabled={deletingDeptId === dept.id}
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         if (deletingDeptId) return;
-                        if (!confirm('Bu departmanı silmek istediğinize emin misiniz? (İçindeki personeller boşa düşecektir)')) return;
-                        setDeletingDeptId(dept.id);
-                        try {
-                          const res = await fetch(`/api/admin/departments/${dept.id}`, { method: 'DELETE' });
-                          const resData = await res.json().catch(() => ({}));
-                          if (!res.ok) throw new Error(resData.error || 'Departman silinemedi');
-                          toast('Departman silindi', 'success');
-                          if (selectedDept === dept.id) setSelectedDept(null);
-                          refreshDepartments();
-                        } catch (err) {
-                          toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
-                        } finally {
-                          setDeletingDeptId(null);
-                        }
+                        setDeleteDeptTarget({ id: dept.id, name: dept.name, staffCount: dept.staffCount });
                       }}
                     >
                       <Trash2 className="h-4 w-4" /> {deletingDeptId === dept.id ? 'Siliniyor...' : 'Departmanı Sil'}
@@ -495,7 +657,15 @@ export default function StaffPage() {
               </div>
 
               <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--k-text-primary)' }}>
-                {dept.name}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedDept(dept.id); setCurrentPage(1); resetSearch(); }}
+                  className="text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--k-primary) rounded"
+                  style={{ color: 'inherit', background: 'none', font: 'inherit', cursor: 'pointer' }}
+                  aria-label={`${dept.name} departmanını aç`}
+                >
+                  {dept.name}
+                </button>
               </h3>
               {dept.description && (
                 <p className="text-xs line-clamp-2 mb-3" style={{ color: 'var(--k-text-muted)' }}>
@@ -515,7 +685,7 @@ export default function StaffPage() {
               {/* Expanded: alt birim listesi açılır. Kart yüksekliği esner;
                   diğer kartlar grid satır bağımsızlığıyla etkilenmez. */}
               {children.length > 0 && isExpanded && (
-                <div className="mb-3" aria-label="Alt departmanlar">
+                <div className="relative z-10 mb-3" aria-label="Alt departmanlar">
                   <div
                     className="flex items-center gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider"
                     style={{ color: 'var(--k-text-muted)' }}
@@ -530,7 +700,7 @@ export default function StaffPage() {
                         <li key={child.id}>
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); setSelectedDept(child.id); setCurrentPage(1); setSearchQuery(''); }}
+                            onClick={(e) => { e.stopPropagation(); setSelectedDept(child.id); setCurrentPage(1); resetSearch(); }}
                             className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-md text-xs hover:bg-[color:var(--k-surface-hover)] focus-visible:bg-[color:var(--k-surface-hover)] focus-visible:outline-none"
                             title={`${child.staffCount} personel`}
                           >
@@ -560,36 +730,16 @@ export default function StaffPage() {
               )}
 
               <div className="flex items-center gap-2.5 pt-3 border-t mt-auto" style={{ borderColor: 'var(--k-border)' }}>
-                <div className="flex">
-                  {(() => {
-                    const directStaff = staffByDeptMap.get(dept.id) ?? [];
-                    const shown = directStaff.slice(0, 3);
-                    const hidden = Math.max(0, dept.staffCount - shown.length);
-                    return (
-                      <>
-                        {shown.map(s => (
-                          <Avatar key={s.id} className="h-6 w-6 -ml-1.5 first:ml-0 ring-2 ring-white">
-                            <AvatarFallback className="text-[9px] font-semibold text-white" style={{ background: deptColor }}>
-                              {s.initials}
-                            </AvatarFallback>
-                          </Avatar>
-                        ))}
-                        {hidden > 0 && (
-                          <div
-                            className="h-6 w-6 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold"
-                            style={{
-                              background: 'var(--k-surface-hover)',
-                              color: 'var(--k-text-muted)',
-                              marginLeft: shown.length > 0 ? -6 : 0,
-                            }}
-                          >
-                            +{hidden}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
+                {/* Departman-renkli kişi rozeti. Eski avatar yığını sayfalanmış (≤10)
+                    listeden çiziliyordu → çoğu departman için boş/yanlış avatar gösteriyordu,
+                    kaldırıldı. Doğru sayı dept.staffCount (sunucu rollup) üzerinden. */}
+                <span
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full"
+                  style={{ background: `${deptColor}1f`, color: deptColor }}
+                  aria-hidden
+                >
+                  <Users size={13} />
+                </span>
                 <span className="text-xs ml-auto tabular-nums" style={{ color: 'var(--k-text-muted)' }}>
                   <strong style={{ color: 'var(--k-text-primary)' }}>{dept.staffCount}</strong> kişi
                 </span>
@@ -624,6 +774,7 @@ export default function StaffPage() {
               </div>
               <Field label="Departman Adı">
                 <Input
+                  autoFocus
                   placeholder="Örn: Kardiyoloji"
                   value={newDeptName}
                   onChange={(e) => setNewDeptName(e.target.value)}
@@ -646,7 +797,8 @@ export default function StaffPage() {
                           outline: active ? `2px solid var(--k-text-primary)` : 'none',
                           outlineOffset: 2,
                         }}
-                        aria-label={`Renk: ${c}`}
+                        aria-pressed={active}
+                        aria-label={`Renk seçeneği${active ? ' (seçili)' : ''}`}
                       >
                         {active && '✓'}
                       </button>
@@ -695,7 +847,7 @@ export default function StaffPage() {
         <section className="flex flex-col gap-4">
           <header className="k-card flex flex-wrap items-center gap-5 p-5" style={{ borderLeft: `3px solid ${selectedDeptColorOrPrimary}` }}>
             <button
-              onClick={() => { setSelectedDept(null); setCurrentPage(1); setSearchQuery(''); }}
+              onClick={() => { setSelectedDept(null); setCurrentPage(1); resetSearch(); }}
               className="k-btn k-btn-subtle k-btn-sm"
               aria-label="Departmanlara dön"
             >
@@ -722,6 +874,13 @@ export default function StaffPage() {
               <button className="k-btn k-btn-ghost" onClick={() => setShowAssignStaff(true)}>
                 <UserPlus size={15} /> Personel Ekle
               </button>
+              <button
+                className="k-btn k-btn-ghost"
+                onClick={() => { window.location.href = `/api/admin/staff/export?department=${selectedDept}`; }}
+                title="Bu departmanı (alt birimler dahil) Excel olarak indir"
+              >
+                <Download size={15} /> İndir
+              </button>
               <button className="k-btn k-btn-ghost" onClick={() => setEditingDept({ id: selectedDeptData.id, name: selectedDeptData.name, color: selectedDeptData.color, parentId: selectedDeptData.parentId ?? null })}>
                 <Edit size={15} /> Düzenle
               </button>
@@ -729,22 +888,9 @@ export default function StaffPage() {
                 className="k-btn k-btn-ghost"
                 style={{ color: 'var(--k-error)', borderColor: 'var(--k-error-bg)' }}
                 disabled={deletingDeptId === selectedDept}
-                onClick={async () => {
+                onClick={() => {
                   if (deletingDeptId) return;
-                  if (!confirm(`"${selectedDeptData.name}" departmanını silmek istediğinize emin misiniz?`)) return;
-                  setDeletingDeptId(selectedDept);
-                  try {
-                    const res = await fetch(`/api/admin/departments/${selectedDept}`, { method: 'DELETE' });
-                    const resData = await res.json().catch(() => ({}));
-                    if (!res.ok) throw new Error(resData.error || 'Departman silinemedi');
-                    toast('Departman silindi', 'success');
-                    setSelectedDept(null);
-                    refreshDepartments();
-                  } catch (err) {
-                    toast(err instanceof Error ? err.message : 'Departman silinemedi', 'error');
-                  } finally {
-                    setDeletingDeptId(null);
-                  }
+                  setDeleteDeptTarget({ id: selectedDeptData.id, name: selectedDeptData.name, staffCount: selectedDeptData.staffCount });
                 }}
               >
                 <Trash2 size={15} /> {deletingDeptId === selectedDept ? 'Siliniyor…' : 'Sil'}
@@ -753,18 +899,30 @@ export default function StaffPage() {
           </header>
 
           <div className="k-card p-5">
+            {bulkBar}
             <DataTable
               key={`dept-${selectedDept}`}
               columns={columns}
               data={filteredStaff}
               searchKey="name"
               searchPlaceholder="Bu departmanda ara..."
+              defaultSearch={searchQuery}
+              mobileCardRenderer={renderMobileStaffCard}
               onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)}
               totalCount={data?.total}
               pageCount={data?.totalPages}
               currentPage={currentPage}
+              pageSize={pageSize}
               onPageChange={setCurrentPage}
               onSearchChange={handleSearch}
+              sorting={sorting}
+              onSortingChange={handleSortingChange}
+              enableRowSelection
+              onSelectionChange={setSelectedStaff}
+              getRowId={(s) => (s as Staff).id}
+              selectionResetKey={selectionResetKey}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageSizeChange={handlePageSizeChange}
             />
           </div>
         </section>
@@ -773,18 +931,30 @@ export default function StaffPage() {
       {/* All staff view */}
       {activeView === 'all' && (
         <div className="k-card p-5">
+          {bulkBar}
           <DataTable
             key="all-staff"
             columns={columns}
             data={allStaff}
             searchKey="name"
             searchPlaceholder="Personel ara (isim, e-posta)..."
+            defaultSearch={searchQuery}
+            mobileCardRenderer={renderMobileStaffCard}
             onRowClick={(staff) => router.push(`/admin/staff/${(staff as { id: string }).id}`)}
             totalCount={data?.total}
             pageCount={data?.totalPages}
             currentPage={currentPage}
+            pageSize={pageSize}
             onPageChange={setCurrentPage}
             onSearchChange={handleSearch}
+            sorting={sorting}
+            onSortingChange={handleSortingChange}
+            enableRowSelection
+            onSelectionChange={setSelectedStaff}
+            getRowId={(s) => (s as Staff).id}
+            selectionResetKey={selectionResetKey}
+            pageSizeOptions={[10, 25, 50, 100]}
+            onPageSizeChange={handlePageSizeChange}
           />
         </div>
       )}
@@ -879,7 +1049,8 @@ export default function StaffPage() {
                         outline: active ? `2px solid var(--k-text-primary)` : 'none',
                         outlineOffset: 2,
                       }}
-                      aria-label={`Renk: ${c}`}
+                      aria-pressed={active}
+                      aria-label={`Renk seçeneği${active ? ' (seçili)' : ''}`}
                     >
                       {active && '✓'}
                     </button>
@@ -999,7 +1170,8 @@ export default function StaffPage() {
                         outline: active ? `2px solid var(--k-text-primary)` : 'none',
                         outlineOffset: 2,
                       }}
-                      aria-label={`Renk: ${c}`}
+                      aria-pressed={active}
+                      aria-label={`Renk seçeneği${active ? ' (seçili)' : ''}`}
                     >
                       {active && '✓'}
                     </button>
@@ -1018,9 +1190,8 @@ export default function StaffPage() {
           <AssignStaffModal
             deptId={selectedDept}
             deptName={dept.name}
-            allStaff={allStaff}
             onClose={() => setShowAssignStaff(false)}
-            onSaved={refetch}
+            onSaved={refreshDepartments}
           />
         ) : null;
       })()}
@@ -1029,6 +1200,101 @@ export default function StaffPage() {
         onClose={() => setShowBulkImport(false)}
         onImported={refetch}
       />
+
+      {/* Toplu eğitim atama — seçili personellere */}
+      <AssignTrainingModal
+        open={bulkAssignOpen}
+        onOpenChange={setBulkAssignOpen}
+        userIds={selectedStaff.map(s => s.id)}
+        targetLabel={`${selectedStaff.length} personel`}
+        onSuccess={() => { clearSelection(); refreshDepartments(); }}
+      />
+
+      {/* Toplu pasifleştirme onayı */}
+      <PremiumModal
+        isOpen={bulkDeactivateConfirm}
+        onClose={() => { if (!bulkDeactivating) setBulkDeactivateConfirm(false); }}
+        eyebrow="Toplu İşlem"
+        title="Seçili personeli pasifleştir"
+        subtitle={`${selectedStaff.length} personel pasifleştirilecek. Giriş yapamazlar; geçmiş kayıtları korunur ve daha sonra yeniden aktifleştirilebilirler.`}
+        size="md"
+        disableEscape={bulkDeactivating}
+        footer={
+          <PremiumModalFooter
+            actions={
+              <>
+                <PremiumButton variant="ghost" onClick={() => setBulkDeactivateConfirm(false)} disabled={bulkDeactivating}>
+                  Vazgeç
+                </PremiumButton>
+                <PremiumButton
+                  onClick={handleBulkDeactivate}
+                  loading={bulkDeactivating}
+                  icon={<UserMinus className="h-4 w-4" />}
+                >
+                  {bulkDeactivating ? 'Pasifleştiriliyor' : `${selectedStaff.length} Personeli Pasifleştir`}
+                </PremiumButton>
+              </>
+            }
+          />
+        }
+      >
+        <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+          Bu işlem geri alınabilir — personeli daha sonra düzenleme sayfasından yeniden aktifleştirebilirsiniz.
+        </p>
+      </PremiumModal>
+
+      {/* Departman silme onayı — etkilenen personel + alt birim sayısını gösterir */}
+      <PremiumModal
+        isOpen={!!deleteDeptTarget}
+        onClose={() => { if (deletingDeptId !== deleteDeptTarget?.id) setDeleteDeptTarget(null); }}
+        eyebrow="Tehlikeli İşlem"
+        title="Departmanı sil"
+        subtitle={deleteDeptTarget ? `"${deleteDeptTarget.name}" departmanı silinecek.` : ''}
+        size="md"
+        disableEscape={!!deleteDeptTarget && deletingDeptId === deleteDeptTarget.id}
+        footer={
+          <PremiumModalFooter
+            actions={
+              <>
+                <PremiumButton
+                  variant="ghost"
+                  onClick={() => setDeleteDeptTarget(null)}
+                  disabled={!!deleteDeptTarget && deletingDeptId === deleteDeptTarget.id}
+                >
+                  Vazgeç
+                </PremiumButton>
+                <PremiumButton
+                  onClick={handleConfirmDeleteDept}
+                  loading={!!deleteDeptTarget && deletingDeptId === deleteDeptTarget.id}
+                  icon={<Trash2 className="h-4 w-4" />}
+                >
+                  {!!deleteDeptTarget && deletingDeptId === deleteDeptTarget.id ? 'Siliniyor' : 'Sil'}
+                </PremiumButton>
+              </>
+            }
+          />
+        }
+      >
+        {deleteDeptTarget && (() => {
+          const childCount = childrenByParent.get(deleteDeptTarget.id)?.length ?? 0;
+          return (
+            <div className="flex flex-col gap-3 text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+              {deleteDeptTarget.staffCount > 0 && (
+                <p>
+                  <strong style={{ color: 'var(--k-error)' }}>{deleteDeptTarget.staffCount} personel</strong> bu departmanda
+                  (alt birimler dahil). Silince bu personeller <strong>departmansız</strong> kalır; kayıtları korunur.
+                </p>
+              )}
+              {childCount > 0 && (
+                <p>
+                  Bu departmanın <strong>{childCount} alt birimi</strong> var. Alt birimlerin bağı da kaldırılır.
+                </p>
+              )}
+              <p>Bu işlem geri alınamaz.</p>
+            </div>
+          );
+        })()}
+      </PremiumModal>
     </div>
   );
 }
