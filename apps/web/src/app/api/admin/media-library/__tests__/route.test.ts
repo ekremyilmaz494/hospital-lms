@@ -218,13 +218,13 @@ describe('POST /api/admin/media-library — tür kısıtı', () => {
 
 describe('GET /api/admin/media-library — org-scope liste', () => {
   it('org öğelerini döner', async () => {
+    // s3Key select'te YOK (sızmamalı) — mock da gerçek select'i yansıtır.
     prismaMock.mediaAsset.findMany.mockResolvedValue([
       {
         id: 'm1',
         title: 'A',
         description: null,
         mediaType: 'video',
-        s3Key: 'k',
         durationSeconds: 60,
         fileSizeBytes: BigInt(1000),
         createdAt: new Date(),
@@ -238,5 +238,6 @@ describe('GET /api/admin/media-library — org-scope liste', () => {
     const body = await res.json();
     expect(body.items).toHaveLength(1);
     expect(body.items[0].fileSizeBytes).toBe(1000); // BigInt → Number
+    expect(body.items[0]).not.toHaveProperty('s3Key'); // ham key sızmaz
   });
 });

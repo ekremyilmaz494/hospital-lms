@@ -37,7 +37,9 @@ export const GET = withAdminRoute(
           title: true,
           description: true,
           mediaType: true,
-          s3Key: true,
+          // s3Key bilinçli olarak DÖNDÜRÜLMEZ: ham depolama key'i client'a sızmasın
+          // (depolama düzeni açığa çıkar). Önizleme/seçim id üzerinden çözülür; eğitim
+          // sihirbazı gerçek key'i sunucuda sourceMediaAssetId'den alır.
           durationSeconds: true,
           fileSizeBytes: true,
           createdAt: true,

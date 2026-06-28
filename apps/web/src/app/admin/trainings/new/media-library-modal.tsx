@@ -20,7 +20,6 @@ interface MediaAssetItem {
   title: string;
   description: string | null;
   mediaType: 'video' | 'audio';
-  s3Key: string;
   durationSeconds: number | null;
   usageCount: number;
 }
@@ -101,7 +100,11 @@ export function MediaLibraryModal({ open, onClose, onSelect, defaultFilter = 'al
       picked.push({
         id: Date.now() + Math.floor(Math.random() * 1e6),
         title: it.title,
-        url: it.s3Key, // s3Key paylaşılır → publish'te videoKey olur
+        // Ham s3Key client'a sızmaz (artık GET dönmüyor). Wizard yalnız truthy bir
+        // "hazır" sinyali ister; gerçek videoKey publish/create'te sunucuda
+        // sourceMediaAssetId'den çözülür (in-org doğrulamalı). Bu sentinel asla
+        // videoKey olmaz — sunucu kütüphane öğesini daima asset'ten çözer.
+        url: `library://${it.id}`,
         contentType: it.mediaType,
         durationSeconds: it.durationSeconds ?? undefined,
         sourceMediaAssetId: it.id,

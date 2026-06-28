@@ -50,9 +50,13 @@ const ALLOWED_CONTENT_TYPES = [
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'audio/mpeg',
   'audio/wav',
+  'audio/x-wav',
+  'audio/wave',
   'audio/mp4',
+  'audio/x-m4a',
   'audio/ogg',
   'audio/aac',
+  'audio/x-aac',
   'image/png',
   'image/jpeg',
   // SVG bilinçli olarak hariç: gömülü <script> ile servis edilince stored-XSS açar.

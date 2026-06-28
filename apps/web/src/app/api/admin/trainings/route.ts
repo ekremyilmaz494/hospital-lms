@@ -161,22 +161,28 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
           const pgCount = v.pageCount ?? null
           let videoTitle = v.title
 
-          // Medya kütüphanesinden seçim — sourceMediaAssetId varsa bilgileri oradan çek
-          const sourceMediaAssetId =
-            (v as Record<string, unknown>).sourceMediaAssetId as string | undefined
+          // Medya kütüphanesinden seçim — sourceMediaAssetId varsa bilgileri oradan çek.
+          // (Artık şemada tanımlı; eskiden cast'leniyordu ama zod siliyordu — bkz validations.ts.)
+          const sourceMediaAssetId = v.sourceMediaAssetId
           if (sourceMediaAssetId) {
             const asset = await tx.mediaAsset.findFirst({
               where: { id: sourceMediaAssetId, organizationId: organizationId },
             })
-            if (asset?.s3Key) {
-              url = asset.s3Key
-              ct = (asset.mediaType as typeof ct) || 'video'
-              duration = asset.durationSeconds || 0
-              videoTitle = videoTitle || asset.title
-            }
+            // Güvenlik (güven sınırı): kütüphane seçimi YALNIZ kendi kurumunun
+            // asset'inden çözülür. Asset bulunamazsa (cross-tenant/forge veya silinmiş)
+            // bu öğe ATLANIR — client'ın gönderdiği url'e ASLA fallback yapılmaz
+            // (aksi halde sahte istek başka org'un key'ini videoKey'e yazabilirdi).
+            if (!asset?.s3Key) continue
+            url = asset.s3Key
+            ct = (asset.mediaType as typeof ct) || 'video'
+            duration = asset.durationSeconds || 0
+            videoTitle = videoTitle || asset.title
           }
 
-          if (!url) continue
+          // Savunma: çözümlenmemiş kütüphane sentinel'i (library://...) ASLA videoKey olmaz.
+          // (Normalde yukarıdaki blok url'i asset.s3Key ile değiştirir; bu, forge/eksik
+          // sourceMediaAssetId durumunda son emniyet.)
+          if (!url || url.startsWith('library://')) continue
           const defaultTitle = url.split('/').pop()?.replace(/\.[^.]+$/, '') || (ct === 'pdf' ? `Doküman ${idx + 1}` : `Video ${idx + 1}`)
 
           await tx.trainingVideo.create({

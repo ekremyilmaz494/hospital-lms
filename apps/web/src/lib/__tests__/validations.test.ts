@@ -8,6 +8,7 @@ import {
   createPlanSchema,
   trainingFeedbackSubmitSchema,
   trainingFeedbackFormUpsertSchema,
+  createTrainingBodySchema,
 } from '../validations'
 
 describe('createOrganizationSchema', () => {
@@ -273,5 +274,42 @@ describe('trainingFeedbackFormUpsertSchema', () => {
       }],
     })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('createTrainingBodySchema — kütüphane seçimi (sourceMediaAssetId)', () => {
+  const base = {
+    title: 'Test Eğitim',
+    startDate: '2026-01-01T00:00:00.000Z',
+    endDate: '2026-12-31T00:00:00.000Z',
+  }
+
+  // REGRESYON: zod v4 bilinmeyen anahtarları siler. sourceMediaAssetId şemada
+  // tanımlı olmazsa create/publish route'ları onu hiç göremez → kütüphane seçimi
+  // bozulur (videoKey'e sentinel yazılır, personelde 403). 2026-06-28.
+  it('videos[].sourceMediaAssetId parse sonrası KORUNUR', () => {
+    const assetId = '11111111-1111-4111-8111-111111111111'
+    const result = createTrainingBodySchema.safeParse({
+      ...base,
+      videos: [{ title: 'V', url: `library://${assetId}`, contentType: 'video', sourceMediaAssetId: assetId }],
+    })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.videos?.[0].sourceMediaAssetId).toBe(assetId)
+  })
+
+  it('geçersiz (uuid olmayan) sourceMediaAssetId reddedilir', () => {
+    const result = createTrainingBodySchema.safeParse({
+      ...base,
+      videos: [{ url: 'x', contentType: 'video', sourceMediaAssetId: 'not-a-uuid' }],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('sourceMediaAssetId olmadan da geçerli (doğrudan yükleme)', () => {
+    const result = createTrainingBodySchema.safeParse({
+      ...base,
+      videos: [{ url: 'videos/org/x.mp4', contentType: 'video' }],
+    })
+    expect(result.success).toBe(true)
   })
 })
