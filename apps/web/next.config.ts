@@ -92,15 +92,29 @@ const nextConfig: NextConfig = {
       : {}),
   },
   redirects: async () => [
+    // Medya Kütüphanesi yeniden kurulduğunda (#209) eski "İçerik Kütüphanesi"
+    // route'u (/admin/content-library) kaldırıldı ve sayfa /admin/media-library'ye
+    // taşındı. Eski bookmark/SEO için yönlendirme.
+    // ⚠️ PROD INCIDENT (2026-06-28): Bu iki kural TERS yazılmıştı
+    // (media-library → content-library) → yeni çalışan sayfa, silinmiş eski route'a
+    // KALICI (308) yönlendiriliyor, sonra 404 üretiyordu. Hard refresh/cache temizliği
+    // çözmüyordu çünkü yönlendirme sunucu tarafındaydı. Yön düzeltildi (eski → yeni).
+    //
+    // permanent:false (307) + hedef sorgu paramı (?from=cl) BİLİNÇLİDİR: bazı
+    // tarayıcılar eski TERS 308'i (media-library → content-library) kalıcı
+    // cache'lemiş olabilir. Hedefi farklı bir cache key'e (?from=cl) düşürmek,
+    // media-library bare-path'inin bayat 308'iyle sonsuz döngü oluşmasını engeller;
+    // bayat tarayıcı bile tek atlamada doğru sayfaya iner. 307 ise bu kuralın
+    // kendisinin kalıcı cache'lenmesini önler (geçiş bittiğinde temizlenebilir).
     {
-      source: '/admin/media-library',
-      destination: '/admin/content-library',
-      permanent: true,
+      source: '/admin/content-library',
+      destination: '/admin/media-library?from=cl',
+      permanent: false,
     },
     {
-      source: '/admin/media-library/:path*',
-      destination: '/admin/content-library',
-      permanent: true,
+      source: '/admin/content-library/:path*',
+      destination: '/admin/media-library?from=cl',
+      permanent: false,
     },
     // Eski /marketing/* URL'leri root marketing route group'una taşındı.
     // Eski bookmark/SEO için 301 redirect.

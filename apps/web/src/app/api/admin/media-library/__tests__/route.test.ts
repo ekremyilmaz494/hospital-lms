@@ -136,6 +136,26 @@ describe('DELETE /api/admin/media-library/[id] — referans-kontrollü S3', () =
     expect(deleteObjectMock).not.toHaveBeenCalled();
   });
 
+  it('S3 silme kararı, DB satırı silindikten SONRA sayılır (TOCTOU yarış-güvenli)', async () => {
+    prismaMock.mediaAsset.findUnique.mockResolvedValue({
+      id: 'm1',
+      title: 'X',
+      organizationId: 'org-1',
+      s3Key: 'videos/org-1/media-library/x.mp4',
+    });
+    prismaMock.trainingVideo.count.mockResolvedValue(0);
+    prismaMock.mediaAsset.delete.mockResolvedValue({});
+
+    await DELETE(jsonReq('http://x/api/admin/media-library/m1', 'DELETE'), params('m1'));
+
+    // Sıra kritik: önce mediaAsset.delete, SONRA trainingVideo.count. Aksi halde
+    // (eski kod) silme ile sayım arasında bir eğitime eklenen asset'in kullanımdaki
+    // S3 dosyası yanlışlıkla silinebilirdi ("hiçbir admin yüklemesi silinmez" ihlali).
+    const deleteOrder = prismaMock.mediaAsset.delete.mock.invocationCallOrder[0];
+    const countOrder = prismaMock.trainingVideo.count.mock.invocationCallOrder[0];
+    expect(deleteOrder).toBeLessThan(countOrder);
+  });
+
   it('başka org öğesi → 403, silinmez', async () => {
     prismaMock.mediaAsset.findUnique.mockResolvedValue({
       id: 'm1',
