@@ -3,7 +3,6 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
-import { findActivePeriod } from '@/lib/training-periods'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS } from '../_shared'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
@@ -19,13 +18,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
 
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
-  const { userDeptFilter, assignmentDateFilter, attemptDateFilter, trainingScope, departmentId, periodId } = resolved.filters
-
-  // URL'de periodId yoksa aktif period'a düş — staff raporu ile aynı pattern.
-  const activePeriod = periodId ? null : await findActivePeriod(orgId)
-  const activePeriodId = periodId ?? activePeriod?.id ?? null
-  const assignmentPeriodFilter = activePeriodId ? { periodId: activePeriodId } : {}
-  const attemptPeriodFilter = activePeriodId ? { assignment: { periodId: activePeriodId } } : {}
+  // Dönem çözümü _shared'da merkezi (assignment + attempt dönem filtreleri hazır gelir).
+  const { userDeptFilter, assignmentDateFilter, attemptDateFilter, trainingScope, departmentId, assignmentPeriodFilter, attemptPeriodFilter } = resolved.filters
 
   try {
     const [departments, deptStaff, assignmentGroups, attemptAggregates] = await Promise.all([

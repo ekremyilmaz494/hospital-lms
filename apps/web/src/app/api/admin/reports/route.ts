@@ -17,7 +17,8 @@ import { resolveReportFilters, REPORTS_CACHE_HEADERS } from './_shared'
 export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => {
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
-  const { trainingScope, userDeptFilter, assignmentDateFilter, attemptDateFilter } = resolved.filters
+  // Dönem filtresi diğer sekmelerle TUTARLI olsun diye Genel Özet'e de uygulanır.
+  const { trainingScope, userDeptFilter, assignmentDateFilter, attemptDateFilter, assignmentPeriodFilter, attemptPeriodFilter } = resolved.filters
 
   try {
     const [
@@ -33,7 +34,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => 
       prisma.training.count({ where: trainingScope }),
       prisma.trainingAssignment.groupBy({
         by: ['status'],
-        where: { training: trainingScope, user: { ...userDeptFilter }, ...assignmentDateFilter },
+        where: { training: trainingScope, user: { ...userDeptFilter }, ...assignmentDateFilter, ...assignmentPeriodFilter },
         _count: true,
       }),
       prisma.examAttempt.aggregate({
@@ -42,6 +43,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => 
           postExamScore: { not: null },
           user: { ...userDeptFilter },
           ...attemptDateFilter,
+          ...attemptPeriodFilter,
         },
         _avg: { postExamScore: true },
       }),
@@ -72,7 +74,9 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => 
       passed: passedCount,
       failed: statusMap['failed'] ?? 0,
       locked: lockedCount,
-      pending: statusMap['pending'] ?? 0,
+      // 'pending' = henüz başlamamış atamalar (DB status'ü 'assigned'). Eski kod
+      // var olmayan 'pending' status'ünü okuyordu → daima 0. Doğru alan: 'assigned'.
+      pending: statusMap['assigned'] ?? 0,
       in_progress: statusMap['in_progress'] ?? 0,
     }
 

@@ -16,7 +16,8 @@ import { resolveReportFilters, REPORTS_CACHE_HEADERS, STAFF_CAP } from '../_shar
 export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => {
   const resolved = await resolveReportFilters(request, orgId)
   if (resolved.error) return resolved.error
-  const { trainingScope, userDeptFilter, assignmentDateFilter } = resolved.filters
+  // Dönem filtresi diğer sekmelerle TUTARLI olsun diye Başarısızlık'a da uygulanır.
+  const { trainingScope, userDeptFilter, assignmentDateFilter, assignmentPeriodFilter } = resolved.filters
 
   try {
     const failedAssignments = await prisma.trainingAssignment.findMany({
@@ -29,6 +30,7 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => 
           ...userDeptFilter,
         },
         ...assignmentDateFilter,
+        ...assignmentPeriodFilter,
       },
       select: {
         id: true,
