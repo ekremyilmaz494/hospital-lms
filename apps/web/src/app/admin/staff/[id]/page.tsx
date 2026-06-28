@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download, KeyRound, FileText } from 'lucide-react';
+import { ArrowLeft, GraduationCap, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download, KeyRound, FileText, CheckCircle2, Target, Award, ArrowUp } from 'lucide-react';
 import { AssignTrainingModal } from '../assign-training-modal';
 import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -32,6 +32,20 @@ const statusMap: Record<string, { label: string; bg: string; text: string; dot: 
   assigned:    { label: 'Atandı',       bg: K.INFO_BG,       text: '#1e40af',    dot: K.INFO },
   locked:      { label: 'Kilitli',      bg: K.ERROR_BG,      text: '#b91c1c',    dot: K.ERROR },
 };
+
+/** Ham ISO tarihi okunabilir Türkçe biçime çevirir: "23 Haz 2026". */
+function formatTrDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/** "%92" / 92 / "92" → 0–100 aralığında sayı (ilerleme çubuğu için). */
+function toPct(v: string | number | null | undefined): number {
+  const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
+  return Number.isNaN(n) ? 0 : Math.max(0, Math.min(100, n));
+}
 
 export default function StaffDetailPage() {
   const router = useRouter();
@@ -292,10 +306,38 @@ export default function StaffDetailPage() {
 
       {/* ── Stats ── */}
       <section className="sd-stats" aria-label="Performans özeti">
-        <StatTile label="Atanan Eğitim" value={staff.stats?.assignedTrainings ?? 0} suffix="eğitim" icon={<GraduationCap className="h-4 w-4" />} accent={K.INFO} />
-        <StatTile label="Tamamlanan" value={staff.stats?.completedTrainings ?? 0} suffix="bitti" icon={<TrendingUp className="h-4 w-4" />} accent={K.PRIMARY} />
-        <StatTile label="Başarı Oranı" value={staff.stats?.successRate ?? '0%'} icon={<TrendingUp className="h-4 w-4" />} accent={K.SUCCESS} />
-        <StatTile label="Ortalama Puan" value={staff.stats?.avgScore ?? '0'} icon={<TrendingUp className="h-4 w-4" />} accent={K.WARNING} />
+        <StatTile
+          label="Atanan Eğitim"
+          value={staff.stats?.assignedTrainings ?? 0}
+          suffix="eğitim"
+          icon={<GraduationCap className="h-[18px] w-[18px]" />}
+          accent={K.INFO} accentBg={K.INFO_BG}
+        />
+        <StatTile
+          label="Tamamlanan"
+          value={staff.stats?.completedTrainings ?? 0}
+          suffix={`/ ${staff.stats?.assignedTrainings ?? 0}`}
+          icon={<CheckCircle2 className="h-[18px] w-[18px]" />}
+          accent={K.PRIMARY} accentBg={K.PRIMARY_LIGHT}
+          progress={(staff.stats?.assignedTrainings ?? 0) > 0
+            ? Math.round(((staff.stats?.completedTrainings ?? 0) / (staff.stats!.assignedTrainings)) * 100)
+            : 0}
+        />
+        <StatTile
+          label="Başarı Oranı"
+          value={staff.stats?.successRate ?? '%0'}
+          icon={<Target className="h-[18px] w-[18px]" />}
+          accent={K.SUCCESS} accentBg={K.SUCCESS_BG}
+          progress={toPct(staff.stats?.successRate)}
+        />
+        <StatTile
+          label="Ortalama Puan"
+          value={staff.stats?.avgScore ?? '0'}
+          suffix="/ 100"
+          icon={<Award className="h-[18px] w-[18px]" />}
+          accent={K.WARNING} accentBg={K.WARNING_BG}
+          progress={toPct(staff.stats?.avgScore)}
+        />
       </section>
 
       {/* ── Profile info + Training history (2-col on desktop) ── */}
@@ -428,26 +470,55 @@ export default function StaffDetailPage() {
                       const st = statusMap[t.status] || statusMap.assigned;
                       const isLast = idx === trainingHistory.length - 1;
                       return (
-                        <tr key={t.trainingId}>
-                          <td style={{
+                        <tr key={t.trainingId} className="sd-row">
+                          <td title={t.title} style={{
                             padding: '14px 12px',
                             borderBottom: isLast ? 'none' : `1px solid ${K.BORDER_LIGHT}`,
                             verticalAlign: 'middle',
-                            fontFamily: K.FONT_DISPLAY,
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: K.TEXT_PRIMARY,
+                            maxWidth: 340,
                           }}>
-                            {t.title}
+                            <span style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              fontFamily: K.FONT_DISPLAY,
+                              fontSize: 13.5,
+                              fontWeight: 600,
+                              color: K.TEXT_PRIMARY,
+                              lineHeight: 1.35,
+                            }}>
+                              {t.title}
+                            </span>
                           </td>
-                          <td style={tdNum(K, isLast)}>{t.attempt}/{t.maxAttempts}</td>
-                          <td style={tdNum(K, isLast)}>{t.preScore !== null ? `${t.preScore}%` : '—'}</td>
+                          <td style={tdNum(K, isLast)}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              minWidth: 38, padding: '2px 8px', borderRadius: 999,
+                              background: K.BG, border: `1px solid ${K.BORDER_LIGHT}`,
+                              fontSize: 11, fontWeight: 600, color: K.TEXT_SECONDARY,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}>
+                              {t.attempt}/{t.maxAttempts}
+                            </span>
+                          </td>
+                          <td style={tdNum(K, isLast)}>{t.preScore !== null ? `%${t.preScore}` : '—'}</td>
                           <td style={{
                             ...tdNum(K, isLast),
                             fontWeight: 700,
                             color: t.status === 'passed' ? K.PRIMARY : K.TEXT_PRIMARY,
                           }}>
-                            {t.postScore !== null ? `${t.postScore}%` : '—'}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              {t.postScore !== null ? `%${t.postScore}` : '—'}
+                              {t.preScore !== null && t.postScore !== null && t.postScore > t.preScore && (
+                                <span
+                                  title={`Gelişim: +${t.postScore - t.preScore} puan`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 1, fontSize: 10, fontWeight: 700, color: K.SUCCESS }}
+                                >
+                                  <ArrowUp className="h-3 w-3" />{t.postScore - t.preScore}
+                                </span>
+                              )}
+                            </span>
                           </td>
                           <td style={{ padding: '14px 12px', borderBottom: isLast ? 'none' : `1px solid ${K.BORDER_LIGHT}`, verticalAlign: 'middle' }}>
                             <span style={{
@@ -470,12 +541,12 @@ export default function StaffDetailPage() {
                             padding: '14px 12px',
                             borderBottom: isLast ? 'none' : `1px solid ${K.BORDER_LIGHT}`,
                             verticalAlign: 'middle',
-                            fontSize: 11,
+                            fontSize: 11.5,
                             color: K.TEXT_MUTED,
                             whiteSpace: 'nowrap',
                             fontVariantNumeric: 'tabular-nums',
                           }}>
-                            {t.date}
+                            {formatTrDate(t.date)}
                           </td>
                           <td style={{ padding: '14px 12px', borderBottom: isLast ? 'none' : `1px solid ${K.BORDER_LIGHT}`, verticalAlign: 'middle' }}>
                             {(t.status === 'failed' || t.status === 'locked') && (
@@ -558,9 +629,9 @@ export default function StaffDetailPage() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                         {[
                           { lbl: 'Deneme', val: `${t.attempt}/${t.maxAttempts}` },
-                          { lbl: 'Ön', val: t.preScore !== null ? `${t.preScore}%` : '—' },
-                          { lbl: 'Son', val: t.postScore !== null ? `${t.postScore}%` : '—', color: t.status === 'passed' ? K.PRIMARY : K.TEXT_PRIMARY },
-                          { lbl: 'Tarih', val: t.date, small: true },
+                          { lbl: 'Ön', val: t.preScore !== null ? `%${t.preScore}` : '—' },
+                          { lbl: 'Son', val: t.postScore !== null ? `%${t.postScore}` : '—', color: t.status === 'passed' ? K.PRIMARY : K.TEXT_PRIMARY },
+                          { lbl: 'Tarih', val: formatTrDate(t.date), small: true },
                         ].map((c, i) => (
                           <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <span style={{
@@ -816,12 +887,29 @@ export default function StaffDetailPage() {
           grid-template-columns: repeat(4, 1fr);
           gap: 14px;
         }
+        .sd-stat {
+          transition: transform 260ms cubic-bezier(0.16,1,0.3,1), border-color 200ms ease, box-shadow 200ms ease;
+        }
+        .sd-stat:hover {
+          transform: translateY(-2px);
+          border-color: ${K.BORDER};
+          box-shadow: 0 4px 8px rgba(15,23,42,0.06), 0 12px 28px rgba(15,23,42,0.06);
+        }
 
-        /* Grid */
+        /* Grid — left rail stays its natural height (no stretch) */
         .sd-grid {
           display: grid;
           grid-template-columns: 1fr 2fr;
           gap: 18px;
+          align-items: start;
+        }
+
+        /* Training-history row hover */
+        .sd-table-wrap :global(tbody tr) {
+          transition: background 140ms ease;
+        }
+        .sd-table-wrap :global(tbody tr:hover) {
+          background: ${K.BG};
         }
 
         /* Mobile cards: hidden by default */
@@ -871,63 +959,79 @@ function tdNum(K: { BORDER_LIGHT: string; TEXT_SECONDARY: string }, isLast: bool
 
 // ── Stat Tile ──
 function StatTile({
-  label, value, suffix, icon, accent,
+  label, value, suffix, icon, accent, accentBg, progress,
 }: {
   label: string;
   value: number | string;
   suffix?: string;
   icon: React.ReactNode;
   accent: string;
+  accentBg: string;
+  progress?: number | null;
 }) {
   return (
     <div
+      className="sd-stat"
       style={{
-        position: 'relative',
-        padding: '20px 22px 20px 26px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        padding: 20,
         background: K.SURFACE,
-        borderRadius: 14,
-        border: `1.5px solid ${K.BORDER}`,
+        borderRadius: 16,
+        border: `1.5px solid ${K.BORDER_LIGHT}`,
         boxShadow: K.SHADOW_CARD,
-        overflow: 'hidden',
-        transition: 'border-color 200ms ease, transform 260ms cubic-bezier(0.16,1,0.3,1)',
       }}
     >
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        top: 14,
-        bottom: 14,
-        width: 3,
-        background: accent,
-        borderRadius: '0 2px 2px 0',
-      }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ display: 'inline-flex', color: accent }}>{icon}</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{
+          width: 36, height: 36, borderRadius: 11,
+          background: accentBg, color: accent,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          {icon}
+        </span>
         <span style={{
           fontFamily: K.FONT_DISPLAY,
-          fontSize: 11,
+          fontSize: 10.5,
           fontWeight: 600,
-          letterSpacing: '0.08em',
+          letterSpacing: '0.07em',
           textTransform: 'uppercase',
           color: K.TEXT_MUTED,
+          textAlign: 'right',
+          lineHeight: 1.3,
         }}>
           {label}
         </span>
       </div>
+
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span style={{
           fontFamily: K.FONT_DISPLAY,
-          fontSize: 30,
+          fontSize: 32,
           fontWeight: 700,
           color: K.TEXT_PRIMARY,
           lineHeight: 1,
-          letterSpacing: '-0.02em',
+          letterSpacing: '-0.025em',
           fontVariantNumeric: 'tabular-nums',
         }}>
           {typeof value === 'number' ? value.toLocaleString('tr-TR') : value}
         </span>
-        {suffix && <span style={{ fontSize: 12, color: K.TEXT_MUTED }}>{suffix}</span>}
+        {suffix && <span style={{ fontSize: 12, fontWeight: 500, color: K.TEXT_MUTED, fontVariantNumeric: 'tabular-nums' }}>{suffix}</span>}
       </div>
+
+      {progress != null && (
+        <div style={{ height: 6, borderRadius: 999, background: K.BORDER_LIGHT, overflow: 'hidden' }} aria-hidden="true">
+          <div style={{
+            height: '100%',
+            width: `${Math.max(0, Math.min(100, progress))}%`,
+            background: accent,
+            borderRadius: 999,
+            transition: 'width 600ms cubic-bezier(0.16,1,0.3,1)',
+          }} />
+        </div>
+      )}
     </div>
   );
 }
