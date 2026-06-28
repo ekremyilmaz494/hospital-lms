@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download, KeyRound } from 'lucide-react';
+import { ArrowLeft, GraduationCap, TrendingUp, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download, KeyRound, FileText } from 'lucide-react';
 import { AssignTrainingModal } from '../assign-training-modal';
 import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -236,6 +236,30 @@ export default function StaffDetailPage() {
           >
             <Download className="h-4 w-4" />
             <span>KVKK Dışa Aktar</span>
+          </a>
+          <a
+            href={`/api/admin/staff/${staff.id}/training-record`}
+            className="sd-btn"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              height: 42,
+              padding: '0 18px',
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: 'none',
+              background: '#ffffff',
+              color: '#44403c',
+              border: '1.5px solid #c9c4be',
+              fontFamily: K.FONT_DISPLAY,
+              whiteSpace: 'nowrap',
+            }}
+            title="SKS Eğitim Kayıt Sicil Formu — bu personelin tüm eğitim geçmişi (PDF)"
+          >
+            <FileText className="h-4 w-4" />
+            <span>Eğitim Sicili (PDF)</span>
           </a>
           <button
             className="sd-btn"

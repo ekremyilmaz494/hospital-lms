@@ -115,6 +115,7 @@ export default function TrainingDetailPage() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
   const [downloadingCompletion, setDownloadingCompletion] = useState<'pdf' | 'excel' | null>(null);
+  const [downloadingAnnouncement, setDownloadingAnnouncement] = useState(false);
   const [downloadingTab, setDownloadingTab] = useState<'pdf' | 'excel' | 'pdf-completed' | 'pdf-incomplete' | null>(null);
   const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
   const [resetting, setResetting] = useState(false);
@@ -345,6 +346,27 @@ export default function TrainingDetailPage() {
                 >
                   {downloadingCompletion === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   <span>{downloadingCompletion === 'excel' ? 'Excel hazırlanıyor…' : 'Excel Rapor indir'}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={downloadingAnnouncement}
+                  onClick={async () => {
+                    setDownloadingAnnouncement(true);
+                    try {
+                      const res = await fetch(`/api/admin/trainings/${id}/announcement-form`);
+                      if (!res.ok) throw new Error('Duyuru formu oluşturulamadı');
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'egitim_duyuru_formu.pdf';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch { toast('Eğitim Duyuru Formu indirilemedi', 'error'); }
+                    finally { setDownloadingAnnouncement(false); }
+                  }}
+                >
+                  {downloadingAnnouncement ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                  <span>{downloadingAnnouncement ? 'Duyuru formu hazırlanıyor…' : 'Eğitim Duyuru Formu (PDF)'}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
                   <MessageSquare className="h-4 w-4" />
