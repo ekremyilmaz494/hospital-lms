@@ -36,13 +36,16 @@ export const DELETE = withAdminRoute<{ id: string }>(
         return errorResponse('Bu medya kurumunuza ait değil.', 403);
       }
 
-      // S3 referans kontrolü: bu s3Key'i hâlâ kullanan TrainingVideo var mı?
-      // Varsa S3 nesnesine DOKUNMA (eğitim çalışmaya devam etsin) — yalnız DB satırını sil.
+      // S3 referans kontrolü — TOCTOU yarış-güvenli sıra: ÖNCE DB satırını sil,
+      // SONRA kullanım sayımını yap. Böylece silme ile sayım arasında bir eğitimin
+      // bu asset'i "kütüphaneden seç" ile eklemesi engellenir (asset satırı artık
+      // yok → org-scope'lu lookup ıskalar) ve sayım olabildiğince geç çalışıp
+      // eşzamanlı eklenmiş bir referansı görür. Kullanımdaki S3 dosyası ASLA silinmez.
+      await prisma.mediaAsset.delete({ where: { id } });
+
       const usageCount = await prisma.trainingVideo.count({
         where: { videoKey: item.s3Key },
       });
-
-      await prisma.mediaAsset.delete({ where: { id } });
 
       if (usageCount === 0) {
         // Hiçbir eğitim kullanmıyor → S3 nesnesini de temizle (deleteObject hata fırlatmaz).
