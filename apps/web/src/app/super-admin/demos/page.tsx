@@ -72,6 +72,8 @@ interface DemoCredentials {
   adminEmail: string;
   adminTc: string;
   tempPassword: string;
+  staffEmail?: string;
+  staffTc?: string;
 }
 
 type StatusFilter = 'all' | 'active' | 'suspended';
@@ -212,14 +214,24 @@ export default function DemosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           organizationId: credentials.orgId,
-          items: [{
-            fullName: 'Demo Yönetici',
-            tcKimlik: credentials.adminTc,
-            email: credentials.adminEmail,
-            tempPassword: credentials.tempPassword,
-            department: null,
-            title: 'Esas Yönetici',
-          }],
+          items: [
+            {
+              fullName: 'Demo Yönetici',
+              tcKimlik: credentials.adminTc,
+              email: credentials.adminEmail,
+              tempPassword: credentials.tempPassword,
+              department: null,
+              title: 'Esas Yönetici',
+            },
+            ...(credentials.staffEmail && credentials.staffTc ? [{
+              fullName: 'Demo Personel',
+              tcKimlik: credentials.staffTc,
+              email: credentials.staffEmail,
+              tempPassword: credentials.tempPassword,
+              department: 'Örnek Birim',
+              title: 'Örnek Personel',
+            }] : [])
+          ],
           maskMode: 'full',
         }),
       });
@@ -484,10 +496,6 @@ export default function DemosPage() {
                   <FileDown className="h-4 w-4" /> Demo Yönetici Hesabı
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" onClick={downloadCredentialsPdf} disabled={downloadingPdf} className="gap-2 text-white" style={{ background: 'var(--color-primary, #0d9668)' }}>
-                    <FileDown className="h-4 w-4" />
-                    {downloadingPdf ? 'PDF üretiliyor...' : 'PDF Olarak İndir'}
-                  </Button>
                   <button type="button" onClick={() => copyToClipboard(credentials.adminEmail, 'email')} className="inline-flex h-9 items-center gap-1.5 rounded border px-3 text-xs font-semibold" style={{ background: '#fff', color: 'var(--color-text-primary)', borderColor: 'var(--color-border)' }}>
                     {copied === 'email' ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                     {credentials.adminEmail}
@@ -501,6 +509,35 @@ export default function DemosPage() {
                     Şifre: {credentials.tempPassword}
                   </button>
                 </div>
+              </div>
+
+              {credentials.staffEmail && credentials.staffTc && (
+                <div className="rounded-lg border-2 p-4" style={{ background: 'var(--color-info-bg)', borderColor: 'var(--color-info)' }}>
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--color-info)' }}>
+                    <Users className="h-4 w-4" /> Örnek Personel Hesabı
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => copyToClipboard(credentials.staffEmail!, 'email')} className="inline-flex h-9 items-center gap-1.5 rounded border px-3 text-xs font-semibold" style={{ background: '#fff', color: 'var(--color-text-primary)', borderColor: 'var(--color-border)' }}>
+                      {copied === 'email' ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {credentials.staffEmail}
+                    </button>
+                    <button type="button" onClick={() => copyToClipboard(credentials.staffTc!, 'tc')} className="inline-flex h-9 items-center gap-1.5 rounded border px-3 text-xs font-semibold" style={{ background: '#fff', color: 'var(--color-text-primary)', borderColor: 'var(--color-border)' }}>
+                      {copied === 'tc' ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      TC: {credentials.staffTc}
+                    </button>
+                    <button type="button" onClick={() => copyToClipboard(credentials.tempPassword, 'pwd')} className="inline-flex h-9 items-center gap-1.5 rounded border px-3 text-xs font-semibold" style={{ background: '#fff', color: 'var(--color-text-primary)', borderColor: 'var(--color-border)' }}>
+                      {copied === 'pwd' ? <CheckCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      Şifre: {credentials.tempPassword}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex pt-2">
+                 <Button type="button" onClick={downloadCredentialsPdf} disabled={downloadingPdf} className="w-full gap-2 text-white" style={{ background: 'var(--color-primary, #0d9668)' }}>
+                  <FileDown className="h-4 w-4" />
+                  {downloadingPdf ? 'PDF üretiliyor...' : 'Giriş Bilgilerini PDF Olarak İndir'}
+                </Button>
               </div>
             </>
           )}

@@ -60,6 +60,69 @@ const TRAININGS = [
           { optionText: 'Yiyecekler', isCorrect: false },
         ],
       },
+      {
+        questionText: 'Damlacık izolasyonu gerektiren bir hastanın odasına girerken ne takılmalıdır?',
+        options: [
+          { optionText: 'N95 Maske', isCorrect: false },
+          { optionText: 'Cerrahi Maske', isCorrect: true },
+          { optionText: 'Sadece eldiven', isCorrect: false },
+          { optionText: 'Özel bir ekipmana gerek yoktur', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Solunum izolasyonunda (havayolu) hangi maske tipi zorunludur?',
+        options: [
+          { optionText: 'Cerrahi maske', isCorrect: false },
+          { optionText: 'Bez maske', isCorrect: false },
+          { optionText: 'N95 / FFP2 veya FFP3 maske', isCorrect: true },
+          { optionText: 'Oksijen maskesi', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Eller ne zaman su ve sabunla yıkanmalıdır?',
+        options: [
+          { optionText: 'Gözle görülür bir kirlenme olduğunda', isCorrect: true },
+          { optionText: 'Sadece hasta temasından sonra', isCorrect: false },
+          { optionText: 'Sadece tuvaletten sonra', isCorrect: false },
+          { optionText: 'Günde sadece bir kez', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Tıbbi atıklar hangi renk torbaya atılır?',
+        options: [
+          { optionText: 'Siyah torba', isCorrect: false },
+          { optionText: 'Kırmızı torba', isCorrect: true },
+          { optionText: 'Mavi torba', isCorrect: false },
+          { optionText: 'Sarı torba', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Kesici ve delici alet atıkları nerede biriktirilmelidir?',
+        options: [
+          { optionText: 'Kırmızı çöp poşetinde', isCorrect: false },
+          { optionText: 'Siyah çöp poşetinde', isCorrect: false },
+          { optionText: 'Delinmeye dirençli sarı kutularda', isCorrect: true },
+          { optionText: 'Karton kutularda', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Evsel atıklar hangi renk torbaya atılmalıdır?',
+        options: [
+          { optionText: 'Kırmızı', isCorrect: false },
+          { optionText: 'Sarı', isCorrect: false },
+          { optionText: 'Siyah', isCorrect: true },
+          { optionText: 'Mavi', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Cerrahi el yıkama işlemi en az ne kadar sürmelidir?',
+        options: [
+          { optionText: '10 saniye', isCorrect: false },
+          { optionText: '30 saniye', isCorrect: false },
+          { optionText: '2-3 dakika', isCorrect: true },
+          { optionText: '5-6 dakika', isCorrect: false },
+        ],
+      },
     ],
   },
   {
@@ -95,6 +158,69 @@ const TRAININGS = [
           { optionText: 'Gürültülü olduğu için', isCorrect: false },
         ],
       },
+      {
+        questionText: 'Hastanelerde hangi yangın sınıfı (söndürücü tipi) daha yaygın kullanılmalıdır?',
+        options: [
+          { optionText: 'Su bazlı', isCorrect: false },
+          { optionText: 'KKT (Kuru Kimyevi Toz) ve CO2', isCorrect: true },
+          { optionText: 'Köpüklü', isCorrect: false },
+          { optionText: 'Kum', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Hastane tahliyesinde öncelikli kurtarılacak hasta grubu hangisidir?',
+        options: [
+          { optionText: 'Yürüyebilen hastalar', isCorrect: true },
+          { optionText: 'Yoğun bakım hastaları', isCorrect: false },
+          { optionText: 'Ameliyattaki hastalar', isCorrect: false },
+          { optionText: 'Yatağa bağımlı hastalar', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Kırmızı Kod (1111) hastanelerde hangi acil durumu ifade eder?',
+        options: [
+          { optionText: 'Bebek kaçırma', isCorrect: false },
+          { optionText: 'Yangın', isCorrect: true },
+          { optionText: 'Kardiyak arrest (Kalp durması)', isCorrect: false },
+          { optionText: 'Saldırı / Güvenlik ihlali', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Yangın anında dumanlı bir ortamda nasıl hareket edilmelidir?',
+        options: [
+          { optionText: 'Koşarak uzaklaşılmalı', isCorrect: false },
+          { optionText: 'Ayakta ve hızlıca yürünmeli', isCorrect: false },
+          { optionText: 'Yere olabildiğince yakın, eğilerek veya emekleyerek', isCorrect: true },
+          { optionText: 'Derin nefes alarak', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Yangın kapılarının temel işlevi nedir?',
+        options: [
+          { optionText: 'Güvenliği sağlamak', isCorrect: false },
+          { optionText: 'Yangın ve dumanın diğer bölümlere geçişini engellemek', isCorrect: true },
+          { optionText: 'Hırsızları engellemek', isCorrect: false },
+          { optionText: 'Estetik görünüm sağlamak', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'Tahliye işlemi sırasında kapılar ne yapılmalıdır?',
+        options: [
+          { optionText: 'Tamamen açık bırakılmalıdır', isCorrect: false },
+          { optionText: 'Kilitlenmelidir', isCorrect: false },
+          { optionText: 'Kilitlenmeden sıkıca kapatılmalıdır', isCorrect: true },
+          { optionText: 'Sökülmelidir', isCorrect: false },
+        ],
+      },
+      {
+        questionText: 'R.A.C.E. (Kurtar, Alarma Bas, Sınırlandır, Söndür/Tahliye Et) akronimindeki "C - Contain" ne anlama gelir?',
+        options: [
+          { optionText: 'Yangını sınırlandırmak için kapıları ve pencereleri kapatmak', isCorrect: true },
+          { optionText: 'Hastaları çağırarak bilgilendirmek', isCorrect: false },
+          { optionText: 'Cihazları kontrol etmek', isCorrect: false },
+          { optionText: 'Merkezle iletişime geçmek', isCorrect: false },
+        ],
+      },
     ],
   },
 ]
@@ -105,6 +231,8 @@ export interface SeedDemoOrganizationResult {
   adminEmail: string
   adminTc: string
   tempPassword: string
+  staffEmail?: string
+  staffTc?: string
 }
 
 async function nextDemoIdentity() {
@@ -266,7 +394,12 @@ export async function seedDemoOrganization({
       data: { ownerUserId: admin.dbUser.id },
     })
 
+    let staffEmail: string | undefined
+    let staffTc: string | undefined
+
     if (filled) {
+      staffEmail = `personel1@${identity.emailDomain}`
+      staffTc = tcs[1]
       await seedFilledDemoData({
         organizationId: organization.id,
         adminId: admin.dbUser.id,
@@ -284,6 +417,8 @@ export async function seedDemoOrganization({
       adminEmail,
       adminTc,
       tempPassword,
+      staffEmail,
+      staffTc,
     }
   } catch (err) {
     await deleteAuthUsers(createdAuthUserIds)
@@ -357,6 +492,18 @@ async function seedFilledDemoData({
 
   for (let tIdx = 0; tIdx < TRAININGS.length; tIdx++) {
     const item = TRAININGS[tIdx]
+    
+    const mediaAsset = await prisma.mediaAsset.create({
+      data: {
+        organizationId,
+        title: `${item.title} - Tanıtım`,
+        mediaType: 'video',
+        s3Key: `videos/${organizationId}/demo/${item.video}`,
+        fileSizeBytes: 15000000,
+        uploadedById: adminId,
+      }
+    })
+
     const training = await prisma.training.create({
       data: {
         organizationId,
@@ -377,10 +524,11 @@ async function seedFilledDemoData({
           create: {
             title: `${item.title} - Tanıtım`,
             videoUrl: `/uploads/${item.video}`, // perf-check-disable-line raw-video-url — demo public upload path'i bilinçli.
-            videoKey: '',
+            videoKey: mediaAsset.s3Key,
             durationSeconds: 18,
             contentType: 'video',
             sortOrder: 1,
+            sourceMediaAssetId: mediaAsset.id,
           },
         },
         questions: {
