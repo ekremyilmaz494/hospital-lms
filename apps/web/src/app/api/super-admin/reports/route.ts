@@ -11,11 +11,13 @@ export const GET = withSuperAdminRoute(async () => {
     recentOrganizations,
     monthlyGrowth,
   ] = await Promise.all([
-    prisma.organization.count(),
-    prisma.user.count(),
-    prisma.training.count({ where: { isActive: true, publishStatus: { not: 'archived' } } }),
-    prisma.organizationSubscription.count({ where: { status: 'active' } }),
+    // Demo org'lar raporlara dahil değil (gerçek müşteri metrikleri).
+    prisma.organization.count({ where: { isDemo: false } }),
+    prisma.user.count({ where: { organization: { isDemo: false } } }),
+    prisma.training.count({ where: { isActive: true, publishStatus: { not: 'archived' }, organization: { isDemo: false } } }),
+    prisma.organizationSubscription.count({ where: { status: 'active', organization: { isDemo: false } } }),
     prisma.organization.findMany({
+      where: { isDemo: false },
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: { _count: { select: { users: true } } },
@@ -24,7 +26,7 @@ export const GET = withSuperAdminRoute(async () => {
     prisma.$queryRaw<{ month: string; count: bigint }[]>`
       SELECT to_char(created_at, 'YYYY-MM') as month, count(*)::bigint as count
       FROM organizations
-      WHERE created_at > now() - interval '12 months'
+      WHERE created_at > now() - interval '12 months' AND is_demo = false
       GROUP BY month
       ORDER BY month
     `,

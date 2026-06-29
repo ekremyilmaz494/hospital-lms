@@ -30,6 +30,9 @@ export const GET = withSuperAdminRoute(async ({ request }) => {
   }
   if (status === 'active') where.isActive = true
   if (status === 'suspended') where.isSuspended = true
+  // "Organizasyonlar" yalnız gerçek müşterileri gösterir; demolar ayrı "Demo Yönetimi"
+  // menüsünde (/api/super-admin/demos). count ve findMany aynı where'i paylaşır.
+  where.isDemo = false
 
   const [organizations, total] = await Promise.all([
     prisma.organization.findMany({

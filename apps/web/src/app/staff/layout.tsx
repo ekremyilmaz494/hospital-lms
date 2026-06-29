@@ -12,8 +12,7 @@ import { useMobile } from '@/hooks/use-mobile';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
-import { createClient } from '@/lib/supabase/client';
-import { useAuthStore } from '@/store/auth-store';
+import { performLogout } from '@/lib/auth/logout';
 import { OfflineQueueProvider } from '@/components/providers/offline-queue-provider';
 
 export default function StaffLayout({
@@ -43,15 +42,8 @@ export default function StaffLayout({
     localStorage.setItem('sidebar:staff:collapsed', String(next));
   };
 
-  const handleLogout = async () => {
-    // Çıkışı önce sunucu rotasından yap: SSR cookie handler oturum çerezlerini KESİN temizler.
-    // (Client signOut'un global-scope network hatasında çerezi temizlemeden çıkma sorununu aşar —
-    // aksi halde /auth/login'e gidince middleware hâlâ oturumu görüp panele geri atıyordu.)
-    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* yine de devam et */ }
-    try { await createClient().auth.signOut(); } catch { /* yerel oturum durumunu da temizle */ }
-    useAuthStore.getState().setUser(null);
-    // Full reload — middleware temizlenmiş çerezle yeniden değerlendirsin (router.push race'i yok).
-    window.location.href = '/auth/login';
+  const handleLogout = () => {
+    void performLogout();
   };
 
   // Auth guard: staff paneline sadece staff, admin ve super_admin erişebilir.

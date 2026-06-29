@@ -12,6 +12,7 @@ import { BRAND } from '@/lib/brand';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, HelpCircle, LogOut, X } from 'lucide-react';
+import { performLogout } from '@/lib/auth/logout';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -577,14 +578,7 @@ export const AppSidebar = memo(function AppSidebar({
             </div>
             <button
               type="button"
-              onClick={async () => {
-                try {
-                  await fetch('/api/auth/logout', { method: 'POST' });
-                } catch {
-                  // Ignore — redirect regardless
-                }
-                window.location.href = '/auth/login';
-              }}
+              onClick={() => { void performLogout(); }}
               className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
               style={{
                 color: '#f4a9a1',

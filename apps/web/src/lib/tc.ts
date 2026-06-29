@@ -52,3 +52,29 @@ export function maskTcKimlik(tc: string | null | undefined): string {
   if (normalized.length !== 11) return '***********'
   return `${normalized.slice(0, 5)}*****${normalized.slice(-1)}`
 }
+
+/**
+ * Test/demo amaçlı geçerli TC Kimlik No üretir.
+ * Gerçek kişiye ait olmaması için rastgele 9 hane üretip resmi kontrol hanelerini hesaplar.
+ */
+export function generateTestTc(): string {
+  const digits = Array.from({ length: 9 }, (_, i) => {
+    if (i === 0) return Math.floor(Math.random() * 9) + 1
+    return Math.floor(Math.random() * 10)
+  })
+
+  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8]
+  const evenSum = digits[1] + digits[3] + digits[5] + digits[7]
+  const tenth = (((oddSum * 7) - evenSum) % 10 + 10) % 10
+  const eleventh = ([...digits, tenth].reduce((sum, d) => sum + d, 0)) % 10
+
+  return [...digits, tenth, eleventh].join('')
+}
+
+export function generateUniqueTcs(count: number): string[] {
+  const values = new Set<string>()
+  while (values.size < count) {
+    values.add(generateTestTc())
+  }
+  return [...values]
+}

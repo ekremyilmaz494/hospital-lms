@@ -81,6 +81,9 @@ model Organization {
   isSuspended         Boolean   @default(false) @map("is_suspended")
   suspendedReason     String?   @map("suspended_reason") @db.Text
   suspendedAt         DateTime? @map("suspended_at") @db.Timestamptz
+  // Demo organizasyonu işareti — "Demo Yönetimi" menüsünden otomatik üretilir.
+  // Gerçek müşteri listelerinden/sayımlarından DIŞLANIR; yalnız bu işaretli org'lar silinebilir.
+  isDemo              Boolean   @default(false) @map("is_demo")
   sessionTimeout      Int       @default(30) @map("session_timeout")
   defaultPassingScore Int       @default(70) @map("default_passing_score")
   defaultMaxAttempts  Int       @default(3) @map("default_max_attempts")
@@ -179,6 +182,7 @@ model Organization {
   invitations            Invitation[]
 
   @@index([sector], map: "organization_sector_idx")
+  @@index([isDemo], map: "organization_is_demo_idx")
   @@map("organizations")
 }
 

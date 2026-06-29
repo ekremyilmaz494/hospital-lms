@@ -26,19 +26,22 @@ export const GET = withSuperAdminRoute(async () => {
       recentOrganizations,
       recentLogs,
     ] = await Promise.all([
-      prisma.organization.count(),
-      prisma.organization.count({ where: { isActive: true, isSuspended: false } }),
-      prisma.user.count(),
-      prisma.user.count({ where: { role: 'staff' satisfies UserRole } }),
+      // Demo org'lar gerçek müşteri sayımlarına dahil EDİLMEZ (Demo Yönetimi menüsü ayrı).
+      prisma.organization.count({ where: { isDemo: false } }),
+      prisma.organization.count({ where: { isActive: true, isSuspended: false, isDemo: false } }),
+      prisma.user.count({ where: { organization: { isDemo: false } } }),
+      prisma.user.count({ where: { role: 'staff' satisfies UserRole, organization: { isDemo: false } } }),
       // Platform sayımları: archived/inactive training'ler "aktif değil" — tutarlılık için hariç
-      prisma.training.count({ where: { isActive: true, publishStatus: { not: 'archived' } } }),
-      prisma.trainingAssignment.count({ where: { training: { isActive: true, publishStatus: { not: 'archived' } } } }),
-      prisma.trainingAssignment.count({ where: { status: 'passed' satisfies AssignmentStatus, training: { isActive: true, publishStatus: { not: 'archived' } } } }),
+      prisma.training.count({ where: { isActive: true, publishStatus: { not: 'archived' }, organization: { isDemo: false } } }),
+      prisma.trainingAssignment.count({ where: { training: { isActive: true, publishStatus: { not: 'archived' }, organization: { isDemo: false } } } }),
+      prisma.trainingAssignment.count({ where: { status: 'passed' satisfies AssignmentStatus, training: { isActive: true, publishStatus: { not: 'archived' }, organization: { isDemo: false } } } }),
       prisma.organizationSubscription.findMany({
+        where: { organization: { isDemo: false } },
         include: { plan: { select: { name: true } }, organization: { select: { name: true, code: true, isActive: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.organization.findMany({
+        where: { isDemo: false },
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -100,13 +103,14 @@ export const GET = withSuperAdminRoute(async () => {
       LEFT JOIN (
         SELECT date_trunc('month', created_at) AS m, COUNT(*) AS cnt
         FROM organizations
-        WHERE created_at >= ${sixMonthsAgo}
+        WHERE created_at >= ${sixMonthsAgo} AND is_demo = false
         GROUP BY m
       ) o ON o.m = gs.month
       LEFT JOIN (
-        SELECT date_trunc('month', created_at) AS m, COUNT(*) AS cnt
-        FROM users
-        WHERE created_at >= ${sixMonthsAgo}
+        SELECT date_trunc('month', u.created_at) AS m, COUNT(*) AS cnt
+        FROM users u
+        INNER JOIN organizations org ON org.id = u.organization_id
+        WHERE u.created_at >= ${sixMonthsAgo} AND org.is_demo = false
         GROUP BY m
       ) u ON u.m = gs.month
       ORDER BY gs.month
@@ -158,7 +162,7 @@ export const GET = withSuperAdminRoute(async () => {
     }))
 
     // Platform health
-    const suspendedCount = await prisma.organization.count({ where: { isSuspended: true } })
+    const suspendedCount = await prisma.organization.count({ where: { isSuspended: true, isDemo: false } })
     const alert = suspendedCount > 0 ? {
       message: `${suspendedCount} hastane askıya alındı`,
       actionLabel: 'Görüntüle',

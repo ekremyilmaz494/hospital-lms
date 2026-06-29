@@ -73,6 +73,8 @@ export const updateOrganizationSchema = createOrganizationSchema.partial().exten
   isActive: z.boolean().optional(),
   isSuspended: z.boolean().optional(),
   suspendedReason: z.string().max(500).optional(),
+  // Demo işareti — zod v4 bilinmeyen anahtarı siler; eklemezsek PATCH route alanı görmez.
+  isDemo: z.boolean().optional(),
   slug: z.string().min(3).max(50).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanılabilir').optional(),
   customDomain: z.string().min(3).max(255).optional(),
 })
