@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
         organizationId: true,
         phone: true,
         phoneVerifiedAt: true,
-        organization: { select: { slug: true, smsMfaEnabled: true, setupCompleted: true, ipAllowlistEnabled: true, ipAllowlist: true } },
+        organization: { select: { slug: true, isActive: true, isSuspended: true, smsMfaEnabled: true, setupCompleted: true, ipAllowlistEnabled: true, ipAllowlist: true } },
       }
     })
 
@@ -238,6 +238,16 @@ export async function POST(request: NextRequest) {
     if (!dbUser.isActive) {
       return jsonResponse(
         { error: 'Hesabınız devre dışı bırakılmış. Yöneticinizle iletişime geçin.' },
+        403
+      )
+    }
+
+    // Org pasif/askıya alınmışsa (örn. demo iptali) giriş ekranında temiz ret — super_admin muaf.
+    // checkOrgActive (api-helpers.ts) ile birebir aynı kural/mesaj; aksi halde kullanıcı girip
+    // her API'den 403 alırdı.
+    if ((!dbUser.organization?.isActive || dbUser.organization?.isSuspended) && dbUser.role !== 'super_admin') {
+      return jsonResponse(
+        { error: 'Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.' },
         403
       )
     }
