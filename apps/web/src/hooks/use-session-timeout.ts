@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { performLogout } from '@/lib/auth/logout';
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll'] as const;
 const WARNING_BEFORE_MS = 60_000; // Show warning 1 minute before logout
@@ -20,7 +19,6 @@ export function useSessionTimeout({
   onTimeout,
   enabled = true,
 }: UseSessionTimeoutOptions) {
-  const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef<number>(0);
@@ -30,13 +28,14 @@ export function useSessionTimeout({
     if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
   }, []);
 
-  const handleLogout = useCallback(async () => {
+  const handleLogout = useCallback(() => {
     clearTimers();
     onTimeout?.();
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/auth/login?reason=timeout');
-  }, [clearTimers, onTimeout, router]);
+    // Çıkış butonlarıyla aynı sağlam akış: önce sunucu rotası (çerezi kesin siler),
+    // sonra full-reload. Eski `auth.signOut()+router.push` deseni bayat çerez
+    // bıraktığı için kullanıcı timeout sonrası panele geri atılabiliyordu.
+    void performLogout('/auth/login?reason=timeout');
+  }, [clearTimers, onTimeout]);
 
   const resetTimers = useCallback(() => {
     if (!enabled || timeoutMinutes <= 0) return;

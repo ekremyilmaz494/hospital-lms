@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Menu, User, LogOut } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { performLogout } from '@/lib/auth/logout';
 import { useAuthStore } from '@/store/auth-store';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -35,11 +35,8 @@ export function AdminTopbar({
   const router = useRouter();
   const { user } = useAuthStore();
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    useAuthStore.getState().setUser(null);
-    router.push('/auth/login');
+  const handleLogout = () => {
+    void performLogout();
   };
 
   return (

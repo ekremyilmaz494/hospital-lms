@@ -9,6 +9,7 @@ import {
   trainingFeedbackSubmitSchema,
   trainingFeedbackFormUpsertSchema,
   createTrainingBodySchema,
+  updateOrganizationSchema,
 } from '../validations'
 
 describe('createOrganizationSchema', () => {
@@ -36,6 +37,16 @@ describe('createOrganizationSchema', () => {
       email: 'test@test.com',
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('updateOrganizationSchema', () => {
+  it('isDemo alanını korur', () => {
+    const result = updateOrganizationSchema.safeParse({ isDemo: true })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.isDemo).toBe(true)
+    }
   })
 })
 

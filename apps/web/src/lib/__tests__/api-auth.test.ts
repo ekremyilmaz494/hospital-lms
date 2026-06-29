@@ -96,6 +96,16 @@ const activeDbUser = {
   isActive: true,
   mustChangePassword: false,
   role: 'admin',
+  organizationId: 'org-1',
+  organization: {
+    slug: 'test-hastanesi',
+    isActive: true,
+    isSuspended: false,
+    smsMfaEnabled: false,
+    setupCompleted: true,
+    ipAllowlistEnabled: false,
+    ipAllowlist: [],
+  },
 }
 
 beforeEach(() => {

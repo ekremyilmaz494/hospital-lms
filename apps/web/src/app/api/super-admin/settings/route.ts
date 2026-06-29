@@ -10,8 +10,8 @@ import { BRAND } from '@/lib/brand'
  */
 export const GET = withSuperAdminRoute(async () => {
   // Platform ayarları — env'den ve DB'den toplanan bilgiler
-  const orgCount = await prisma.organization.count({ where: { isActive: true } })
-  const userCount = await prisma.user.count()
+  const orgCount = await prisma.organization.count({ where: { isActive: true, isDemo: false } })
+  const userCount = await prisma.user.count({ where: { organization: { isDemo: false } } })
 
   return jsonResponse({
     platformName: process.env.NEXT_PUBLIC_PLATFORM_NAME || BRAND.fullName,

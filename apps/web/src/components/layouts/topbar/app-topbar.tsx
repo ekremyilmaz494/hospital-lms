@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu, Search, X, User, Bell, LogOut, Check } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { performLogout } from '@/lib/auth/logout';
 import { useAuthStore } from '@/store/auth-store';
 import { NotificationBell } from '@/components/shared/notification-bell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -70,11 +70,8 @@ export function AppTopbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const { user } = useAuthStore();
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    useAuthStore.getState().setUser(null);
-    router.push('/auth/login');
+  const handleLogout = () => {
+    void performLogout();
   };
 
   const profilePath = getRolePath(user?.role, 'settings');
