@@ -59,10 +59,14 @@ export default function AdminLayout({
   };
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    // Çıkışı önce sunucu rotasından yap: SSR cookie handler oturum çerezlerini KESİN temizler.
+    // (Client signOut'un global-scope network hatasında çerezi temizlemeden çıkma sorununu aşar —
+    // aksi halde /auth/login'e gidince middleware hâlâ oturumu görüp panele geri atıyordu.)
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* yine de devam et */ }
+    try { await createClient().auth.signOut(); } catch { /* yerel oturum durumunu da temizle */ }
     useAuthStore.getState().setUser(null);
-    router.push('/auth/login');
+    // Full reload — middleware temizlenmiş çerezle yeniden değerlendirsin (router.push race'i yok).
+    window.location.href = '/auth/login';
   };
 
   useEffect(() => {
