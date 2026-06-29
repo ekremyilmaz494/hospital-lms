@@ -2,22 +2,6 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { logger } from '@/lib/logger'
 
-const FALLBACK_LOGO_PATH = path.join(process.cwd(), 'public', 'logos', 'devakent.png')
-
-let cachedFallback: string | null = null
-
-async function readFallbackLogo(): Promise<string | null> {
-  if (cachedFallback !== null) return cachedFallback
-  try {
-    const buffer = await fs.readFile(FALLBACK_LOGO_PATH)
-    cachedFallback = `data:image/png;base64,${buffer.toString('base64')}`
-    return cachedFallback
-  } catch (err) {
-    logger.warn('Certificate PDF', 'Fallback logo okunamadi', err)
-    return null
-  }
-}
-
 export async function resolveOrgLogoDataUrl(logoUrl: string | null | undefined): Promise<string | null> {
   if (logoUrl) {
     try {
@@ -36,8 +20,8 @@ export async function resolveOrgLogoDataUrl(logoUrl: string | null | undefined):
         return `data:${contentType};base64,${base64}`
       }
     } catch (err) {
-      logger.warn('Certificate PDF', 'Logo yuklenemedi, fallback kullanilacak', err)
+      logger.warn('Certificate PDF', 'Kurum logosu yuklenemedi', err)
     }
   }
-  return readFallbackLogo()
+  return null
 }

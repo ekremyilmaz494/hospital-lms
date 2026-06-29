@@ -63,7 +63,7 @@ function GoldSeal() {
 
 function CertificatePreview({ cert }: { cert: Certificate }) {
   const fullName = cert.user ? `${cert.user.firstName ?? ''} ${cert.user.lastName ?? ''}`.trim() : '';
-  const orgLogo = (cert.user?.organization as { logoUrl?: string | null } | undefined)?.logoUrl ?? '/logos/devakent.png';
+  const orgLogo = (cert.user?.organization as { logoUrl?: string | null } | undefined)?.logoUrl ?? null;
   const issued = new Date(cert.issuedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
   const expiryLabel = cert.expiresAt
     ? `${new Date(cert.expiresAt).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}${cert.isExpired ? ' (Süresi Dolmuş)' : ''}`
@@ -121,8 +121,12 @@ function CertificatePreview({ cert }: { cert: Certificate }) {
 
       <div className="relative h-full flex flex-col items-center justify-between px-8 pt-6 pb-4 sm:px-14 sm:pt-7 sm:pb-5" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
         <div className="flex flex-col items-center gap-1 w-full">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={orgLogo} alt="Hastane Logosu" className="h-10 sm:h-12 object-contain" style={{ maxWidth: '55%' }} />
+          {orgLogo ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={orgLogo} alt="Hastane Logosu" className="h-10 sm:h-12 object-contain" style={{ maxWidth: '55%' }} />
+          ) : (
+            <div aria-hidden className="h-10 sm:h-12" />
+          )}
           <h1 className="text-[22px] sm:text-[30px] font-bold tracking-[0.05em] mt-1" style={{ color: ART_GOLD_DARK, letterSpacing: '0.08em' }}>
             BAŞARI SERTİFİKASI
           </h1>

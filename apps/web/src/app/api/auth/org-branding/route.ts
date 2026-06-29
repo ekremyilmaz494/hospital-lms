@@ -18,8 +18,8 @@ export async function GET() {
     }
 
     const userId = session.user.id
-    // v3: sector enum eklendi (2026-05-17, Faz 3) — eski cache invalidate
-    const cacheKey = `org-branding:v3:${userId}`
+    // v5: isDemo eklendi — demo hesaplarda sol üst logo/monogram bastırılır.
+    const cacheKey = `org-branding:v5:${userId}`
 
     // Redis cache — branding nadiren değişir (10 dk TTL)
     const cached = await getCached<object>(cacheKey)
@@ -44,6 +44,7 @@ export async function GET() {
             ownerUserId: true,
             maxAdmins: true,
             sector: true,
+            isDemo: true,
           },
         },
       },

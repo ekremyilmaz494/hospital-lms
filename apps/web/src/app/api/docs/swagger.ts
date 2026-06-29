@@ -41,7 +41,6 @@ export const openApiSpec = {
     { name: 'Admin: Rapor', description: 'Raporlama, Excel/PDF export islemleri' },
     { name: 'Admin: Sertifika', description: 'Sertifika yonetimi' },
     { name: 'Admin: Bildirim', description: 'Bildirim olusturma ve listeleme' },
-    { name: 'Admin: Yedekleme', description: 'Veritabani yedekleme islemleri' },
     { name: 'Admin: Ayarlar', description: 'Organizasyon ve platform ayarlari' },
     { name: 'Admin: Denetim', description: 'Denetim kayitlari, uyum raporu ve yetkinlik matrisi' },
     { name: 'Personel', description: 'Personel paneli — egitimler, sertifikalar, profil' },
@@ -646,34 +645,6 @@ export const openApiSpec = {
         responses: {
           201: { description: 'Bildirim olusturuldu' },
         },
-      },
-    },
-
-    // ── Admin: Backups ───────────────────────────────────────────────────────
-    '/admin/backups': {
-      get: {
-        summary: 'Yedek listesi',
-        description: 'Organizasyona ait veritabani yedeklerini listeler.',
-        tags: ['Admin: Yedekleme'],
-        security: [{ bearer: [] }],
-        responses: { 200: { description: 'Yedek listesi' } },
-      },
-      post: {
-        summary: 'Manuel yedek al',
-        description: 'Veritabaninin manuel yedegini olusturur.',
-        tags: ['Admin: Yedekleme'],
-        security: [{ bearer: [] }],
-        responses: { 201: { description: 'Yedekleme baslatildi' } },
-      },
-    },
-
-    '/admin/backups/{id}/download': {
-      get: {
-        summary: 'Yedek indir',
-        tags: ['Admin: Yedekleme'],
-        security: [{ bearer: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
-        responses: { 200: { description: 'Yedek dosyasi' } },
       },
     },
 

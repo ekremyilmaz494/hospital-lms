@@ -1,26 +1,25 @@
 import { prisma } from '@/lib/prisma'
-import { jsonResponse } from '@/lib/api-helpers'
-import { withAdminRoute } from '@/lib/api-handler'
+import { jsonResponse, errorResponse } from '@/lib/api-helpers'
+import { withSuperAdminRoute } from '@/lib/api-handler'
 
-/**
- * GET /api/admin/backups/health
- *
- * Yedek sisteminin sağlık göstergeleri — /admin/backups dashboard'unda
- * 4 KPI kartı bunu okur. Hızlı, sade aggregate query'ler:
- *  - Son 7 gün: toplam, başarılı, oran
- *  - Son tamamlanan yedek (timestamp)
- *  - Son verify edilen yedek (verified=true) timestamp'i
- *  - Toplam yedek sayısı + toplam boyut
- *
- * Önemli: kurum (organizationId) bazında filtreli; bir admin sadece kendi
- * kurumunun health verisini görür.
- */
-export const GET = withAdminRoute(async ({ organizationId }) => {
+async function requireRealOrganization(organizationId: string) {
+  return prisma.organization.findFirst({
+    where: { id: organizationId, isDemo: false },
+    select: { id: true },
+  })
+}
+
+export const GET = withSuperAdminRoute(async ({ request }) => {
+  const { searchParams } = new URL(request.url)
+  const organizationId = searchParams.get('organizationId')?.trim()
+  if (!organizationId) return errorResponse('Yedek sağlığı için kurum seçilmelidir', 400)
+  const organization = await requireRealOrganization(organizationId)
+  if (!organization) return errorResponse('Kurum bulunamadı veya demo kurumlar yedek paneline dahil değil', 404)
+
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
   const [recent7d, lastCompleted, lastVerified, totals] = await Promise.all([
-    // Son 7 gün — completed/failed/verification_failed sayılarını groupBy ile topla
     prisma.dbBackup.groupBy({
       by: ['status'],
       where: { organizationId, createdAt: { gte: sevenDaysAgo } },
@@ -49,23 +48,18 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     recent7dByStatus[r.status] = r._count._all
     recent7dTotal += r._count._all
   }
-  const recent7dCompleted = recent7dByStatus['completed'] ?? 0
+  const recent7dCompleted = recent7dByStatus.completed ?? 0
   const successRate7d = recent7dTotal > 0 ? Math.round((recent7dCompleted / recent7dTotal) * 100) : null
 
-  // Son verify edilen yedek "stale" mi (örn. 36 saatten eski)? — günlük cron varsa
-  // 24 saatten taze olması beklenir; 36 saat eşik, gecikme tolere edilir.
   const lastVerifiedAgeHours = lastVerified
     ? Math.round((now.getTime() - lastVerified.createdAt.getTime()) / (60 * 60 * 1000))
     : null
   const verifyStale = lastVerifiedAgeHours === null || lastVerifiedAgeHours > 36
-
-  // Son completed yedek "stale" mi (>30 saat = 1 gün + 6 saat tolerans)
   const lastCompletedAgeHours = lastCompleted
     ? Math.round((now.getTime() - lastCompleted.createdAt.getTime()) / (60 * 60 * 1000))
     : null
   const completedStale = lastCompletedAgeHours === null || lastCompletedAgeHours > 30
 
-  // Genel sağlık skoru: 7 gün başarı + verify tazelik + son yedek tazelik
   let healthLevel: 'healthy' | 'warning' | 'critical' = 'healthy'
   const healthIssues: string[] = []
   if (completedStale) {
@@ -92,9 +86,9 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     last7Days: {
       total: recent7dTotal,
       completed: recent7dCompleted,
-      failed: recent7dByStatus['failed'] ?? 0,
-      verificationFailed: recent7dByStatus['verification_failed'] ?? 0,
-      successRate: successRate7d, // null = veri yok
+      failed: recent7dByStatus.failed ?? 0,
+      verificationFailed: recent7dByStatus.verification_failed ?? 0,
+      successRate: successRate7d,
     },
     lastBackup: lastCompleted ? {
       at: lastCompleted.createdAt.toISOString(),
@@ -110,5 +104,5 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       count: totals._count._all,
       sizeMb: totals._sum.fileSizeMb ? Number(totals._sum.fileSizeMb) : 0,
     },
-  }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
-}, { requireOrganization: true })
+  }, 200, { 'Cache-Control': 'private, no-store' })
+})

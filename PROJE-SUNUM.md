@@ -145,7 +145,7 @@ Eğitim listesinde filtreleme (duruma göre, kategoriye göre), arama ve sayfala
 
 **Akreditasyon** (`/admin/accreditation`) — JCI/SKS akreditasyon sürecini takip eden modül. Hangi standartlar karşılandı, hangileri eksik, raporlama.
 
-**Yedeklemeler** (`/admin/backups`) — Veritabanı yedekleme geçmişi. Otomatik günlük yedekleme çalışıyor (Vercel cron), ayrıca manuel yedekleme tetiklenebilir. Yedekler şifreli olarak saklanıyor.
+**Yedeklemeler** (`/super-admin/backups`) — Super admin tarafında kurum seçilerek veritabanı yedekleme geçmişi izlenir. Otomatik günlük yedekleme çalışıyor (Vercel cron), ayrıca manuel yedekleme tetiklenebilir. Yedekler şifreli olarak saklanıyor.
 
 **Ayarlar** (`/admin/settings`) — Hastane genel ayarları (isim, logo, oturum zaman aşımı süresi), eğitim kategorileri yönetimi ve HBYS entegrasyon ayarları.
 

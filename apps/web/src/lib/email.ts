@@ -8,6 +8,8 @@ import { emailLayout, cta, alertBox, infoCard } from '@/lib/email-layout'
 import { getOrgUrl } from '@/lib/api-helpers'
 import { certificateVerifyUrl } from '@/lib/certificate-url'
 
+const SUBSCRIPTION_SUPPORT_URL = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/help`
+
 /**
  * Escapes HTML special characters to prevent HTML injection in email templates.
  * Must be applied to all user-provided or database-sourced values before interpolation.
@@ -683,13 +685,13 @@ export async function sendInvoiceEmail(params: {
 
 /** Deneme suresi dolmak uzere (7, 3, 1 gun kala) */
 export async function sendTrialExpiringEmail(to: string, organizationName: string, daysLeft: number) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const ctaUrl = SUBSCRIPTION_SUPPORT_URL
   const content = `
     ${alertBox(`${daysLeft} gun kaldi!`, 'warning')}
     <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Dolmak Uzere</h2>
     <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin deneme surenizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
     <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen bir abonelik plani secin.</p>
-    ${cta(ctaUrl, 'Plan Secin', '#f59e0b')}
+    ${cta(ctaUrl, 'Destekle Gorusun', '#f59e0b')}
     <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">Deneme suresi doldugunda yeni egitim ve personel ekleyemezsiniz. Mevcut verileriniz silinmez.</p>
   `
   const html = emailLayout({
@@ -703,14 +705,14 @@ export async function sendTrialExpiringEmail(to: string, organizationName: strin
 
 /** Deneme suresi doldu */
 export async function sendTrialExpiredEmail(to: string, organizationName: string) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const ctaUrl = SUBSCRIPTION_SUPPORT_URL
   const content = `
     ${alertBox('Deneme suresi doldu', 'error')}
     <h2 style="color: #1e293b; margin-top: 0;">Deneme Sureniz Sona Erdi</h2>
     <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> icin ucretsiz deneme sureniz sona ermistir.</p>
     <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
     <p style="color: #64748b;">Hizmeti kesintisiz kullanmak icin lutfen bir abonelik plani satin alin.</p>
-    ${cta(ctaUrl, 'Simdi Abone Ol', '#dc2626')}
+    ${cta(ctaUrl, 'Destekle Gorusun', '#dc2626')}
   `
   const html = emailLayout({
     org: { name: organizationName },
@@ -723,13 +725,13 @@ export async function sendTrialExpiredEmail(to: string, organizationName: string
 
 /** Abonelik suresi dolmak uzere (7, 3, 1 gun kala) */
 export async function sendSubscriptionExpiringEmail(to: string, organizationName: string, daysLeft: number) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const ctaUrl = SUBSCRIPTION_SUPPORT_URL
   const content = `
     ${alertBox(`${daysLeft} gun kaldi!`, 'warning')}
     <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Yenilenmeyi Bekliyor</h2>
     <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginizin bitmesine <strong>${daysLeft} gun</strong> kaldi.</p>
     <p style="color: #64748b;">Hizmet kesintisi yasamamamak icin lutfen aboneliginizi yenileyin.</p>
-    ${cta(ctaUrl, 'Aboneligi Yenile', '#f59e0b')}
+    ${cta(ctaUrl, 'Destekle Gorusun', '#f59e0b')}
   `
   const html = emailLayout({
     org: { name: organizationName },
@@ -742,14 +744,14 @@ export async function sendSubscriptionExpiringEmail(to: string, organizationName
 
 /** Abonelik suresi doldu */
 export async function sendSubscriptionExpiredEmail(to: string, organizationName: string) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const ctaUrl = SUBSCRIPTION_SUPPORT_URL
   const content = `
     ${alertBox('Abonelik sona erdi', 'error')}
     <h2 style="color: #1e293b; margin-top: 0;">Aboneliginiz Sona Ermistir</h2>
     <p style="color: #64748b;"><strong>${escapeHtml(organizationName)}</strong> aboneliginiz sona ermistir.</p>
     <p style="color: #64748b;">Yeni kayit olusturma kisitlanmistir. Mevcut verilerinize erismeye devam edebilirsiniz.</p>
     <p style="color: #64748b;">Hizmeti tekrar aktif hale getirmek icin lutfen aboneliginizi yenileyin.</p>
-    ${cta(ctaUrl, 'Simdi Yenile', '#dc2626')}
+    ${cta(ctaUrl, 'Destekle Gorusun', '#dc2626')}
   `
   const html = emailLayout({
     org: { name: organizationName },
@@ -921,7 +923,7 @@ export async function certificateIssuedEmail(email: string, staffName: string, t
  * manuel bildirim göndermek için kullanılabilir. */
 export async function subscriptionExpiryEmail(email: string, organizationName: string, planName: string, expiryDate: string, daysRemaining: number) {
   const isCritical = daysRemaining <= 3
-  const ctaUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin/settings/subscription`
+  const ctaUrl = SUBSCRIPTION_SUPPORT_URL
   const ctaColor = isCritical ? '#dc2626' : '#f59e0b'
   const content = `
     ${alertBox(`${daysRemaining} gün kaldı!`, isCritical ? 'error' : 'warning')}

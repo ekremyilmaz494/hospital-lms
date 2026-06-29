@@ -1,8 +1,8 @@
 /**
  * Organizasyon yedek payload'ı — tek doğruluk kaynağı.
  *
- * Manuel backup (POST /api/admin/backups), cron backup (GET /api/cron/backup)
- * ve download fallback (GET /api/admin/backups/[id]/download) AYNI assembler'ı
+ * Manuel backup (POST /api/super-admin/backups), cron backup (GET /api/cron/backup)
+ * ve download fallback (GET /api/super-admin/backups/[id]/download) AYNI assembler'ı
  * çağırır (drift yok).
  *
  * ──────────────────────────────────────────────────────────────────

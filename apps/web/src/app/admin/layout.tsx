@@ -100,6 +100,7 @@ export default function AdminLayout({
             orgName={branding?.orgName || user?.department || 'KlinoVax LMS'}
             orgCode={branding?.orgCode || 'Organizasyon Yöneticisi'}
             orgLogoUrl={branding?.orgLogoUrl ?? undefined}
+            isDemo={branding?.isDemo === true}
             userName={fullName}
             userRole={displayRole}
             userInitials={initials}
@@ -114,6 +115,7 @@ export default function AdminLayout({
           navGroups={adminNav}
           orgName={branding?.orgName || user?.department || ''}
           orgLogoUrl={branding?.orgLogoUrl ?? undefined}
+          isDemo={branding?.isDemo === true}
           userName={fullName}
           userRole={displayRole}
           userInitials={initials}

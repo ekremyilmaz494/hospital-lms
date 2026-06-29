@@ -202,8 +202,6 @@ export const adminNav: NavGroup[] = [
     items: [
       // Yalnızca Esas Yönetici görür — sıradan admin'lerde gizli
       { title: 'Yönetici Yönetimi', href: '/admin/yoneticiler', icon: UserCog, ownerOnly: true },
-      { title: 'Abonelik', href: '/admin/subscription', icon: CreditCard },
-      { title: 'Yedekler', href: '/admin/backups', icon: Database },
       {
         title: 'Ayarlar',
         href: '/admin/settings',

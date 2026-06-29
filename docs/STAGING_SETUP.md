@@ -245,7 +245,7 @@ Her staging deploy'dan sonra manuel çalıştırın:
 - [ ] Yeni eğitim oluştur → video yükle → kaydet
 - [ ] Staff olarak gir → atanmış eğitim görünüyor → pre-exam başlat
 - [ ] /admin/accreditation → PDF indir → Türkçe karakter, logo, tablolar kontrol
-- [ ] /admin/subscription → plan bilgisi, kota progress bar'ları
+- [ ] Super admin olarak /super-admin/subscriptions → plan bilgisi ve abonelik yönetimi
 - [ ] Çıkış yap → login sayfasına dönüyor
 
 Otomatik:

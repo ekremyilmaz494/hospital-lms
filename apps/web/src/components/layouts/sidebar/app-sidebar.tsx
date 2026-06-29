@@ -96,6 +96,7 @@ interface AppSidebarProps {
   orgName?: string;
   orgCode?: string;
   orgLogoUrl?: string;
+  isDemo?: boolean;
   userName?: string;
   userRole?: string;
   userAvatar?: string;
@@ -108,6 +109,7 @@ export const AppSidebar = memo(function AppSidebar({
   orgName = BRAND.fullName,
   orgCode,
   orgLogoUrl,
+  isDemo = false,
   userName = 'Kullanıcı',
   userRole = 'Admin',
   userAvatar,
@@ -154,6 +156,7 @@ export const AppSidebar = memo(function AppSidebar({
   }, []);
 
   const showExpanded = isHovered;
+  const showOrgLogo = Boolean(orgLogoUrl) && !isDemo;
 
   const darkBg = `linear-gradient(180deg, ${INK_DEEP} 0%, ${INK} 100%)`;
 
@@ -173,7 +176,7 @@ export const AppSidebar = memo(function AppSidebar({
       >
         {/* Logo tile */}
         <div className="flex h-16 w-full items-center justify-center shrink-0" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
-          {orgLogoUrl ? (
+          {showOrgLogo ? (
             <button
               onClick={onToggleCollapse}
               className="flex h-10 w-10 items-center justify-center overflow-hidden"
@@ -187,8 +190,15 @@ export const AppSidebar = memo(function AppSidebar({
               onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
               aria-label="Paneli genişlet"
             >
-              <Image src={orgLogoUrl} alt={orgName} width={36} height={36} className="object-contain" unoptimized />
+              <Image src={orgLogoUrl!} alt={orgName} width={36} height={36} className="object-contain" unoptimized />
             </button>
+          ) : isDemo ? (
+            <button
+              onClick={onToggleCollapse}
+              className="flex h-10 w-10 items-center justify-center"
+              style={{ borderRadius: '2px', transition: 'transform 120ms ease' }}
+              aria-label="Paneli genişlet"
+            />
           ) : (
             <button
               onClick={onToggleCollapse}
@@ -315,14 +325,21 @@ export const AppSidebar = memo(function AppSidebar({
           className="flex h-16 items-center gap-3 px-4 shrink-0"
           style={{ borderBottom: `1px solid ${HAIRLINE}` }}
         >
-          {orgLogoUrl ? (
+          {showOrgLogo ? (
             <button
               onClick={onToggleCollapse}
               className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden"
               style={{ backgroundColor: CREAM, borderRadius: '2px', border: `1px solid ${GOLD}` }}
             >
-              <Image src={orgLogoUrl} alt={orgName} width={36} height={36} className="object-contain" unoptimized />
+              <Image src={orgLogoUrl!} alt={orgName} width={36} height={36} className="object-contain" unoptimized />
             </button>
+          ) : isDemo ? (
+            <button
+              onClick={onToggleCollapse}
+              className="flex h-10 w-10 shrink-0 items-center justify-center"
+              style={{ borderRadius: '2px' }}
+              aria-label="Paneli daralt"
+            />
           ) : (
             <button
               onClick={onToggleCollapse}

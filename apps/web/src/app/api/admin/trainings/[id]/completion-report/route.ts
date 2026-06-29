@@ -103,8 +103,8 @@ export const GET = withAdminRoute<{ id: string }>(async ({ params, dbUser, organ
   const W = doc.internal.pageSize.getWidth()
   const H = doc.internal.pageSize.getHeight()
   const orgName = training.organization?.name ?? BRAND.fullName
-  // Sertifika PDF'i ile aynı kaynak: org logoUrl varsa onu, yoksa
-  // public/logos/devakent.png fallback'ini kullanır (cert-logo helper).
+  // Sertifika PDF'i ile aynı kaynak: org logoUrl varsa onu kullanır; logo yoksa
+  // başka müşterinin logosuna düşmeden monogram tile çizer.
   const logoDataUrl = await resolveOrgLogoDataUrl(training.organization?.logoUrl)
 
   // ── HEADER ──────────────────────────────────────────────

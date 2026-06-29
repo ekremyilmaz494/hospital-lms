@@ -28,6 +28,7 @@ interface MobileSidebarDrawerProps {
   navGroups: NavGroup[];
   orgName: string;
   orgLogoUrl?: string;
+  isDemo?: boolean;
   userName: string;
   userRole: string;
   userInitials: string;
@@ -47,6 +48,7 @@ export function MobileSidebarDrawer({
   navGroups,
   orgName,
   orgLogoUrl,
+  isDemo = false,
   userName,
   userRole,
   userInitials,
@@ -57,6 +59,7 @@ export function MobileSidebarDrawer({
   const visibleGroups = navGroups
     .map(g => ({ ...g, items: g.items.filter(it => !it.ownerOnly || isOwner) }))
     .filter(g => g.items.length > 0);
+  const showOrgLogo = Boolean(orgLogoUrl) && !isDemo;
 
   return (
     <Sheet open={open} onOpenChange={(val) => !val && onClose()}>
@@ -91,7 +94,7 @@ export function MobileSidebarDrawer({
             № 00 · Menü
           </p>
           <div className="flex items-center gap-3">
-            {orgLogoUrl ? (
+            {showOrgLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={orgLogoUrl}
@@ -99,6 +102,8 @@ export function MobileSidebarDrawer({
                 className="h-10 w-10 object-cover"
                 style={{ border: `1px solid ${INK}`, borderRadius: '2px' }}
               />
+            ) : isDemo ? (
+              <div aria-hidden className="h-10 w-10 shrink-0" />
             ) : (
               <div
                 className="flex h-10 w-10 items-center justify-center text-[13px] font-semibold"

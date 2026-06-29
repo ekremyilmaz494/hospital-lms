@@ -75,7 +75,7 @@ async function main() {
   if (!candidate) {
     console.error(`\n❌ Test edilebilecek S3'te şifreli yedek bulunamadı.\n`)
     console.error(`   Önce bir yedek almanız gerekiyor. Seçenekler:`)
-    console.error(`     1) /admin/backups sayfasına gidip "Manuel Yedek Al" butonuna tıklayın`)
+    console.error(`     1) /super-admin/backups sayfasına gidip kurum seçin ve "Manuel Yedek Al" butonuna tıklayın`)
     console.error(`     2) Lokalde cron'u manuel tetikleyin (dev server çalışıyorsa):`)
     console.error(`        curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/backup`)
     console.error(`        (CRON_SECRET .env.local'de tanımlı)`)

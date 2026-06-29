@@ -327,7 +327,7 @@ export default function NewOrganizationPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label style={{ color: 'var(--color-text-secondary)' }}>Organizasyon Adı *</Label>
-                  <Input name="name" placeholder="Devakent Hastanesi" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
+                  <Input name="name" placeholder="Ornek Hastanesi" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
                 <div>
                   <Label style={{ color: 'var(--color-text-secondary)' }}>Organizasyon Kodu *</Label>

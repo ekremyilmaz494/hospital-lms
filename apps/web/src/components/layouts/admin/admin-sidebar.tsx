@@ -13,6 +13,7 @@ interface AdminSidebarProps {
   orgName?: string;
   orgCode?: string;
   orgLogoUrl?: string;
+  isDemo?: boolean;
   userName?: string;
   userRole?: string;
   userAvatar?: string;
@@ -30,14 +31,12 @@ const TEXT_PRIMARY = '#1c1917';
 const TEXT_SECONDARY = '#44403c';
 const TEXT_MUTED = '#78716c';
 
-/** orgLogoUrl boşsa kullanılan varsayılan kurum logosu (public/ altında). */
-const DEFAULT_ORG_LOGO = '/devakent-logo.svg';
-
 export const AdminSidebar = memo(function AdminSidebar({
   navGroups,
   collapsed = false,
   orgName = 'Klinova LMS',
   orgLogoUrl,
+  isDemo = false,
   userName = 'Kullanıcı',
   userRole = 'Admin',
   userAvatar,
@@ -50,6 +49,7 @@ export const AdminSidebar = memo(function AdminSidebar({
     .filter(g => g.items.length > 0);
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const showOrgLogo = Boolean(orgLogoUrl) && !isDemo;
 
   const toggleExpand = useCallback((href: string) => {
     setExpandedItems(prev =>
@@ -87,27 +87,50 @@ export const AdminSidebar = memo(function AdminSidebar({
         }}
       >
         {collapsed ? (
-          /* Daraltılmış sidebar: kompakt monogram — geniş yatay logo 72px'e sığmaz */
-          <div
-            className="flex items-center justify-center rounded-[10px] shrink-0 text-white font-bold"
-            style={{
-              width: 36,
-              height: 36,
-              fontSize: 15,
-              background: PRIMARY,
-              boxShadow: `0 2px 6px ${PRIMARY}50`,
-            }}
-          >
-            <span>{(orgName[0] ?? 'K').toUpperCase()}</span>
-          </div>
+          showOrgLogo ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={orgLogoUrl}
+              alt={orgName}
+              style={{ maxHeight: 36, maxWidth: 48, objectFit: 'contain' }}
+            />
+          ) : isDemo ? (
+            <div aria-hidden style={{ width: 36, height: 36 }} />
+          ) : (
+            <div
+              className="flex items-center justify-center rounded-[10px] shrink-0 text-white font-bold"
+              style={{
+                width: 36,
+                height: 36,
+                fontSize: 15,
+                background: PRIMARY,
+                boxShadow: `0 2px 6px ${PRIMARY}50`,
+              }}
+            >
+              <span>{(orgName[0] ?? 'K').toUpperCase()}</span>
+            </div>
+          )
         ) : (
-          /* Açık sidebar: tam yatay kurum logosu — en-boy oranı korunur (çekiştirme yok) */
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={orgLogoUrl || DEFAULT_ORG_LOGO}
-            alt={orgName}
-            style={{ height: 36, width: 'auto', objectFit: 'contain' }}
-          />
+          showOrgLogo ? (
+            /* Açık sidebar: tam yatay kurum logosu — en-boy oranı korunur */
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={orgLogoUrl}
+              alt={orgName}
+              style={{ height: 36, width: 'auto', objectFit: 'contain' }}
+            />
+          ) : isDemo ? (
+            <div aria-hidden style={{ height: 36 }} />
+          ) : (
+            <div className="min-w-0 text-center">
+              <div className="truncate text-[14px] font-bold" style={{ color: TEXT_PRIMARY }}>
+                {orgName}
+              </div>
+              <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>
+                Organizasyon
+              </div>
+            </div>
+          )
         )}
       </div>
 

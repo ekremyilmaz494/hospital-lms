@@ -86,11 +86,10 @@ export function UpgradeModal({ open, onOpenChange, featureLabel }: UpgradeModalP
           <Button
             className="w-full"
             onClick={() => {
-              // Fiyatlandirma sayfasina yonlendir
-              window.location.href = '/admin/settings/subscription'
+              window.location.href = '/help'
             }}
           >
-            Planinizi Yukseltin
+            Destekle Gorusun
           </Button>
           <DialogClose
             render={

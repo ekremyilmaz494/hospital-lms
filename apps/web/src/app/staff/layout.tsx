@@ -80,6 +80,7 @@ export default function StaffLayout({
             orgName={branding?.orgName || user?.department || ''}
             orgCode={branding?.orgCode || ''}
             orgLogoUrl={branding?.orgLogoUrl ?? undefined}
+            isDemo={branding?.isDemo === true}
             userName={fullName}
             userRole="Personel"
             userInitials={initials}
@@ -93,6 +94,7 @@ export default function StaffLayout({
           navGroups={staffNav}
           orgName={branding?.orgName || user?.department || ''}
           orgLogoUrl={branding?.orgLogoUrl ?? undefined}
+          isDemo={branding?.isDemo === true}
           userName={fullName}
           userRole="Personel"
           userInitials={initials}

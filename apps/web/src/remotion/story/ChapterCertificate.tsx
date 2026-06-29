@@ -186,7 +186,7 @@ export const ChapterCertificate: React.FC<{ localFrame: number; opacity: number 
               D
             </div>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 900, color: DARK, letterSpacing: "0.1em" }}>DEVAKENT HASTANESI</p>
+              <p style={{ fontSize: 10, fontWeight: 900, color: DARK, letterSpacing: "0.1em" }}>ORNEK HASTANE</p>
               <p style={{ fontSize: 8, color: "#4a7060", letterSpacing: "0.15em", textTransform: "uppercase" }}>
                 Egitim Platformu
               </p>
