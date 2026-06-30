@@ -1007,27 +1007,30 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(28, 25, 23, 0.34)', backdropFilter: 'blur(2px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
+        overflowY: 'auto',
+        padding: 'clamp(16px, 4vh, 32px) 16px',
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--k-surface)', borderRadius: 16,
-          width: '100%', maxWidth: 560, maxHeight: '90vh',
+          width: 'min(100%, 620px)', maxHeight: 'calc(100dvh - 48px)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+          border: '1px solid var(--k-border)',
+          boxShadow: '0 24px 64px rgba(15, 23, 42, 0.22)',
         }}
       >
         <div style={{
-          padding: '16px 20px', borderBottom: '1px solid var(--k-border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 20px 14px', borderBottom: '1px solid var(--k-border)',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+          background: 'var(--k-surface)', flexShrink: 0,
         }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--k-text-primary)' }}>
               {initial ? 'Standart Düzenle' : 'Yeni Standart'}
             </h3>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--k-text-muted)' }}>
@@ -1046,8 +1049,8 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
           </button>
         </div>
 
-        <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--k-text-muted)', marginBottom: 5 }}>
                 Kod *
@@ -1165,6 +1168,7 @@ function StandardFormModal({ initial, defaultBody, onClose, onSaved }: StandardF
         <div style={{
           padding: '12px 20px', borderTop: '1px solid var(--k-border)',
           display: 'flex', justifyContent: 'flex-end', gap: 8,
+          background: 'var(--k-surface)', flexShrink: 0,
         }}>
           <button
             type="button"
