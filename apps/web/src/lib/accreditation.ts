@@ -1,12 +1,13 @@
 /**
- * Akreditasyon Raporu Servisi
+ * Akreditasyon / denetim raporu servisi.
  *
- * JCI, ISO 9001, ISO 15189, TJC ve OSHA standartlarına göre
- * organizasyonun uyumluluk durumunu hesaplar ve rapor oluşturur.
+ * JCI, ISO 9001, ISO 15189, TJC, OSHA ve SKS standartlarina gore
+ * organizasyonun egitim uyumlulugunu hesaplar ve rapor olusturur.
  */
 import { prisma } from '@/lib/prisma'
 
-export type StandardBody = 'JCI' | 'ISO_9001' | 'ISO_15189' | 'TJC' | 'OSHA'
+export const VALID_STANDARD_BODIES = ['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA', 'SKS'] as const
+export type StandardBody = typeof VALID_STANDARD_BODIES[number]
 
 export interface FindingRecord {
   standardCode: string
@@ -19,8 +20,7 @@ export interface FindingRecord {
   status: 'compliant' | 'at_risk' | 'non_compliant'
 }
 
-export interface AccreditationReportData {
-  reportId: string
+export interface AccreditationComplianceData {
   organizationId: string
   standardBody: StandardBody
   periodStart: Date
@@ -32,6 +32,10 @@ export interface AccreditationReportData {
   nonCompliantCount: number
 }
 
+export interface AccreditationReportData extends AccreditationComplianceData {
+  reportId: string
+}
+
 /** Uyumluluk durumunu hesapla */
 function calcStatus(actual: number, required: number): FindingRecord['status'] {
   if (actual >= required) return 'compliant'
@@ -39,20 +43,22 @@ function calcStatus(actual: number, required: number): FindingRecord['status'] {
   return 'non_compliant'
 }
 
+function normalizeCategories(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.length > 0) : []
+}
+
 /**
- * Akreditasyon raporu oluştur ve DB'ye kaydet.
+ * Uyumluluk durumunu hesaplar; DB'ye rapor yazmaz.
+ * Simulasyon ve rapor kaydetme ayni hesap motorunu kullanir.
  */
-export async function generateAccreditationReport(params: {
+export async function calculateAccreditationCompliance(params: {
   organizationId: string
   standardBody: StandardBody
   periodStart: Date
   periodEnd: Date
-  generatedBy: string
-}): Promise<AccreditationReportData> {
-  const { organizationId, standardBody, periodStart, periodEnd, generatedBy } = params
+}): Promise<AccreditationComplianceData> {
+  const { organizationId, standardBody, periodStart, periodEnd } = params
 
-  // a) Bu standart için aktif standartları getir:
-  // global (organizationId=null) + bu kuruma özel standartlar
   const standards = await prisma.accreditationStandard.findMany({
     where: {
       standardBody,
@@ -65,16 +71,14 @@ export async function generateAccreditationReport(params: {
     orderBy: { code: 'asc' },
   })
 
-  // b) Organizasyondaki toplam aktif personel sayısı
   const totalStaff = await prisma.user.count({
     where: { organizationId, role: 'staff', isActive: true },
   })
 
-  // c) Her standart için uyumluluk hesapla
   const findings: FindingRecord[] = []
 
   for (const std of standards) {
-    const categories = std.requiredTrainingCategories as string[]
+    const categories = normalizeCategories(std.requiredTrainingCategories)
 
     if (categories.length === 0) {
       findings.push({
@@ -90,12 +94,10 @@ export async function generateAccreditationReport(params: {
       continue
     }
 
-    // Bu kategorilerdeki eğitimleri dönem içinde tamamlamış personel (her kategoriden en az biri)
-    // Her kategoride tamamlama yapan personel kümesini kesişimle bul
+    // Her kategori icin en az bir basarili tamamlama yapan personel kumesini kesisimle bul.
     let completedStaffIds: string[] | null = null
 
     for (const category of categories) {
-      // Bu kategoride dönem içinde tamamlanmış assignment'ı olan personel
       const staffInCategory = await prisma.trainingAssignment.findMany({
         where: {
           status: 'passed',
@@ -112,7 +114,6 @@ export async function generateAccreditationReport(params: {
       if (completedStaffIds === null) {
         completedStaffIds = ids
       } else {
-        // Kesişim: her iki listede de olan personel
         const idSet = new Set(ids)
         completedStaffIds = completedStaffIds.filter(id => idSet.has(id))
       }
@@ -136,7 +137,6 @@ export async function generateAccreditationReport(params: {
     })
   }
 
-  // d) Genel uyumluluk oranı = compliant standart / toplam standart
   const compliantCount = findings.filter(f => f.status === 'compliant').length
   const atRiskCount = findings.filter(f => f.status === 'at_risk').length
   const nonCompliantCount = findings.filter(f => f.status === 'non_compliant').length
@@ -144,30 +144,7 @@ export async function generateAccreditationReport(params: {
     ? Math.round((compliantCount / findings.length) * 100)
     : 0
 
-  const standardBodyLabels: Record<string, string> = {
-    JCI: 'JCI Akreditasyonu',
-    ISO_9001: 'ISO 9001 Kalite Yönetimi',
-    ISO_15189: 'ISO 15189 Laboratuvar',
-    TJC: 'The Joint Commission',
-    OSHA: 'OSHA İş Güvenliği',
-  }
-
-  // e) AccreditationReport tablosuna kaydet
-  const report = await prisma.accreditationReport.create({
-    data: {
-      organizationId,
-      title: `${standardBodyLabels[standardBody] ?? standardBody} Denetim Raporu`,
-      standardBody,
-      generatedBy,
-      periodStart,
-      periodEnd,
-      overallComplianceRate,
-      findings: findings as object[],
-    },
-  })
-
   return {
-    reportId: report.id,
     organizationId,
     standardBody,
     periodStart,
@@ -180,26 +157,71 @@ export async function generateAccreditationReport(params: {
   }
 }
 
-/** Mevcut uyumluluk durumunu hesapla (rapor kaydetmeden, son 12 ay) */
+/**
+ * Akreditasyon raporu olustur ve DB'ye kaydet.
+ */
+export async function generateAccreditationReport(params: {
+  organizationId: string
+  standardBody: StandardBody
+  periodStart: Date
+  periodEnd: Date
+  generatedBy: string
+}): Promise<AccreditationReportData> {
+  const { organizationId, standardBody, periodStart, periodEnd, generatedBy } = params
+
+  const compliance = await calculateAccreditationCompliance({
+    organizationId,
+    standardBody,
+    periodStart,
+    periodEnd,
+  })
+
+  const standardBodyLabels: Record<StandardBody, string> = {
+    JCI: 'JCI Akreditasyonu',
+    ISO_9001: 'ISO 9001 Kalite Yonetimi',
+    ISO_15189: 'ISO 15189 Laboratuvar',
+    TJC: 'The Joint Commission',
+    OSHA: 'OSHA Is Guvenligi',
+    SKS: 'SKS Saglikta Kalite Standartlari',
+  }
+
+  const report = await prisma.accreditationReport.create({
+    data: {
+      organizationId,
+      title: `${standardBodyLabels[standardBody] ?? standardBody} Denetim Raporu`,
+      standardBody,
+      generatedBy,
+      periodStart,
+      periodEnd,
+      overallComplianceRate: compliance.overallComplianceRate,
+      findings: compliance.findings as object[],
+    },
+  })
+
+  return {
+    reportId: report.id,
+    ...compliance,
+  }
+}
+
+/** Mevcut uyumluluk durumunu hesapla; rapor kaydetmez. */
 export async function getCurrentCompliance(params: {
   organizationId: string
   standardBody: StandardBody
-  requestedBy: string  // Admin user UUID — geçici rapor için generated_by alanı
-}): Promise<Omit<AccreditationReportData, 'reportId' | 'generatedBy'>> {
-  const periodEnd = new Date()
-  const periodStart = new Date(periodEnd)
-  periodStart.setFullYear(periodStart.getFullYear() - 1)
+  requestedBy: string
+  periodStart?: Date
+  periodEnd?: Date
+}): Promise<AccreditationComplianceData> {
+  const periodEnd = params.periodEnd ?? new Date()
+  const periodStart = params.periodStart ?? new Date(periodEnd)
+  if (!params.periodStart) periodStart.setFullYear(periodStart.getFullYear() - 1)
 
-  const result = await generateAccreditationReport({
+  void params.requestedBy
+
+  return calculateAccreditationCompliance({
     organizationId: params.organizationId,
     standardBody: params.standardBody,
     periodStart,
     periodEnd,
-    generatedBy: params.requestedBy,
   })
-
-  // Kaydedilen raporu sil (bu sadece önizleme — kullanıcı simülasyon görmek istiyor)
-  await prisma.accreditationReport.delete({ where: { id: result.reportId } })
-
-  return result
 }

@@ -1,12 +1,13 @@
 /**
- * Akreditasyon raporu için veri toplama.
+ * Akreditasyon raporu icin veri toplama.
  *
- * Tek bir fonksiyon — route'tan çağrılır, ReportContext döndürür.
- * Tüm sorgular organizationId ile filtrelenir (multi-tenant izolasyon KRİTİK).
+ * Tek bir fonksiyon route'tan cagrilir, ReportContext dondurur.
+ * Tum sorgular organizationId ile filtrelenir (multi-tenant izolasyon kritik).
  */
 
 import { prisma } from '@/lib/prisma'
 import type { FindingRecord } from '@/lib/accreditation'
+import type { UserRole } from '@/types/database'
 import type {
   ReportContext,
   DepartmentComplianceRow,
@@ -16,13 +17,12 @@ import type {
 import { fetchLogoAsDataUrl } from './helpers/logo'
 
 const MAX_GAPS_IN_REPORT = 50
-const GAP_THRESHOLD_DAYS = 14 // Bu süreden eski atamalar "gecikmiş" sayılır
+const GAP_THRESHOLD_DAYS = 14
 
 function daysSince(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / 86400000)
 }
 
-/** Bulgu severity'sine göre önerilen aksiyon son tarihi üret. */
 function deadlineFor(severity: 'non_compliant' | 'at_risk'): Date {
   const d = new Date()
   d.setDate(d.getDate() + (severity === 'non_compliant' ? 30 : 60))
@@ -36,11 +36,14 @@ function recommendationFor(finding: FindingRecord): string {
   return `Eksik ${finding.missingStaffCount} personel uyum esigine yaklastirilmali. Hatirlatma bildirimi ve mentorluk desteklenmeli.`
 }
 
+function findingCategories(findings: FindingRecord[]): string[] {
+  return Array.from(new Set(findings.flatMap(f => f.categories).filter(Boolean))).sort()
+}
+
 export async function buildReportContext(
   reportId: string,
   orgId: string
 ): Promise<ReportContext | null> {
-  // 1) Ana rapor + organizasyon
   const report = await prisma.accreditationReport.findFirst({
     where: { id: reportId, organizationId: orgId },
     select: {
@@ -59,34 +62,43 @@ export async function buildReportContext(
   if (!report) return null
 
   const findings = (report.findings as unknown as FindingRecord[]) ?? []
+  const categories = findingCategories(findings)
+  const cutoffDate = new Date(Math.min(
+    report.periodEnd.getTime(),
+    Date.now() - GAP_THRESHOLD_DAYS * 86400000,
+  ))
 
-  // 2) Departman uyum oranı + eksik eğitim + logo — paralel
-  const [departmentGroups, overdueAssignments, logoDataUrl] = await Promise.all([
-    // Departman bazlı: her departmanın toplam personel + tamamlanmış atama oranı
-    prisma.$queryRaw<Array<{ department: string; total_staff: bigint; completed_count: bigint }>>`
-      SELECT
-        COALESCE(d.name, 'Atanmamis') AS department,
-        COUNT(DISTINCT u.id)::bigint AS total_staff,
-        COUNT(DISTINCT CASE WHEN ta.completed_at IS NOT NULL THEN ta.id END)::bigint AS completed_count
-      FROM users u
-      LEFT JOIN departments d ON d.id = u.department_id
-      LEFT JOIN training_assignments ta ON ta.user_id = u.id
-      WHERE u.organization_id = ${orgId}::uuid
-        AND u.role = 'staff'
-        AND u.is_active = true
-      GROUP BY d.name
-      ORDER BY total_staff DESC
-    `,
+  const trainingFilter = categories.length > 0
+    ? { organizationId: orgId, category: { in: categories } }
+    : { organizationId: orgId }
 
-    // Eksik eğitim: 14+ gün önce atanmış, hala tamamlanmamış
+  const [staffRows, overdueAssignments, logoDataUrl] = await Promise.all([
+    prisma.user.findMany({
+      where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+      select: {
+        id: true,
+        departmentRel: { select: { name: true } },
+        assignments: {
+          where: {
+            status: 'passed',
+            completedAt: { gte: report.periodStart, lte: report.periodEnd },
+            training: trainingFilter,
+          },
+          select: { id: true },
+        },
+      },
+    }),
+
     prisma.trainingAssignment.findMany({
       where: {
         user: { organizationId: orgId, isActive: true },
         completedAt: null,
-        assignedAt: { lte: new Date(Date.now() - GAP_THRESHOLD_DAYS * 86400000) },
+        assignedAt: { gte: report.periodStart, lte: cutoffDate },
+        training: trainingFilter,
       },
       select: {
         assignedAt: true,
+        dueDate: true,
         user: {
           select: {
             firstName: true,
@@ -100,36 +112,38 @@ export async function buildReportContext(
       take: MAX_GAPS_IN_REPORT,
     }),
 
-    // Logo
     fetchLogoAsDataUrl(report.organization.logoUrl),
   ])
 
-  // 3) Departman rows — percent hesapla
-  const departments: DepartmentComplianceRow[] = departmentGroups
-    .map(g => {
-      const totalStaff = Number(g.total_staff)
-      const completedCount = Number(g.completed_count)
-      const complianceRate = totalStaff > 0
-        ? Math.round((completedCount / totalStaff) * 100)
-        : 0
-      return { department: g.department, totalStaff, completedCount, complianceRate }
-    })
-    .filter(r => r.totalStaff > 0)
+  const departmentsMap = new Map<string, { totalStaff: number; completedCount: number }>()
+  for (const staff of staffRows) {
+    const department = staff.departmentRel?.name ?? 'Atanmamis'
+    const current = departmentsMap.get(department) ?? { totalStaff: 0, completedCount: 0 }
+    current.totalStaff += 1
+    if (staff.assignments.length > 0) current.completedCount += 1
+    departmentsMap.set(department, current)
+  }
 
-  // 4) Gap rows
+  const departments: DepartmentComplianceRow[] = Array.from(departmentsMap.entries())
+    .map(([department, row]) => ({
+      department,
+      totalStaff: row.totalStaff,
+      completedCount: row.completedCount,
+      complianceRate: row.totalStaff > 0 ? Math.round((row.completedCount / row.totalStaff) * 100) : 0,
+    }))
+    .sort((a, b) => b.totalStaff - a.totalStaff)
+
   const trainingGaps: TrainingGapRow[] = overdueAssignments.map(a => ({
     userName: `${a.user.firstName} ${a.user.lastName}`.trim(),
     department: a.user.departmentRel?.name ?? null,
     trainingTitle: a.training.title,
-    dueDate: a.assignedAt,
-    daysOverdue: daysSince(a.assignedAt),
+    dueDate: a.dueDate ?? a.assignedAt,
+    daysOverdue: daysSince(a.dueDate ?? a.assignedAt),
   }))
 
-  // 5) Action plan — findings içinden türet
   const actionPlan: ActionPlanRow[] = findings
     .filter(f => f.status !== 'compliant')
     .sort((a, b) => {
-      // non_compliant önce, sonra en büyük gap
       if (a.status !== b.status) return a.status === 'non_compliant' ? -1 : 1
       return (b.requiredRate - b.actualRate) - (a.requiredRate - a.actualRate)
     })

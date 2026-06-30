@@ -4,11 +4,17 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 import type { UserRole } from '@/types/database'
 import { findActivePeriod } from '@/lib/training-periods'
+import { VALID_STANDARD_BODIES } from '@/lib/accreditation'
+
+const VALID_CATEGORIES = [
+  'enfeksiyon', 'is-guvenligi', 'hasta-haklari', 'radyoloji',
+  'laboratuvar', 'eczane', 'acil', 'genel',
+] as const
 
 const actionPlanSchema = z.object({
-  standardBody: z.enum(['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA']),
-  /** Eksik personeli atamak için kullanılacak eğitim kategorileri */
-  categories: z.array(z.string().min(1)).min(1),
+  standardBody: z.enum(VALID_STANDARD_BODIES),
+  /** Eksik personeli atamak icin kullanilacak egitim kategorileri */
+  categories: z.array(z.enum(VALID_CATEGORIES)).min(1),
   /** Hedef tamamlanma tarihi */
   dueDate: z.string().datetime().optional(),
 })
@@ -16,26 +22,26 @@ const actionPlanSchema = z.object({
 /**
  * POST /api/admin/accreditation/action-plan
  *
- * Belirlenen kategorilerdeki aktif eğitimleri, o kategorilerde hiç
- * assignment'ı olmayan tüm personele atar (TrainingAssignment).
+ * Belirlenen kategorilerdeki yayindaki aktif egitimleri, o egitimlerde atamasi
+ * olmayan aktif personele atar (TrainingAssignment).
  */
 export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
   const body = await parseBody(request)
-  if (!body) return errorResponse('Geçersiz istek verisi')
+  if (!body) return errorResponse('Gecersiz istek verisi')
 
   const parsed = actionPlanSchema.safeParse(body)
-  if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? 'Geçersiz veri')
+  if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? 'Gecersiz veri')
 
-  const { categories, dueDate } = parsed.data
+  const { standardBody, categories, dueDate } = parsed.data
   const orgId = organizationId
 
   try {
-    // Paralel: ilgili eğitimler + tüm aktif personel + aktif dönem
     const [trainings, allStaff, activePeriod] = await Promise.all([
       prisma.training.findMany({
         where: {
           organizationId: orgId,
           isActive: true,
+          publishStatus: 'published',
           category: { in: categories },
         },
         select: { id: true, category: true },
@@ -48,14 +54,18 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     ])
 
     if (trainings.length === 0) {
-      return errorResponse('Bu kategorilerde aktif eğitim bulunamadı')
+      return errorResponse('Bu kategorilerde yayinda aktif egitim bulunamadi')
     }
 
-    // Mevcut assignment'ları bir Set olarak al (userId-trainingId ikilisi)
+    if (allStaff.length === 0) {
+      return jsonResponse({ message: 'Atanacak aktif personel bulunamadi.', createdCount: 0 })
+    }
+
     const existingAssignments = await prisma.trainingAssignment.findMany({
       where: {
         trainingId: { in: trainings.map(t => t.id) },
         userId: { in: allStaff.map(s => s.id) },
+        ...(activePeriod ? { periodId: activePeriod.id } : {}),
       },
       select: { userId: true, trainingId: true },
     })
@@ -64,16 +74,22 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       existingAssignments.map(a => `${a.userId}:${a.trainingId}`)
     )
 
-    // Eksik assignment'ları belirle
-    const newAssignments: { userId: string; trainingId: string; organizationId: string; assignedBy: string; dueDate?: Date }[] = []
+    const newAssignments: {
+      userId: string
+      trainingId: string
+      organizationId: string
+      assignedById: string
+      dueDate?: Date
+    }[] = []
+
     for (const staff of allStaff) {
       for (const training of trainings) {
         if (!existingSet.has(`${staff.id}:${training.id}`)) {
           newAssignments.push({
             userId: staff.id,
             trainingId: training.id,
-            organizationId,
-            assignedBy: dbUser.id,
+            organizationId: orgId,
+            assignedById: dbUser.id,
             ...(dueDate ? { dueDate: new Date(dueDate) } : {}),
           })
         }
@@ -81,10 +97,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     }
 
     if (newAssignments.length === 0) {
-      return jsonResponse({ message: 'Tüm personel zaten bu eğitimlere atanmış.', createdCount: 0 })
+      return jsonResponse({ message: 'Tum personel zaten bu egitimlere atanmis.', createdCount: 0 })
     }
 
-    // Toplu oluştur
     const result = await prisma.trainingAssignment.createMany({
       data: newAssignments.map(a => ({
         ...a,
@@ -99,6 +114,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       action: 'accreditation_action_plan_created',
       entityType: 'training_assignment',
       newData: {
+        standardBody,
         categories,
         createdCount: result.count,
         trainingsCount: trainings.length,
@@ -107,10 +123,10 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     })
 
     return jsonResponse(
-      { message: `${result.count} yeni atama oluşturuldu.`, createdCount: result.count },
+      { message: `${result.count} yeni atama olusturuldu.`, createdCount: result.count },
       201
     )
   } catch {
-    return errorResponse('Aksiyon planı oluşturulamadı', 500)
+    return errorResponse('Aksiyon plani olusturulamadi', 500)
   }
 }, { requireOrganization: true })

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, XCircle,
-  RefreshCw, Download, Plus, ChevronDown, Loader2, FileText,
+  RefreshCw, Download, Plus, Loader2, FileText,
   Pencil, Trash2, Lock, X, ChevronRight,
 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
@@ -11,7 +11,7 @@ import { useToast } from '@/components/shared/toast';
 
 // ── Tipler ──
 
-type StandardBody = 'JCI' | 'ISO_9001' | 'ISO_15189' | 'TJC' | 'OSHA';
+type StandardBody = 'JCI' | 'ISO_9001' | 'ISO_15189' | 'TJC' | 'OSHA' | 'SKS';
 
 interface AccreditationStandard {
   id: string;
@@ -77,6 +77,7 @@ const STANDARD_BODIES: { value: StandardBody; label: string }[] = [
   { value: 'ISO_15189', label: 'ISO 15189 Laboratuvar' },
   { value: 'TJC', label: 'The Joint Commission' },
   { value: 'OSHA', label: 'OSHA İş Güvenliği' },
+  { value: 'SKS', label: 'SKS Sağlıkta Kalite Standartları' },
 ];
 
 type TabId = 'standards' | 'simulation' | 'reports';
@@ -144,6 +145,7 @@ export default function AccreditationPage() {
 
   // Tab 3: Raporlar
   const [reports, setReports] = useState<AccreditationReport[]>([]);
+  const [reportTotal, setReportTotal] = useState(0);
   const [loadingReports, setLoadingReports] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -183,6 +185,7 @@ export default function AccreditationPage() {
       const res = await fetch(`/api/admin/accreditation/reports?standardBody=${selectedBody}&limit=50`);
       const json = await res.json();
       setReports(json.reports ?? []);
+      setReportTotal(json.pagination?.total ?? json.reports?.length ?? 0);
     } catch {
       toast('Raporlar yüklenemedi', 'error');
     } finally {
@@ -191,9 +194,11 @@ export default function AccreditationPage() {
   }, [selectedBody, toast]);
 
   useEffect(() => {
-    if (activeTab === 'standards') loadStandards();
-    if (activeTab === 'reports') loadReports();
-  }, [activeTab, loadStandards, loadReports]);
+    queueMicrotask(() => {
+      void loadStandards();
+      void loadReports();
+    });
+  }, [loadStandards, loadReports]);
 
   // ── Simülasyon ──
 
@@ -201,7 +206,13 @@ export default function AccreditationPage() {
     setLoadingCompliance(true);
     setCompliance(null);
     try {
-      const res = await fetch(`/api/admin/accreditation/compliance?standardBody=${selectedBody}`);
+      if (new Date(simPeriodStart) >= new Date(simPeriodEnd)) throw new Error('Dönem başlangıcı bitiş tarihinden önce olmalıdır');
+      const qs = new URLSearchParams({
+        standardBody: selectedBody,
+        periodStart: new Date(simPeriodStart).toISOString(),
+        periodEnd: new Date(simPeriodEnd).toISOString(),
+      });
+      const res = await fetch(`/api/admin/accreditation/compliance?${qs.toString()}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Hata');
       setCompliance(json.compliance);
@@ -218,10 +229,10 @@ export default function AccreditationPage() {
       setLoadingCompliance(false);
     }
   };
-
   const generateReport = async () => {
     setGenerating(true);
     try {
+      if (new Date(simPeriodStart) >= new Date(simPeriodEnd)) throw new Error('Dönem başlangıcı bitiş tarihinden önce olmalıdır');
       const res = await fetch('/api/admin/accreditation/reports/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,7 +245,7 @@ export default function AccreditationPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Hata');
       toast('Rapor oluşturuldu ve kaydedildi');
-      // Raporlar tabına geç
+      await loadReports();
       setActiveTab('reports');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Rapor oluşturulamadı', 'error');
@@ -242,7 +253,6 @@ export default function AccreditationPage() {
       setGenerating(false);
     }
   };
-
   const createActionPlan = async () => {
     if (actionPlanCategories.length === 0) {
       toast('En az bir kategori seçin', 'error');
@@ -305,17 +315,17 @@ export default function AccreditationPage() {
             </div>
             <h1 className="k-page-title">Denetim Hazırlık Merkezi</h1>
             <p className="k-page-subtitle">
-              JCI, ISO 9001/15189, TJC ve OSHA standartları · uyum takibi, simülasyon ve denetçiye hazır PDF raporlama.
+              SKS, JCI, ISO 9001/15189, TJC ve OSHA standartları · uyum takibi, simülasyon ve denetçiye hazır PDF raporlama.
             </p>
           </div>
           <div className="k-kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, minWidth: 280 }}>
             <div className="k-kpi" style={{ padding: '14px 16px' }}>
               <div className="k-kpi-label">Aktif Standart</div>
-              <div className="k-kpi-value" style={{ fontSize: 22 }}>{STANDARD_BODIES.length}</div>
+              <div className="k-kpi-value" style={{ fontSize: 22 }}>{standards.length}</div>
             </div>
             <div className="k-kpi" style={{ padding: '14px 16px' }}>
               <div className="k-kpi-label">Toplam Rapor</div>
-              <div className="k-kpi-value" style={{ fontSize: 22 }}>{reports.length}</div>
+              <div className="k-kpi-value" style={{ fontSize: 22 }}>{reportTotal}</div>
             </div>
           </div>
         </header>

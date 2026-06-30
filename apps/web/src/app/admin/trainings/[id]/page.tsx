@@ -201,6 +201,38 @@ export default function TrainingDetailPage() {
 
   const ghostBtnStyle = { borderColor: K.BORDER, color: K.TEXT_SECONDARY, background: K.SURFACE };
 
+  const downloadCompletionPdf = async () => {
+    setDownloadingCompletion('pdf');
+    try {
+      const res = await fetch(`/api/admin/trainings/${id}/completion-report`);
+      if (!res.ok) throw new Error('Katılım formu oluşturulamadı');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'egitim_katilim_formu.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast('Eğitim Katılım Formu indirilemedi', 'error'); }
+    finally { setDownloadingCompletion(null); }
+  };
+
+  const downloadAnnouncementForm = async () => {
+    setDownloadingAnnouncement(true);
+    try {
+      const res = await fetch(`/api/admin/trainings/${id}/announcement-form`);
+      if (!res.ok) throw new Error('Duyuru formu oluşturulamadı');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'egitim_duyuru_formu.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast('Eğitim Duyuru Formu indirilemedi', 'error'); }
+    finally { setDownloadingAnnouncement(false); }
+  };
+
   // Tab-export raporu indir (PDF/Excel). status verilirse personel sekmesinde
   // sadece tamamlayan/tamamlamayan personeli içeren rapor üretir.
   const downloadReport = async (
@@ -297,6 +329,30 @@ export default function TrainingDetailPage() {
               <Edit className="h-4 w-4" /> Düzenle
             </Button>
 
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-lg font-medium"
+              style={ghostBtnStyle}
+              disabled={downloadingCompletion === 'pdf'}
+              onClick={downloadCompletionPdf}
+            >
+              {downloadingCompletion === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {downloadingCompletion === 'pdf' ? 'Katılım formu hazırlanıyor...' : 'Eğitim Katılım Formu'}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-lg font-medium"
+              style={ghostBtnStyle}
+              disabled={downloadingAnnouncement}
+              onClick={downloadAnnouncementForm}
+            >
+              {downloadingAnnouncement ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              {downloadingAnnouncement ? 'Duyuru formu hazırlanıyor...' : 'Eğitim Duyuru Formu'}
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger
                 className="inline-flex h-10 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-[background,box-shadow] duration-150 ease-out hover:bg-[color-mix(in_srgb,var(--color-text-primary,#000)_5%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0d9668)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg,#f1f5f9)]"
@@ -305,27 +361,7 @@ export default function TrainingDetailPage() {
                 <MoreHorizontal className="h-4 w-4" /> Diğer İşlemler
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[240px]">
-                <DropdownMenuItem
-                  disabled={downloadingCompletion === 'pdf'}
-                  onClick={async () => {
-                    setDownloadingCompletion('pdf');
-                    try {
-                      const res = await fetch(`/api/admin/trainings/${id}/completion-report`);
-                      if (!res.ok) throw new Error('Rapor oluşturulamadı');
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = 'tamamlama_raporu.pdf';
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    } catch { toast('PDF raporu indirilemedi', 'error'); }
-                    finally { setDownloadingCompletion(null); }
-                  }}
-                >
-                  {downloadingCompletion === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                  <span>{downloadingCompletion === 'pdf' ? 'PDF hazırlanıyor…' : 'PDF Rapor indir'}</span>
-                </DropdownMenuItem>
+
                 <DropdownMenuItem
                   disabled={downloadingCompletion === 'excel'}
                   onClick={async () => {
@@ -347,27 +383,7 @@ export default function TrainingDetailPage() {
                   {downloadingCompletion === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   <span>{downloadingCompletion === 'excel' ? 'Excel hazırlanıyor…' : 'Excel Rapor indir'}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={downloadingAnnouncement}
-                  onClick={async () => {
-                    setDownloadingAnnouncement(true);
-                    try {
-                      const res = await fetch(`/api/admin/trainings/${id}/announcement-form`);
-                      if (!res.ok) throw new Error('Duyuru formu oluşturulamadı');
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = 'egitim_duyuru_formu.pdf';
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    } catch { toast('Eğitim Duyuru Formu indirilemedi', 'error'); }
-                    finally { setDownloadingAnnouncement(false); }
-                  }}
-                >
-                  {downloadingAnnouncement ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                  <span>{downloadingAnnouncement ? 'Duyuru formu hazırlanıyor…' : 'Eğitim Duyuru Formu (PDF)'}</span>
-                </DropdownMenuItem>
+
                 <DropdownMenuItem onClick={() => router.push(`/admin/feedback-forms/responses?trainingId=${id}`)}>
                   <MessageSquare className="h-4 w-4" />
                   <span>Geri bildirimler</span>

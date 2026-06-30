@@ -69,6 +69,16 @@ export const STANDARD_PROFILES: Record<string, StandardProfile> = {
       complianceWord: 'Uyum',
     },
   },
+  SKS: {
+    bodyLabel: 'SKS Saglikta Kalite Standartlari',
+    accentColor: [13, 150, 104],
+    coverBadge: 'SKS Hastane Seti',
+    terminology: {
+      standardWord: 'Boyut',
+      findingWord: 'Bulgu',
+      complianceWord: 'Uyum',
+    },
+  },
 }
 
 export function getProfile(standardBody: string): StandardProfile {

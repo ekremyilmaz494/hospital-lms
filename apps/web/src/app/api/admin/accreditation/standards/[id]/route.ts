@@ -4,7 +4,7 @@ import { jsonResponse, errorResponse, ApiError } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 
-const VALID_BODIES = ['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA'] as const
+const VALID_BODIES = ['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA', 'SKS'] as const
 const VALID_CATEGORIES = [
   'enfeksiyon', 'is-guvenligi', 'hasta-haklari', 'radyoloji',
   'laboratuvar', 'eczane', 'acil', 'genel',
