@@ -100,9 +100,6 @@ export default function EditTrainingPage() {
     if (!Number.isFinite(d.examDurationMinutes) || d.examDurationMinutes < 1 || d.examDurationMinutes > 600) {
       return 'Sınav süresi 1 ile 600 dakika arasında olmalıdır.';
     }
-    if (!Number.isFinite(d.smgPoints) || d.smgPoints < 0 || d.smgPoints > 999) {
-      return 'SMG puanı 0 ile 999 arasında olmalıdır.';
-    }
     if (d.startDate && d.endDate && new Date(d.startDate) > new Date(d.endDate)) {
       return 'Son tarih başlangıç tarihinden önce olamaz.';
     }
@@ -205,8 +202,8 @@ export default function EditTrainingPage() {
             <h3 style={sectionHeading}>Sınav Ayarları</h3>
           </div>
 
-          <div className="grid grid-cols-2 gap-5 lg:grid-cols-5">
-            <div className="col-span-2 lg:col-span-5">
+          <div className="grid grid-cols-2 gap-5 lg:grid-cols-3">
+            <div className="col-span-2 lg:col-span-3">
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: K.TEXT_SECONDARY }}>
                 <Target className="h-3.5 w-3.5" style={{ color: K.PRIMARY }} /> Baraj Puanı
               </Label>
@@ -248,12 +245,6 @@ export default function EditTrainingPage() {
                 <Clock className="h-3.5 w-3.5" style={{ color: K.ERROR }} /> Süre (dk)
               </Label>
               <Input type="number" value={formData.examDurationMinutes} onChange={(e) => setFormData({ ...formData, examDurationMinutes: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={inputStyle} />
-            </div>
-            <div>
-              <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: K.TEXT_SECONDARY }}>
-                <Award className="h-3.5 w-3.5" style={{ color: K.SUCCESS }} /> SMG Puanı
-              </Label>
-              <Input type="number" min={0} max={999} value={formData.smgPoints} onChange={(e) => setFormData({ ...formData, smgPoints: Number(e.target.value) })} className="h-10 rounded-xl font-mono" style={inputStyle} />
             </div>
             <div>
               <Label className="text-xs font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: K.TEXT_SECONDARY }}>

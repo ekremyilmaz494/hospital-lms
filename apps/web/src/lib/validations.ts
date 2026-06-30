@@ -506,47 +506,6 @@ export const updateSmgPeriodSchema = z.object({
   { message: 'Bitiş tarihi başlangıç tarihinden sonra olmalıdır', path: ['endDate'] }
 )
 
-// ── 360° YETKİNLİK DEĞERLENDİRME ──
-export const competencyItemSchema = z.object({
-  text: z.string().min(2).max(500),
-  description: z.string().max(1000).optional(),
-  order: z.coerce.number().int().min(0).default(0),
-})
-
-export const competencyCategorySchema = z.object({
-  name: z.string().min(2).max(255),
-  weight: z.coerce.number().int().min(0).max(100).default(0),
-  order: z.coerce.number().int().min(0).default(0),
-  items: z.array(competencyItemSchema).min(1).max(20),
-})
-
-export const createCompetencyFormSchema = z.object({
-  title: z.string().min(2).max(255),
-  description: z.string().max(2000).optional(),
-  targetRole: z.string().max(100).optional(),
-  periodStart: z.string().date(),
-  periodEnd: z.string().date(),
-  isActive: z.boolean().optional().default(true),
-  categories: z.array(competencyCategorySchema).min(1).max(10),
-})
-
-export const startEvaluationSchema = z.object({
-  formId: z.string().uuid(),
-  subjectId: z.string().uuid(),
-  managerId: z.string().uuid().optional(),
-  peerIds: z.array(z.string().uuid()).max(5).default([]),
-  subordinateIds: z.array(z.string().uuid()).max(3).default([]),
-  includeSelf: z.boolean().default(true),
-})
-
-export const submitEvaluationSchema = z.object({
-  answers: z.array(z.object({
-    itemId: z.string().uuid(),
-    score: z.coerce.number().int().min(1).max(5),
-    comment: z.string().max(500).optional(),
-  })).min(1),
-})
-
 // ── EĞİTİM KATEGORİLERİ ──
 export const createTrainingCategorySchema = z.object({
   label: z.string().min(1, 'Kategori adı zorunludur').max(30, 'Kategori adı en fazla 30 karakter olabilir'),

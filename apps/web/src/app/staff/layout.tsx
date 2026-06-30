@@ -58,7 +58,6 @@ export default function StaffLayout({
   if (!user) return null;
 
   // Sektör-filtreli nav: branding yüklenmediyse tüm staffNav fallback.
-  // (Devakent staff'ı zaten SMG Puanlarım'ı görür → flicker yok)
   const filteredStaffNav = branding ? filterNavBySector(staffNav, branding.sector) : staffNav;
 
   // Editorial sistemde staff zemini cream paper. Diğer paneller (admin/super-admin)
@@ -91,7 +90,7 @@ export default function StaffLayout({
         <MobileSidebarDrawer
           open={mobileDrawerOpen}
           onClose={() => setMobileDrawerOpen(false)}
-          navGroups={staffNav}
+          navGroups={filteredStaffNav}
           orgName={branding?.orgName || user?.department || ''}
           orgLogoUrl={branding?.orgLogoUrl ?? undefined}
           isDemo={branding?.isDemo === true}

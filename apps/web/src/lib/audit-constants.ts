@@ -227,11 +227,6 @@ export const AUDIT_ENTITY_BADGE: Record<string, { variant: AuditBadgeVariant; la
   training_feedback_form: { variant: 'k-badge-info', label: 'Eğitim Geri Bildirim Formu' },
   training_feedback_response: { variant: 'k-badge-info', label: 'Eğitim Geri Bildirimi' },
 
-  // Yetkinlik (competency)
-  competency_evaluation: { variant: 'k-badge-info', label: 'Yetkinlik Değerlendirme' },
-  CompetencyEvaluation: { variant: 'k-badge-info', label: 'Yetkinlik Değerlendirme' },
-  CompetencyForm: { variant: 'k-badge-info', label: 'Yetkinlik Formu' },
-
   // SMG (Sürekli Mesleki Gelişim)
   SmgPeriod: { variant: 'k-badge-info', label: 'SMG Dönemi' },
   SmgTarget: { variant: 'k-badge-info', label: 'SMG Hedefi' },

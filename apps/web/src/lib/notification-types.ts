@@ -17,7 +17,6 @@ import {
   Info,
   type LucideIcon,
   Megaphone,
-  MessageSquare,
   PlayCircle,
   Sparkles,
   Zap,
@@ -43,7 +42,6 @@ const TYPE_META: Record<string, NotificationTypeMeta> = {
   announcement:        { label: 'DUYURU',     icon: Megaphone,     ink: '#0b1e3f' },
   reminder:            { label: 'HATIRLATMA', icon: Clock3,        ink: '#b4820b' },
   assignment:          { label: 'EĞİTİM',     icon: BookOpen,      ink: '#1a3a28' },
-  competency_evaluation: { label: 'YETKİNLİK', icon: MessageSquare, ink: '#2c55b8' },
   subscription_expiry: { label: 'ABONELİK',   icon: Sparkles,      ink: '#8a5a11' },
 
   // Sistem tarafından otomatik üretilen tipler (Mayıs 2026 öncesinde
@@ -66,7 +64,6 @@ export const FILTER_TYPES: readonly string[] = [
   'assignment',
   'reminder',
   'announcement',
-  'competency_evaluation',
   'warning',
   'info',
   'success',

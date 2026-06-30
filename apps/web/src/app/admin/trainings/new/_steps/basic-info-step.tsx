@@ -33,8 +33,6 @@ interface BasicInfoStepProps {
   setMaxAttempts: (v: number | '') => void;
   examDurationMinutes: number | '';
   setExamDurationMinutes: (v: number | '') => void;
-  smgPoints: number | '';
-  setSmgPoints: (v: number | '') => void;
   isCompulsory: boolean;
   setIsCompulsory: (v: boolean) => void;
   complianceDeadline: string;
@@ -59,7 +57,6 @@ export default function BasicInfoStep({
   endDate, setEndDate,
   maxAttempts, setMaxAttempts,
   examDurationMinutes, setExamDurationMinutes,
-  smgPoints, setSmgPoints,
   isCompulsory, setIsCompulsory,
   complianceDeadline, setComplianceDeadline,
   regulatoryBody, setRegulatoryBody,
@@ -202,7 +199,7 @@ export default function BasicInfoStep({
         >
           <p className="text-sm font-semibold mb-1" style={{ color: K.TEXT_PRIMARY }}>Sınav Ayarları</p>
           <p className="text-[11px] mb-4" style={{ color: K.TEXT_MUTED }}>Baraj puanı &quot;Sınav Soruları&quot; adımında belirlenir — soru sayısına göre otomatik hesaplama yapılır.</p>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <div className="flex items-center gap-1.5 mb-2">
                 <Award className="h-3.5 w-3.5" style={{ color: K.WARNING }} />
@@ -219,14 +216,6 @@ export default function BasicInfoStep({
                   daha fazla girip publish'te 400 alma yanlış-pozitifini önlemek için aynı limit. */}
               <Input type="number" min={1} max={180} value={examDurationMinutes} onChange={(e) => setExamDurationMinutes(e.target.value ? Number(e.target.value) : '')} placeholder="örn. 30" className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
               <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>maks. 180 dakika</p>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Award className="h-3.5 w-3.5" style={{ color: K.SUCCESS }} />
-                <Label className="text-xs font-medium" style={{ color: K.TEXT_MUTED }}>SMG Puanı</Label>
-              </div>
-              <Input type="number" min={0} max={999} value={smgPoints} onChange={(e) => setSmgPoints(e.target.value ? Number(e.target.value) : '')} placeholder="örn. 10" className="h-10" style={{ background: K.SURFACE, borderColor: K.BORDER, fontFamily: K.FONT_MONO, borderRadius: 10 }} />
-              <p className="text-[10px] mt-1" style={{ color: K.TEXT_MUTED }}>Eğitim geçilince staff&apos;a yazılacak SMG puanı</p>
             </div>
           </div>
 

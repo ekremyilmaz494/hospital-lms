@@ -79,7 +79,6 @@ interface DraftSnapshot {
   endDate: string;
   maxAttempts: number | '';
   examDurationMinutes: number | '';
-  smgPoints: number | '';
   isCompulsory: boolean;
   complianceDeadline: string;
   regulatoryBody: string;
@@ -141,7 +140,6 @@ export default function DraftWizardPage() {
   const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [maxAttempts, setMaxAttempts] = useState<number | ''>('');
   const [examDurationMinutes, setExamDurationMinutes] = useState<number | ''>('');
-  const [smgPoints, setSmgPoints] = useState<number | ''>('');
   const [isCompulsory, setIsCompulsory] = useState(false);
   const [complianceDeadline, setComplianceDeadline] = useState('');
   const [regulatoryBody, setRegulatoryBody] = useState('');
@@ -196,7 +194,6 @@ export default function DraftWizardPage() {
           if (draftData.endDate) setEndDate(draftData.endDate);
           setMaxAttempts(draftData.maxAttempts ?? '');
           setExamDurationMinutes(draftData.examDurationMinutes ?? '');
-          setSmgPoints(draftData.smgPoints ?? '');
           setIsCompulsory(!!draftData.isCompulsory);
           setComplianceDeadline(draftData.complianceDeadline ?? '');
           setRegulatoryBody(draftData.regulatoryBody ?? '');
@@ -249,13 +246,13 @@ export default function DraftWizardPage() {
 
   const snapshot = useMemo<DraftSnapshot>(() => ({
     title, description, instructorName, selectedCategory, startDate, endDate,
-    maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
+    maxAttempts, examDurationMinutes, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     videos: persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
     questionsActiveMode, aiPending, aiUploadedSources,
   }), [
     title, description, instructorName, selectedCategory, startDate, endDate,
-    maxAttempts, examDurationMinutes, smgPoints, isCompulsory,
+    maxAttempts, examDurationMinutes, isCompulsory,
     complianceDeadline, regulatoryBody, renewalPeriodMonths,
     persistableVideos, questions, passingScore, selectedDepts, excludedStaff,
     questionsActiveMode, aiPending, aiUploadedSources,
@@ -459,11 +456,11 @@ export default function DraftWizardPage() {
   // Step hash'leri — geri dönüş sonrası dirty kontrolü için. Her adımın yayın-kritik
   // field'larını içerir; eklemeyi sade tutmak için JSON kullanıyoruz (alanlar küçük).
   const stepHashes = useMemo<Record<number, string>>(() => ({
-    1: JSON.stringify({ title, selectedCategory, startDate, endDate, maxAttempts, examDurationMinutes, smgPoints, isCompulsory, complianceDeadline, regulatoryBody, renewalPeriodMonths }),
+    1: JSON.stringify({ title, selectedCategory, startDate, endDate, maxAttempts, examDurationMinutes, isCompulsory, complianceDeadline, regulatoryBody, renewalPeriodMonths }),
     2: JSON.stringify({ videos: videos.map(v => ({ id: v.id, url: v.url, contentType: v.contentType, title: v.title })) }),
     3: JSON.stringify({ passingScore, questions: questions.map(q => ({ text: q.text, options: q.options, correct: q.correct })) }),
     4: JSON.stringify({ selectedDepts, excludedStaff }),
-  }), [title, selectedCategory, startDate, endDate, maxAttempts, examDurationMinutes, smgPoints, isCompulsory, complianceDeadline, regulatoryBody, renewalPeriodMonths, videos, passingScore, questions, selectedDepts, excludedStaff]);
+  }), [title, selectedCategory, startDate, endDate, maxAttempts, examDurationMinutes, isCompulsory, complianceDeadline, regulatoryBody, renewalPeriodMonths, videos, passingScore, questions, selectedDepts, excludedStaff]);
 
   // Bir adım valid kabul edildiyse ve o adımın hash'i o anki hash ile eşleşiyorsa "completed".
   // Eşleşmiyorsa kullanıcı sonradan değiştirmiş demektir → dirty (stepper uyarı, ileri geçişte yeniden validate).
@@ -579,7 +576,7 @@ export default function DraftWizardPage() {
           passingScore: Number(passingScore) || 70,
           maxAttempts: Number(maxAttempts) || 3,
           examDurationMinutes: Number(examDurationMinutes) || 30,
-          smgPoints: Math.max(0, Math.min(999, Number(smgPoints) || 10)),
+          smgPoints: 0,
           startDate: new Date(startDate).toISOString(),
           endDate: new Date(endDate).toISOString(),
           isCompulsory,
@@ -725,7 +722,6 @@ export default function DraftWizardPage() {
               endDate={endDate} setEndDate={setEndDate}
               maxAttempts={maxAttempts} setMaxAttempts={setMaxAttempts}
               examDurationMinutes={examDurationMinutes} setExamDurationMinutes={setExamDurationMinutes}
-              smgPoints={smgPoints} setSmgPoints={setSmgPoints}
               isCompulsory={isCompulsory} setIsCompulsory={setIsCompulsory}
               complianceDeadline={complianceDeadline} setComplianceDeadline={setComplianceDeadline}
               regulatoryBody={regulatoryBody} setRegulatoryBody={setRegulatoryBody}

@@ -14,17 +14,14 @@ import {
   UserCircle,
   BookOpen,
   ShieldCheck,
-  Grid3x3,
   TrendingUp,
   Library,
-  Star,
   ClipboardCheck,
   ClipboardList,
   Activity,
   MessageSquare,
   UserCog,
   Database,
-  Gauge,
   FlaskConical,
   type LucideIcon,
 } from 'lucide-react';
@@ -41,7 +38,7 @@ export interface NavItem {
   /**
    * Hangi sektörlerde gösterilsin. `undefined` → tüm sektörler (default).
    * Faz 3 sektör-agnostik refactor: sağlık-spesifik regülasyon kalemleri
-   * (SMG, SKS uyum) sadece healthcare org'larda görünür.
+   * (SKS uyum gibi sektör özel kalemleri) sadece ilgili sektörlerde görünür.
    */
   sectors?: Sector[];
 }
@@ -162,18 +159,6 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'Sertifikalar', href: '/admin/certificates', icon: Award },
-      { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix', icon: Grid3x3 },
-      { title: 'Yetkinlik Değerlendirmesi', href: '/admin/competency', icon: Gauge },
-      {
-        title: 'SMG Takibi',
-        href: '/admin/smg',
-        icon: Star,
-        sectors: ['healthcare'],
-        children: [
-          { title: 'Genel Bakış', href: '/admin/smg' },
-          { title: 'SKS Denetim Raporu', href: '/admin/smg/inspection' },
-        ],
-      },
     ],
   },
   {
@@ -192,7 +177,15 @@ export const adminNav: NavGroup[] = [
           { title: 'Analitik', href: '/admin/feedback-forms/analytics' },
         ],
       },
-      { title: 'Raporlar', href: '/admin/reports', icon: BarChart3 },
+      {
+        title: 'Raporlar',
+        href: '/admin/reports',
+        icon: BarChart3,
+        children: [
+          { title: 'Genel Raporlar', href: '/admin/reports' },
+          { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix' },
+        ],
+      },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },
     ],
@@ -224,7 +217,6 @@ export const staffNav: NavGroup[] = [
       { title: 'Dashboard', href: '/staff/dashboard', icon: LayoutDashboard },
       { title: 'Eğitimlerim', href: '/staff/my-trainings', icon: BookOpen },
       { title: 'Sertifikalarım', href: '/staff/certificates', icon: Award },
-      { title: 'SMG Puanlarım', href: '/staff/smg', icon: Star, sectors: ['healthcare'] },
       { title: 'Takvim', href: '/staff/calendar', icon: Calendar },
       { title: 'Bildirimler', href: '/staff/notifications', icon: Bell },
       { title: 'Geri Bildirimler', href: '/staff/feedback', icon: MessageSquare },
@@ -234,8 +226,6 @@ export const staffNav: NavGroup[] = [
     label: 'HESABIM',
     items: [
       { title: 'Profilim', href: '/staff/profile', icon: UserCircle },
-      { title: 'Değerlendirmeler', href: '/staff/evaluations', icon: ClipboardCheck },
-      { title: 'Yetkinlik Sonuçlarım', href: '/staff/competency', icon: TrendingUp },
     ],
   },
 ];

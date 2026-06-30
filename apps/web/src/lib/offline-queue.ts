@@ -5,7 +5,6 @@
  * Desteklenen endpoint'ler:
  *  - /api/feedback/submit
  *  - /api/staff/smg/my-points (POST)
- *  - /api/staff/evaluations/[id]/submit
  *
  * Kullanım:
  *   enqueueRequest({ url, method, body }) — kuyruğa ekle, hemen dene.
