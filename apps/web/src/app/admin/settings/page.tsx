@@ -1,22 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
-import {
-  Settings, Save, Building2,
-  Bell, Palette, Mail,
-  ChevronRight, CheckCircle2,
-} from 'lucide-react';
+import { Save, Building2, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import OrganizationTab from './organization-tab';
 
-const tabLoading = () => <div className="h-64 animate-pulse rounded-lg m-8" style={{ background: 'var(--k-surface-hover)' }} />;
-const OrganizationTab = dynamic(() => import('./organization-tab'), { ssr: false, loading: tabLoading });
-const NotificationTab = dynamic(() => import('./notification-tab'), { ssr: false, loading: tabLoading });
-const BrandingTab = dynamic(() => import('./branding-tab'), { ssr: false, loading: tabLoading });
-const EmailTab = dynamic(() => import('./email-tab'), { ssr: false, loading: tabLoading });
 
 interface SettingsData {
   defaultPassingScore: number;
@@ -58,14 +49,6 @@ const defaultSettings: SettingsData = {
   customDomain: '',
 };
 
-const tabs = [
-  { id: 'organization', label: 'Kurum', icon: Building2 },
-  { id: 'branding', label: 'Marka', icon: Palette },
-  { id: 'notifications', label: 'Bildirimler', icon: Bell },
-  { id: 'email', label: 'E-posta', icon: Mail },
-] as const;
-
-type TabId = (typeof tabs)[number]['id'];
 
 /* ─── Main ─── */
 export default function AdminSettingsPage() {
@@ -74,7 +57,6 @@ export default function AdminSettingsPage() {
   const [formData, setFormData] = useState<SettingsData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>('organization');
 
   useEffect(() => {
     if (data) setFormData({ ...defaultSettings, ...data });
@@ -130,75 +112,52 @@ export default function AdminSettingsPage() {
               <span data-current="true">Ayarlar</span>
             </div>
             <h1 className="k-page-title">Platform Ayarları</h1>
-            <p className="k-page-subtitle">Kurum bilgileri, marka, bildirim ve entegrasyon tercihleri.</p>
+            <p className="k-page-subtitle">Kurum bilgileri ve iletişim detayları.</p>
           </div>
         </header>
       </BlurFade>
 
       <div className="flex gap-8">
-        {/* Sidebar tabs */}
+        {/* Settings navigation */}
         <BlurFade delay={0.05}>
           <nav className="w-56 shrink-0 space-y-1.5 sticky top-24">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="group flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[13px] transition-colors duration-200"
-                  style={{
-                    background: isActive ? 'var(--k-primary-light)' : 'transparent',
-                    color: isActive ? 'var(--k-primary)' : 'var(--k-text-secondary)',
-                    fontWeight: isActive ? 600 : 500,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = 'var(--k-surface-hover)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <tab.icon className="h-4 w-4" style={{ opacity: isActive ? 1 : 0.7 }} />
-                  <span className="flex-1">{tab.label}</span>
-                  <ChevronRight
-                    className="h-3.5 w-3.5 transition-transform duration-200"
-                    style={{
-                      opacity: isActive ? 0.9 : 0,
-                      transform: isActive ? 'translateX(0)' : 'translateX(-4px)',
-                    }}
-                  />
-                </button>
-              );
-            })}
+            <div
+              className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[13px]"
+              style={{
+                background: 'var(--k-primary-light)',
+                color: 'var(--k-primary)',
+                fontWeight: 600,
+              }}
+            >
+              <Building2 className="h-4 w-4" />
+              <span className="flex-1">Kurum</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </div>
 
-            {/* Save button in sidebar — E-posta sekmesi kendi "Kaydet"ine sahip olduğundan
-                orada genel Kaydet gizlenir (yanlış sekmeye basıp kaydetmedim sanma karışıklığı). */}
-            {activeTab !== 'email' && (
-              <div className="pt-4 mt-4" style={{ borderTop: '1px solid var(--k-border)' }}>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || saved}
-                  className="k-btn k-btn-primary w-full justify-center"
-                >
-                  {saving ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Kaydediliyor...
-                    </>
-                  ) : saved ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" />
-                      Kaydedildi
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      Kaydet
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+            <div className="pt-4 mt-4" style={{ borderTop: '1px solid var(--k-border)' }}>
+              <button
+                onClick={handleSave}
+                disabled={saving || saved}
+                className="k-btn k-btn-primary w-full justify-center"
+              >
+                {saving ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Kaydediliyor...
+                  </>
+                ) : saved ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Kaydedildi
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Kaydet
+                  </>
+                )}
+              </button>
+            </div>
           </nav>
         </BlurFade>
 
@@ -212,10 +171,7 @@ export default function AdminSettingsPage() {
               boxShadow: 'var(--k-shadow-sm)',
             }}
           >
-            {activeTab === 'organization' && <OrganizationTab {...tabProps} />}
-            {activeTab === 'branding' && <BrandingTab {...tabProps} />}
-            {activeTab === 'notifications' && <NotificationTab {...tabProps} />}
-            {activeTab === 'email' && <EmailTab />}
+            <OrganizationTab {...tabProps} />
           </div>
         </BlurFade>
       </div>

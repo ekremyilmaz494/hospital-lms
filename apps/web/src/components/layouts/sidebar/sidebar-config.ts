@@ -201,7 +201,6 @@ export const adminNav: NavGroup[] = [
         icon: Settings,
         children: [
           { title: 'Genel Ayarlar', href: '/admin/settings' },
-          { title: 'Güvenlik', href: '/admin/settings/security' },
         ],
       },
     ],
