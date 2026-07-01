@@ -8,6 +8,8 @@ import { logger } from '@/lib/logger'
 import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
 import { toEndOfDayUTC } from '@/lib/date-helpers'
 import { assertCronAuth } from '@/lib/cron-auth'
+import { createAuditLog } from '@/lib/api-helpers'
+import { anonymizeUserData } from '@/lib/kvkk/anonymize-user'
 import type { UserRole } from '@/types/database'
 
 // State machine ile uyumlu: EXPIRE event'inin toplu (updateMany) hali.
@@ -110,6 +112,49 @@ export async function GET(request: Request) {
     where: { organizationId: null, createdAt: { lt: new Date(Date.now() - 365 * dayMs) } },
   })
   const deletedLogs = { count: auditDeletedCount + auditNullDeleted.count }
+
+  // 3.2 KVKK saklama-süresi imhası — org `dataRetentionDays`'i aşan PASİF personeli otomatik
+  // anonimleştir (KVKK m.7; data-retention politikası "Kimlik/İletişim: üyelik+1 yıl" ile hizalar).
+  // Kapsam: yalnız staff (admin/owner otomatik silinmez) + `deactivatedAt` damgalı (bu alandan
+  // ÖNCE pasifleştirilmiş legacy kayıtlar null → otomatik hariç, admin elle purge edebilir) +
+  // henüz anonimleştirilmemiş (email @anonymized.local değil → idempotent). Batch cap ile sınırlı.
+  const RETENTION_PURGE_CAP = 100
+  let retentionAnonymized = 0
+  for (const o of retentionOrgs) {
+    if (retentionAnonymized >= RETENTION_PURGE_CAP) break
+    const cutoff = new Date(Date.now() - o.dataRetentionDays * dayMs)
+    const expiredUsers = await prisma.user.findMany({
+      where: {
+        organizationId: o.id,
+        role: 'staff' satisfies UserRole,
+        isActive: false,
+        deactivatedAt: { lt: cutoff }, // null deactivatedAt zaten `lt` ile eşleşmez → hariç
+        NOT: { email: { endsWith: '@anonymized.local' } },
+      },
+      select: { id: true },
+      take: RETENTION_PURGE_CAP - retentionAnonymized,
+    })
+    for (const u of expiredUsers) {
+      try {
+        await anonymizeUserData(u.id)
+        // Sistem-audit (userId null) — kimin/ne zaman silindiğinin KVKK kanıtı (PII içermez).
+        await createAuditLog({
+          userId: null,
+          organizationId: o.id,
+          action: 'KVKK_DATA_DELETION',
+          entityType: 'User',
+          entityId: u.id,
+          newData: { reason: 'retention_auto_purge', retentionDays: o.dataRetentionDays },
+        })
+        retentionAnonymized++
+      } catch (err) {
+        logger.error('cleanup', 'KVKK retention anonimlestirme basarisiz', { userId: u.id, err: err instanceof Error ? err.message : String(err) })
+      }
+    }
+  }
+  if (retentionAnonymized > 0) {
+    logger.info('cleanup', 'KVKK saklama-suresi imhasi tamamlandi', { count: retentionAnonymized })
+  }
 
   // 3.6 Süresi dolmuş güvenilir cihaz (TrustedDevice) kayıtlarını sil — SMS/MFA atlatan
   // cookie zaten geçersiz; DB temizliği birikmeyi önler.
@@ -546,6 +591,7 @@ export async function GET(request: Request) {
     deletedNotifications: deletedNotifications.count,
     staleAttemptsClosed: staleAttempts.count,
     deletedLogs: deletedLogs.count,
+    retentionAnonymized,
     deletedExpoTicketsOk: deletedExpoTicketsOk.count,
     deletedExpoTicketsError: deletedExpoTicketsError.count,
     deletedBackups: deletedBackups.count,

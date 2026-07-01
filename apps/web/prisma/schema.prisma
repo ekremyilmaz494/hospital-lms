@@ -317,6 +317,10 @@ model User {
   role                     UserRole
   avatarUrl                String?   @map("avatar_url") @db.Text
   isActive                 Boolean   @default(true) @map("is_active")
+  // Kullanıcının pasifleştirildiği (isActive=false yapıldığı) an. KVKK saklama-süresi imha
+  // cron'u (api/cron/cleanup) bunu kullanır: dataRetentionDays'i aşan pasif personeli otomatik
+  // anonimleştirir. Aktifleştirmede null'a döner. Aktif kullanıcıda null.
+  deactivatedAt            DateTime? @map("deactivated_at") @db.Timestamptz
   // TC Kimlik No — KVKK gereği AES-256-GCM ile şifrelenmiş + HMAC-SHA256 ile hash'lenmiş.
   // tcEncrypted: ciphertext (görüntüleme için decrypt). tcHash: deterministic, lookup için.
   tcEncrypted              String?   @map("tc_encrypted") @db.Text

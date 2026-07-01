@@ -168,6 +168,12 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
     dataToUpdate.department = deptCheck.name
   }
 
+  // KVKK saklama saati: aktif→pasif geçişinde deactivatedAt damgalanır (cron bunu baz alır),
+  // pasif→aktif geçişinde temizlenir. Değişiklik yoksa alana dokunulmaz.
+  if (typeof parsed.data.isActive === 'boolean' && parsed.data.isActive !== existing.isActive) {
+    dataToUpdate.deactivatedAt = parsed.data.isActive ? null : new Date()
+  }
+
   // Email değişikliği — Supabase Auth ile senkron olmalı (auth identity = email).
   // Sıra: önce Prisma uniqueness kontrolü → Auth update → DB update.
   // Auth başarılı olup DB başarısız olursa kullanıcının auth e-postası ile DB e-postası
@@ -280,8 +286,12 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
   const purge = searchParams.get('purge') === 'true'
 
   // Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)
+  // deactivatedAt yalnız aktif→pasif geçişinde damgalanır (zaten pasifse saklama saati sıfırlanmasın).
   await prisma.$transaction([
-    prisma.user.updateMany({ where: { id, organizationId: orgId }, data: { isActive: false } }),
+    prisma.user.updateMany({
+      where: { id, organizationId: orgId },
+      data: { isActive: false, ...(existing.isActive ? { deactivatedAt: new Date() } : {}) },
+    }),
     prisma.examAttempt.updateMany({
       where: {
         userId: id,
