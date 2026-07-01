@@ -53,7 +53,7 @@ Asagidaki tablo, sistemde saklanan tum kisisel veri alanlarini, sifreleme duruml
 
 | Veri | Alan Adi | Sifreleme | Saklama Suresi | Hukuki Dayanak |
 |------|----------|-----------|----------------|----------------|
-| TC Kimlik Numarasi | `tcNo` | AES-256-GCM | Is iliskisi suresince | KVKK md. 5/2-c (Sozlesmenin ifasi) |
+| TC Kimlik Numarasi | `tcEncrypted` (+ lookup `tcHash`) | AES-256-GCM ciphertext + HMAC-SHA256 hash | Is iliskisi suresince | KVKK md. 5/2-c (Sozlesmenin ifasi) |
 | Ad | `firstName` | Duz metin | Is iliskisi suresince | KVKK md. 5/2-c |
 | Soyad | `lastName` | Duz metin | Is iliskisi suresince | KVKK md. 5/2-c |
 | E-posta adresi | `email` | Duz metin | Is iliskisi suresince | KVKK md. 5/2-c |
@@ -61,10 +61,11 @@ Asagidaki tablo, sistemde saklanan tum kisisel veri alanlarini, sifreleme duruml
 | Unvan / Gorev | `title` | Duz metin | Is iliskisi suresince | KVKK md. 5/2-c |
 | Departman bilgisi | `departmentId` | Referans (UUID) | Is iliskisi suresince | KVKK md. 5/2-c |
 | Profil fotografi | `avatarUrl` | URL (S3 signed) | Is iliskisi suresince | KVKK md. 5/1 (Acik riza) |
-| KVKK Onam Durumu | `kvkkConsent` | Boolean | Surekli | KVKK md. 5/1 |
-| KVKK Onam Tarihi | `kvkkConsentDate` | Tarih/saat | Surekli | KVKK md. 5/1 |
-| Kullanim Sartlari Onayi | `termsAccepted` | Boolean | Surekli | KVKK md. 5/2-c |
+| KVKK Aydinlatma Onay Tarihi | `kvkkNoticeAcknowledgedAt` | Tarih/saat | Surekli | KVKK md. 5/1 |
+| Onaylanan Aydinlatma Surumu | `kvkkNoticeVersion` | Tam sayi | Surekli | KVKK md. 5/1 |
+| Kullanim Sartlari Onayi | `termsAccepted` (+ `termsAcceptedAt`) | Boolean + tarih | Surekli | KVKK md. 5/2-c |
 | Hesap Aktiflik Durumu | `isActive` | Boolean | Surekli | KVKK md. 5/2-c |
+| Pasiflestirme Tarihi (saklama saati) | `deactivatedAt` | Tarih/saat | `dataRetentionDays` sonra anonimlestirilir | KVKK md. 7 (Imha) |
 | Rol (Yetki Seviyesi) | `role` | Duz metin | Is iliskisi suresince | KVKK md. 5/2-c |
 | Olusturma Tarihi | `createdAt` | Tarih/saat | Surekli | KVKK md. 5/2-e (Bir hakkin kullanilmasi) |
 | Son Guncelleme | `updatedAt` | Tarih/saat | Surekli | KVKK md. 5/2-e |
@@ -176,7 +177,7 @@ Tum kritik islemler icin degistirilemez denetim izi olusturulmaktadir:
 - **Zincir Yapisi:** Her log kaydinin hash degeri, bir onceki kaydin hash degerini icerir (blockchain benzeri zincir)
 - **Hash Icerigi:** `prevHash | action | entityType | entityId | userId | createdAt`
 - **Kayit Edilen Bilgiler:** Islem turu, eski veri, yeni veri, IP adresi, User-Agent, zaman damgasi
-- **PII Sanitizasyonu:** Audit log verilerinde kisisel bilgiler (tcNo, phone, email, firstName, lastName, address, password) otomatik olarak `[REDACTED]` ile maskelenir
+- **PII Sanitizasyonu:** Audit log verilerinde kisisel bilgiler (tcNo, phone, email, firstName, lastName, address, password) otomatik olarak `[REDACTED]` ile maskelenir. Ayrica uygulama loglarinda e-posta/telefon/IP `lib/pii-mask.ts` ile maskelenir (m.12)
 - **JCI/SKS Uyumu:** Hash zinciri, kayitlarin sonradan degistirilmedigini kanitlar
 
 ### 3.5 Guvenlik Basliklari
