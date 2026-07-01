@@ -64,6 +64,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   // KVKK / kişisel veri
   KVKK_DATA_DELETION: 'KVKK Veri Silme',
   KVKK_NOTICE_ACKNOWLEDGED: 'KVKK Aydınlatma Onayı',
+  KVKK_REQUEST_RESPONDED: 'KVKK Hak Talebi Yanıtlama',
   TC_DECRYPTED_FOR_REPORT: 'TC Kimlik Rapor İçin Çözüldü',
 
   // Eğitim
