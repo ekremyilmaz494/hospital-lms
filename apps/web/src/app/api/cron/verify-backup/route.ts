@@ -7,14 +7,14 @@ import { logger } from '@/lib/logger'
 import { assertCronAuth } from '@/lib/cron-auth'
 
 /**
- * Haftalık yedek sağlık doğrulaması.
+ * Günlük yedek sağlık doğrulaması.
  *
  * Her aktif kurumun son 24 saatteki en yeni `verified=true` yedeğini S3'ten
  * indirir, çözer, JSON'u parse eder ve kurum kimliğini teyit eder. Cron job
  * sırasında deep verification zaten yapılıyor; bu endpoint "yedek cron silinsin
  * ve bozulsun" veya "S3 IAM bozulsun" türü geçikmeli regresyonları yakalar.
  *
- * Schedule: `vercel.json` → Pazar 04:00 UTC.
+ * Schedule: `vercel.json` → her gün 04:00 UTC.
  */
 export async function GET(request: Request) {
   const authErr = assertCronAuth(request)
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
       await sendEmail({
         to: adminEmail,
         subject: `[Yedek Doğrulama] ${problems.length} kurumda sorun tespit edildi`,
-        html: `<h3>Haftalık Yedek Doğrulama Raporu</h3>
+        html: `<h3>Günlük Yedek Doğrulama Raporu</h3>
           <p><strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}</p>
           <p><strong>Toplam kurum:</strong> ${organizations.length}</p>
           <p><strong>Sorunlu:</strong> ${problems.length}</p>

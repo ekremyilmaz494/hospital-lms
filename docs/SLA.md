@@ -167,7 +167,7 @@ P0 ve P1 olayları için SAĞLAYICI, olay çözümünden sonra **48 saat içinde
 - **Sıklık:** Her gün otomatik (03:15 UTC)
 - **Depolama:** AWS S3 (Frankfurt, eu-central-1), AES-256-GCM şifreleme
 - **Saklama Süresi:** 90 gün
-- **Doğrulama:** Her yedek upload sonrası bütünlük kontrolü; haftalık otomatik restore drill testi
+- **Doğrulama:** Her yedek upload sonrası bütünlük kontrolü + günlük otomatik geri-okuma doğrulaması (`verify-backup` cron, 04:00 UTC); aylık manuel restore drill testi
 
 ### 7.3 Veri Kaybı Durumunda Sorumluluk
 

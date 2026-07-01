@@ -33,7 +33,7 @@ Konfigürasyon: `vercel.json`
 |------|-----------|------|---------------------|
 | `/api/cron/backup` | 03:15 | DB yedekleme → S3 | Yüksek (RPO ihlali) |
 | `/api/cron/cleanup` | 03:00 | Stale attempt, notif, audit rotation | Düşük (1-2 gün tolerans) |
-| `/api/cron/verify-backup` | 03:45 | Yedek geri okunabilirlik kontrolü | Yüksek (sessiz korupt yedek) |
+| `/api/cron/verify-backup` | 04:00 | Yedek geri okunabilirlik kontrolü | Yüksek (sessiz korupt yedek) |
 
 ### Başarısızlık bildirimi
 - **Sentry**: Her cron route `withPerfLogging` + `try/catch` + `logger.error` sarılı → Sentry alarma düşer
@@ -49,7 +49,7 @@ Gerektiğinde Vercel dashboard → Cron Jobs → "Run now". Sonucu her zaman `ve
 
 ### Otomatik akış
 1. `03:15` → backup oluştur + S3'e yükle + AES-256-GCM ile şifrele (`BACKUP_ENCRYPTION_KEY`)
-2. `03:45` → verify-backup: S3'ten indir → decrypt → JSON parse → yapı kontrolü (`isValidBackupData`)
+2. `04:00` → verify-backup: S3'ten indir → decrypt → JSON parse → yapı kontrolü (`isValidBackupData`)
 3. Başarısızlık → Sentry + email alert
 
 ### Manuel doğrulama (haftada 1)
@@ -119,7 +119,7 @@ Build sırasında `withSentryConfig` otomatik upload ediyor. `SENTRY_AUTH_TOKEN`
 |-------------------|----------|-------|------|
 | 09:00 – 13:00 | Ekrem | [yedek-1] | Deploy + smoke test + ilk kullanıcı giriş |
 | 13:00 – 18:00 | [ops-1] | Ekrem | İstek akışı, rate limit, sınav başlatma |
-| 18:00 – 00:00 | [ops-2] | [ops-1] | Cron (03:00/03:15/03:45) öncesi hazır |
+| 18:00 – 00:00 | [ops-2] | [ops-1] | Cron (03:00/03:15/04:00) öncesi hazır |
 | 00:00 – 09:00 | Ekrem (on-call) | — | Backup + cleanup + verify tamamlanma |
 
 **İletişim kanalları**:

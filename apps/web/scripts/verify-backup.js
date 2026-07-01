@@ -8,7 +8,8 @@
  * 4. S3 yazma/okuma/silme çalışıyor mu?
  *
  * Çalıştır: node scripts/verify-backup.js
- * Haftalık cron veya go-live öncesi kontrol olarak kullanın.
+ * Manuel spot-check veya go-live öncesi kontrol olarak kullanın (otomatik günlük
+ * doğrulama /api/cron/verify-backup route'unda her gün 04:00 UTC'de yapılır).
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
 require('dotenv').config({ path: '.env.local' });
