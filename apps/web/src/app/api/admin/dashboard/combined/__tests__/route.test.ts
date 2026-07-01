@@ -8,7 +8,7 @@ vi.mock('@/lib/training-periods', () => ({ findActivePeriod: vi.fn() }))
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }))
 vi.mock('@/lib/api-handler', () => ({ withAdminRoute: (fn: unknown) => fn }))
 
-import { complianceAlertStatus } from '../route'
+import { complianceAlertStatus } from '@/lib/compliance-alert'
 
 describe('complianceAlertStatus', () => {
   it('süresi geçmiş (daysLeft <= 0) → overdue (eskiden hiç gösterilmiyordu)', () => {

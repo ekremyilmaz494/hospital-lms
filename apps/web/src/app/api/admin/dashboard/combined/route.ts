@@ -4,6 +4,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { findActivePeriod } from '@/lib/training-periods'
+import { complianceAlertStatus } from '@/lib/compliance-alert'
 import type { UserRole } from '@/types/database'
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
@@ -71,17 +72,6 @@ function translateAuditAction(raw: string): string {
   if (direct) return direct
   const normalized = raw.replace(/[._]/g, ' ')
   return `"${normalized}" işlemi gerçekleştirdi`
-}
-
-/**
- * Uyum alarmı durumu — son teslim tarihine kalan güne göre.
- * `overdue` = süresi geçmiş (eskiden hiç gösterilmiyordu; frontend "Süre Doldu!" render eder).
- */
-export function complianceAlertStatus(daysLeft: number): 'overdue' | 'critical' | 'warning' | 'ok' {
-  if (daysLeft <= 0) return 'overdue'
-  if (daysLeft <= 7) return 'critical'
-  if (daysLeft <= 30) return 'warning'
-  return 'ok'
 }
 
 async function fetchStats(orgId: string) {
