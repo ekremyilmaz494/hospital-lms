@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { buildTranscriptPdf } from '@/lib/pdf/staff-transcript'
+import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
 import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
 
@@ -34,12 +35,13 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
       }),
       prisma.organization.findUnique({
         where: { id: organizationId },
-        select: { name: true },
+        select: { name: true, logoUrl: true },
       }),
     ])
 
     const fullName = user ? `${user.firstName} ${user.lastName}` : dbUser.id
     const orgName = org?.name ?? ''
+    const logoDataUrl = await resolveOrgLogoDataUrl(org?.logoUrl)
     const generatedAt = new Date().toLocaleDateString('tr-TR', {
       day: '2-digit', month: 'long', year: 'numeric',
     })
@@ -52,7 +54,7 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
       certificateCode: c.certificateCode,
     }))
 
-    const pdfBuffer = await buildTranscriptPdf({ fullName, organizationName: orgName, generatedAt, entries })
+    const pdfBuffer = await buildTranscriptPdf({ fullName, organizationName: orgName, generatedAt, logoDataUrl, entries })
 
     const safeName = fullName.replace(/[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ ]/g, '').trim()
     return new NextResponse(pdfBuffer as unknown as BodyInit, {

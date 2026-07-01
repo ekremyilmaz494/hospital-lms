@@ -38,6 +38,17 @@ describe('createOrganizationSchema', () => {
     })
     expect(result.success).toBe(true)
   })
+
+  it('logoUrl: tam URL VE /public yolunu kabul eder, çöp değeri reddeder', () => {
+    const url = createOrganizationSchema.safeParse({ name: 'Test', code: 'TST', logoUrl: 'https://cdn.klinovax.com/logo.png' })
+    const localPath = createOrganizationSchema.safeParse({ name: 'Test', code: 'TST', logoUrl: '/logos/devakent.png' })
+    const empty = createOrganizationSchema.safeParse({ name: 'Test', code: 'TST', logoUrl: '' })
+    const garbage = createOrganizationSchema.safeParse({ name: 'Test', code: 'TST', logoUrl: 'logo.png' })
+    expect(url.success).toBe(true)
+    expect(localPath.success).toBe(true)
+    expect(empty.success).toBe(true)
+    expect(garbage.success).toBe(false)
+  })
 })
 
 describe('updateOrganizationSchema', () => {

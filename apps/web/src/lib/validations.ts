@@ -28,7 +28,13 @@ export const createOrganizationSchema = z.object({
   address: z.string().optional(),
   phone: z.string().max(20).optional(),
   email: z.email().optional(),
-  logoUrl: z.string().url().optional(),
+  // Tam URL (https://... — S3/CloudFront) VEYA paket public yolu (/logos/devakent.png).
+  // resolveOrgLogoDataUrl ikisini de çözer (yerel yolu diskten, URL'i fetch ile).
+  logoUrl: z
+    .string()
+    .refine(v => v === '' || /^https?:\/\//i.test(v) || v.startsWith('/'),
+      'Logo, tam bir URL (https://...) veya /logos/dosya.png biçiminde bir yol olmalı')
+    .optional(),
   // Subscription alanları — hastane oluşturmada plan bağlamak için
   planId: z.string().uuid().optional(),
   trialDays: z.number().int().min(0).max(365).default(14),

@@ -6,6 +6,8 @@ import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { calculateOverallScore, type FeedbackQuestionType } from '@/lib/feedback-helpers'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
+import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
+import { mimeToPdfFormat } from '@/lib/pdf/helpers/logo'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -63,7 +65,7 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId, audi
     const [org, total] = await Promise.all([
       prisma.organization.findUnique({
         where: { id: organizationId },
-        select: { name: true },
+        select: { name: true, logoUrl: true },
       }),
       prisma.trainingFeedbackResponse.count({ where }),
     ])
@@ -134,6 +136,21 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId, audi
       // Liberation Sans — Türkçe karakter desteği (ğ, ü, ş, ı, İ, ö, ç).
       await applyTurkishFont(doc)
       const pw = doc.internal.pageSize.getWidth()
+
+      // Kurum logosu — sol üstte (varsa; başlık metni ortalı olduğundan çakışmaz)
+      const logoDataUrl = await resolveOrgLogoDataUrl(org?.logoUrl)
+      if (logoDataUrl) {
+        try {
+          const props = doc.getImageProperties(logoDataUrl)
+          const maxH = 16, maxW = 46
+          const scale = Math.min(maxW / props.width, maxH / props.height)
+          const lw = props.width * scale
+          const lh = props.height * scale
+          doc.addImage(logoDataUrl, mimeToPdfFormat(logoDataUrl), 14, 8, lw, lh, undefined, 'FAST')
+        } catch {
+          // logo çizilemedi — logosuz devam
+        }
+      }
 
       doc.setFontSize(16)
       doc.setTextColor(13, 150, 104)

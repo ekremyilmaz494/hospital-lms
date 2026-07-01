@@ -7,6 +7,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from './helpers/font'
+import { mimeToPdfFormat } from './helpers/logo'
 
 export interface TranscriptEntry {
   trainingTitle: string
@@ -20,6 +21,8 @@ export interface TranscriptData {
   fullName: string
   organizationName: string
   generatedAt: string
+  /** Kurum logosu data URL'i (resolveOrgLogoDataUrl ile çözülür); yoksa null. */
+  logoDataUrl: string | null
   entries: TranscriptEntry[]
 }
 
@@ -47,6 +50,27 @@ export async function buildTranscriptPdf(data: TranscriptData): Promise<Buffer> 
   doc.setFont(TURKISH_FONT_FAMILY, 'normal')
   doc.setFontSize(9)
   doc.text(data.organizationName, 15, 22)
+
+  // Kurum logosu — NAVY başlığın sağında beyaz tile (en-boy oranı korunur)
+  if (data.logoDataUrl) {
+    try {
+      const props = doc.getImageProperties(data.logoDataUrl)
+      const maxH = 16, maxW = 46
+      const scale = Math.min(maxW / props.width, maxH / props.height)
+      const lw = props.width * scale
+      const lh = props.height * scale
+      const pad = 2.5
+      const tileW = lw + pad * 2
+      const tileH = lh + pad * 2
+      const tileX = W - 15 - tileW
+      const tileY = (28 - tileH) / 2
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(tileX, tileY, tileW, tileH, 2, 2, 'F')
+      doc.addImage(data.logoDataUrl, mimeToPdfFormat(data.logoDataUrl), tileX + pad, tileY + pad, lw, lh, undefined, 'FAST')
+    } catch {
+      // logo çizilemedi — başlık logosuz devam eder
+    }
+  }
 
   // Meta block
   doc.setTextColor(...INK)

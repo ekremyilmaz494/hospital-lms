@@ -7,6 +7,8 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { applyTurkishFont, TURKISH_FONT_FAMILY } from '@/lib/pdf/helpers/font'
+import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
+import { mimeToPdfFormat } from '@/lib/pdf/helpers/logo'
 import type { UserRole } from '@/types/database'
 import { resolveReportFilters, type ResolvedFilters } from '../_shared'
 
@@ -170,6 +172,7 @@ function renderCoverPage(
   dateLabel: string,
   filterLabel: string | null,
   truncationLabel: string | null,
+  logoDataUrl: string | null,
 ) {
   const pw = doc.internal.pageSize.getWidth()
   const ph = doc.internal.pageSize.getHeight()
@@ -180,6 +183,27 @@ function renderCoverPage(
   // Accent çizgi
   doc.setFillColor(...BRAND_ACCENT)
   doc.rect(0, 32, pw, 1.5, 'F')
+
+  // Kurum logosu — brand şeridin sol üstünde beyaz tile (varsa)
+  if (logoDataUrl) {
+    try {
+      const props = doc.getImageProperties(logoDataUrl)
+      const maxH = 20, maxW = 52
+      const scale = Math.min(maxW / props.width, maxH / props.height)
+      const lw = props.width * scale
+      const lh = props.height * scale
+      const pad = 3
+      const tileW = lw + pad * 2
+      const tileH = lh + pad * 2
+      const tileX = 12
+      const tileY = (32 - tileH) / 2
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(tileX, tileY, tileW, tileH, 2, 2, 'F')
+      doc.addImage(logoDataUrl, mimeToPdfFormat(logoDataUrl), tileX + pad, tileY + pad, lw, lh, undefined, 'FAST')
+    } catch {
+      // logo çizilemedi — logosuz devam
+    }
+  }
 
   // "Rapor" etiketi
   doc.setFont(TURKISH_FONT_FAMILY, 'normal')
@@ -347,7 +371,7 @@ async function fetchReportData(filters: ResolvedFilters) {
   const activeTrainingFilter = { isActive: true, publishStatus: { not: 'archived' } as const }
 
   const [org, staffCount, totalTrainings, totalStaff, trainings, staff, departments, avgScoreResult] = await Promise.all([
-    prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
+    prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, logoUrl: true } }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true, ...userDeptFilter } }),
     prisma.training.count({ where: trainingScope }),
     prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter } }),
@@ -578,7 +602,8 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
       await applyTurkishFont(doc)
 
-      renderCoverPage(doc, orgName, sectionTitle, dateLabel, filterLabel, truncationLabel)
+      const coverLogo = await resolveOrgLogoDataUrl(org?.logoUrl)
+      renderCoverPage(doc, orgName, sectionTitle, dateLabel, filterLabel, truncationLabel, coverLogo)
 
       // İçerik sayfaları
       doc.addPage()

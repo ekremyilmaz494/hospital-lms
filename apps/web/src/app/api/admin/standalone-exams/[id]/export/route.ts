@@ -9,6 +9,8 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { BRAND } from '@/lib/brand'
+import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
+import { mimeToPdfFormat } from '@/lib/pdf/helpers/logo'
 
 function styleHeader(ws: ExcelJS.Worksheet) {
   const headerRow = ws.getRow(1)
@@ -79,7 +81,10 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
     const [exam, allAttempts, questions, assignments] = await Promise.all([
       prisma.training.findFirst({
         where: { id, organizationId: orgId, examOnly: true },
-        include: { _count: { select: { questions: true, assignments: true } } },
+        include: {
+          _count: { select: { questions: true, assignments: true } },
+          organization: { select: { name: true, logoUrl: true } },
+        },
       }),
       // TÜM denemeler (sadece completed değil)
       prisma.examAttempt.findMany({
@@ -245,6 +250,22 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
     // ── PDF Export ──
     if (format === 'pdf') {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const pageW = doc.internal.pageSize.getWidth() // 297 (landscape)
+
+      // Kurum logosu — sağ üstte (varsa)
+      const logoDataUrl = await resolveOrgLogoDataUrl(exam.organization?.logoUrl)
+      if (logoDataUrl) {
+        try {
+          const props = doc.getImageProperties(logoDataUrl)
+          const maxH = 16, maxW = 46
+          const scale = Math.min(maxW / props.width, maxH / props.height)
+          const lw = props.width * scale
+          const lh = props.height * scale
+          doc.addImage(logoDataUrl, mimeToPdfFormat(logoDataUrl), pageW - 14 - lw, 8, lw, lh, undefined, 'FAST')
+        } catch {
+          // logo çizilemedi — logosuz devam
+        }
+      }
 
       // Header
       doc.setFontSize(16)

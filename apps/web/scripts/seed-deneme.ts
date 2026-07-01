@@ -32,6 +32,9 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 const ORG_CODE = 'deneme-org'
 const ORG_NAME = 'Deneme Organizasyonu'
 const EMAIL_DOMAIN = 'deneme-organizasyonu.com'
+// Demo kurum logosu — public/ altındaki paket asset. resolveOrgLogoDataUrl bunu diskten okur,
+// böylece hem panel (sol üst) hem tüm PDF'ler S3 yüklemesi olmadan logolu görünür.
+const ORG_LOGO = '/logos/devakent.png'
 
 async function ensureSupabaseUser(email: string, metadata: Record<string, string>): Promise<string> {
   // KVKK onayını auth metadata'ya gömüyoruz — yoksa middleware her girişte 'kvkk-required'
@@ -127,9 +130,9 @@ async function main() {
   // 1) ORG
   const org = await prisma.organization.upsert({
     where: { code: ORG_CODE },
-    update: { name: ORG_NAME, isActive: true, setupCompleted: true, setupStep: 5 },
+    update: { name: ORG_NAME, isActive: true, setupCompleted: true, setupStep: 5, logoUrl: ORG_LOGO },
     create: {
-      name: ORG_NAME, code: ORG_CODE, slug: ORG_CODE,
+      name: ORG_NAME, code: ORG_CODE, slug: ORG_CODE, logoUrl: ORG_LOGO,
       address: 'Demo Mah., Ankara', phone: '0312 000 00 00', email: `info@${EMAIL_DOMAIN}`,
       setupCompleted: true, setupStep: 5, isActive: true,
       defaultPassingScore: 70, defaultMaxAttempts: 3, defaultExamDuration: 30, sessionTimeout: 30,

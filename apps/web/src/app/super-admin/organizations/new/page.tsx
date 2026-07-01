@@ -77,6 +77,8 @@ export default function NewOrganizationPage() {
       ...(planId && { planId }),
       trialDays: Number(formData.get('trialDays') ?? 14),
     };
+    const logoRaw = String(formData.get('logoUrl') ?? '').trim();
+    if (logoRaw) body.logoUrl = logoRaw;
     if (mode === 'direct' && adminPassword) body.adminPassword = adminPassword;
 
     try {
@@ -347,6 +349,13 @@ export default function NewOrganizationPage() {
                   <Label style={{ color: 'var(--color-text-secondary)' }}>E-posta</Label>
                   <Input name="email" placeholder="info@kurum.com" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
+              </div>
+              <div>
+                <Label style={{ color: 'var(--color-text-secondary)' }}>Kurum Logosu</Label>
+                <Input name="logoUrl" placeholder="https://.../logo.png  veya  /logos/dosya.png" className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)', opacity: 0.75 }}>
+                  Panelde sol üstte ve tüm resmi PDF&apos;lerde (katılım, duyuru, geri bildirim formları…) görünür. Tam URL (S3/CDN) veya paket yolu (/logos/dosya.png). Boş bırakılırsa kurum adı yazısı kullanılır.
+                </p>
               </div>
             </div>
           </div>

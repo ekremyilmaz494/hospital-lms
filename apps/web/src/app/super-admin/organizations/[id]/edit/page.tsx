@@ -17,6 +17,7 @@ interface OrganizationData {
   address: string;
   phone: string;
   email: string;
+  logoUrl: string | null;
   status: string;
   plan: string;
   expiresAt: string;
@@ -51,6 +52,7 @@ export default function EditOrganizationPage() {
       address: formData.get('address'),
       phone: formData.get('phone'),
       email: formData.get('email'),
+      logoUrl: String(formData.get('logoUrl') ?? '').trim(),
       status: formData.get('status'),
       plan: formData.get('plan'),
       expiresAt: formData.get('expiresAt'),
@@ -124,6 +126,25 @@ export default function EditOrganizationPage() {
                   <Label style={{ color: 'var(--color-text-secondary)' }}>E-posta</Label>
                   <Input name="email" defaultValue={organization.email ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }} />
                 </div>
+              </div>
+              <div>
+                <Label style={{ color: 'var(--color-text-secondary)' }}>Kurum Logosu</Label>
+                <div className="mt-1.5 flex items-center gap-3">
+                  {organization.logoUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={organization.logoUrl}
+                      alt="Mevcut logo"
+                      style={{ height: 40, width: 'auto', maxWidth: 120, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--color-border)', background: '#fff', padding: 4 }}
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs" style={{ border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)' }}>—</div>
+                  )}
+                  <Input name="logoUrl" defaultValue={organization.logoUrl ?? ''} placeholder="https://.../logo.png  veya  /logos/dosya.png" className="flex-1" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
+                </div>
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)', opacity: 0.75 }}>
+                  Panelde sol üstte ve tüm resmi PDF&apos;lerde görünür. Tam URL (S3/CDN) veya paket yolu (/logos/dosya.png). Boş bırakılırsa kaldırılır.
+                </p>
               </div>
             </div>
           </div>
