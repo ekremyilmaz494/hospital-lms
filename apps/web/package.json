@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ci": "playwright test",
     "test:e2e:prod": "playwright test --config=playwright.prod.config.ts",
+    "dr:drill": "DR_DRILL=1 vitest run src/app/api/super-admin/restore/__tests__/dr-drill.test.ts",
     "setup": "node scripts/setup.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
