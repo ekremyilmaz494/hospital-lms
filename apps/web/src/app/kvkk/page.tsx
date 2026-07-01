@@ -3,11 +3,11 @@ import { ArrowLeft, Shield, Database, Share2, Clock, UserCheck, Mail, Scale } fr
 import { BlurFade } from '@/components/ui/blur-fade'
 
 export const metadata = {
-  title: 'KVKK Aydınlatma Metni — Klinova',
+  title: 'KVKK Aydınlatma Metni — KlinoVax',
   description: 'Kişisel Verilerin Korunması Kanunu kapsamında aydınlatma metni',
 }
 
-// Klinova palette (admin chrome tokens)
+// KlinoVax palette (admin chrome tokens)
 const INK = '#1c1917'        // --k-text-primary (warm dark)
 const INK_SOFT = '#78716c'   // --k-text-muted (warm gray)
 const CREAM = '#fafaf9'      // --k-bg (warm gray)
@@ -19,17 +19,23 @@ const sections = [
     icon: Shield,
     title: '1. Veri Sorumlusu',
     content:
-      'KlinoVax Suite olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi aşağıda açıklanan amaçlar doğrultusunda ve kanuna uygun olarak işlemekteyiz.',
+      'Bu platformu işleten Ekrem Yılmaz ("KlinoVax" veya "Veri Sorumlusu"), 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi bu metinde açıklanan amaçlarla ve kanuna uygun olarak işlemektedir.',
+  },
+  {
+    icon: UserCheck,
+    title: '2. Veri İşleyen Sıfatımız ve Sınırı',
+    content:
+      'KlinoVax, hizmet verdiği sağlık kuruluşlarının personeline ait verileri, ilgili kuruluşun talimatı doğrultusunda ve onun adına "veri işleyen" sıfatıyla işler; bu veriler bakımından "veri sorumlusu" ilgili sağlık kuruluşudur. KlinoVax bu verileri, kuruluşla yapılan veri işleme sözleşmesinde belirlenen amaçların dışında kullanmaz.',
   },
   {
     icon: Database,
-    title: '2. Kişisel Verilerin İşlenme Amacı',
+    title: '3. Kişisel Verilerin İşlenme Amacı',
     content:
       'Kişisel verileriniz; personel eğitim süreçlerinin yönetilmesi, sınav ve değerlendirme faaliyetlerinin gerçekleştirilmesi, eğitim performansının raporlanması, yasal yükümlülüklerin yerine getirilmesi, sertifika düzenlenmesi, bilgi güvenliği süreçlerinin yürütülmesi ve iletişim faaliyetlerinin yönetilmesi amaçlarıyla işlenmektedir.',
   },
   {
     icon: Scale,
-    title: '3. İşlemenin Hukuki Sebepleri',
+    title: '4. İşlemenin Hukuki Sebepleri',
     content: 'Kişisel verileriniz aşağıdaki hukuki sebeplere dayanılarak işlenmektedir (KVKK md. 5/2):',
     items: [
       'md. 5/2-c — Sözleşmenin kurulması veya ifasıyla doğrudan ilgili olması (iş akdi gereği eğitim kayıtlarının tutulması)',
@@ -39,32 +45,28 @@ const sections = [
   },
   {
     icon: UserCheck,
-    title: '4. İşlenen Kişisel Veriler',
+    title: '5. İşlenen Kişisel Veriler',
     items: [
       'Ad ve Soyad',
       'E-posta adresi',
       'Departman ve unvan bilgisi',
       'Sınav sonuçları ve başarı durumu',
       'Video izleme kayıtları ve ilerleme bilgileri',
+      'Dijital imza görselleri (eğitim katılım/imza formu)',
       'Oturum açma zaman damgaları ve IP adresi (audit log)',
     ],
   },
   {
     icon: Share2,
-    title: '5. Verilerin Aktarılması',
+    title: '6. Verilerin Aktarılması',
     content:
-      'Kişisel verileriniz, hizmetin sunulabilmesi için aşağıdaki üçüncü taraf hizmet sağlayıcılarla paylaşılabilir:',
-    items: [
-      'Supabase (Avrupa Birliği) — Kimlik doğrulama ve veritabanı hizmetleri',
-      'Amazon Web Services S3 (Avrupa Birliği) — Video depolama ve içerik dağıtımı',
-      'Vercel Inc. (Avrupa Birliği) — Uygulama hosting ve CDN hizmetleri',
-    ],
+      'Kişisel verileriniz, hizmetin sunulabilmesi için yurt içi ve yurt dışı bulut/altyapı ve yazılım hizmeti sağlayıcıları ile yalnızca ilgili amaçla sınırlı olarak, KVKK m.8 ve m.9 kapsamında gerekli teknik ve idari tedbirler alınarak paylaşılabilir.',
     footer:
-      'Verileriniz yurt dışına aktarılırken KVKK\'nın 9. maddesi kapsamında gerekli güvenceler sağlanmaktadır.',
+      'Yurt dışına veri aktarımı yalnızca KVKK m.9\'da öngörülen şartların (Kurulca ilan edilen yeterli korumaya sahip ülkelere aktarım, standart sözleşme, taahhütname veya açık rıza) sağlanması hâlinde gerçekleştirilir.',
   },
   {
     icon: Clock,
-    title: '6. Veri Saklama Süresi',
+    title: '7. Veri Saklama Süresi',
     content: 'Kişisel verileriniz aşağıdaki süreler boyunca saklanır:',
     items: [
       'Kimlik ve iletişim bilgileri (ad, e-posta): İş akdi sona ermesinden itibaren 10 yıl (BK md. 146)',
@@ -76,7 +78,7 @@ const sections = [
   },
   {
     icon: UserCheck,
-    title: '7. Veri Sahibinin Hakları',
+    title: '8. Veri Sahibinin Hakları',
     content: 'KVKK\'nın 11. maddesi uyarınca aşağıdaki haklara sahipsiniz:',
     items: [
       'Kişisel verilerinizin işlenip işlenmediğini öğrenme',
@@ -90,10 +92,10 @@ const sections = [
   },
   {
     icon: Mail,
-    title: '8. İletişim',
+    title: '9. Başvuru ve İletişim',
     content:
-      'KVKK kapsamındaki haklarınızı kullanmak için aşağıdaki kanallardan bizimle iletişime geçebilirsiniz. Başvurularınız en geç 30 (otuz) gün içinde sonuçlandırılacaktır.',
-    footer: 'E-posta: kvkk@klinova.app',
+      'KVKK kapsamındaki haklarınızı kullanmak için aşağıdaki kanaldan başvurabilirsiniz. Başvurularınız en geç 30 (otuz) gün içinde sonuçlandırılır.',
+    footer: 'E-posta: kvkk@klinovax.info',
   },
 ]
 
@@ -145,7 +147,7 @@ export default function KVKKPage() {
                 color: INK, letterSpacing: '-0.01em',
               }}
             >
-              Klinova
+              KlinoVax
             </span>
           </div>
         </div>
@@ -234,7 +236,7 @@ export default function KVKKPage() {
         <BlurFade delay={0.6}>
           <div className="mt-12 text-center">
             <p className="text-xs" style={{ color: INK_SOFT }}>
-              Son güncelleme: Nisan 2026 &middot; &copy; 2026 KlinoVax Suite
+              Son güncelleme: Temmuz 2026 &middot; &copy; 2026 KlinoVax
             </p>
           </div>
         </BlurFade>

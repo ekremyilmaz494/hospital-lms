@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { BRAND } from '@/lib/brand'
 
-const KVKK_EMAIL = `kvkk@${BRAND.domain}`
+const KVKK_EMAIL = 'kvkk@klinovax.info'
 
 export const metadata: Metadata = {
   title: `Kisisel Veri Saklama ve Imha Politikasi — ${BRAND.fullName}`,
@@ -16,7 +16,7 @@ const sections = [
   {
     title: '2. Tanimlar',
     content: `**Kisisel Veri:** Kimliginizi belirli veya belirlenebilir kilan her turlu bilgi.
-**Veri Sorumlusu:** Hastane LMS Yazilim Teknolojileri, Ankara, Turkiye.
+**Veri Sorumlusu:** Ekrem Yilmaz, Konya, Turkiye.
 **Imha:** Kisisel verilerin silinmesi, yok edilmesi veya anonim hale getirilmesi.
 **Periyodik Imha:** Kanun'da yer alan kisisel veri isleme sartlarinin tamamen ortadan kalkmasi durumunda, tekrarlayan surelerle resen gerceklestirilen silme, yok etme veya anonimlestime islemidir.`,
   },
@@ -62,7 +62,7 @@ Imha islemleri kayit altina alinir ve 3 yil saklanir.`,
 **Basvuru Yollari:**
 - Platform icerisinden: Staff Paneli → Kisisel Verilerim (KVKK) → Yeni Talep
 - E-posta: ${KVKK_EMAIL}
-- Posta: Hastane LMS Yazilim Teknolojileri, Ankara, Turkiye
+- Posta: Ekrem Yilmaz, Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu / Konya
 
 **Yasal Sure:** Talebiniz en gec **30 gun** icinde sonuclandirilir. Islem ucret gerektiriyorsa (Kurul tarifesi), bilgilendirilirsiniz.
 
@@ -80,7 +80,7 @@ Imha islemleri kayit altina alinir ve 3 yil saklanir.`,
     title: '8. Politika Guncellemeleri',
     content: `Bu politika, mevzuat degisiklikleri veya isleme faaliyetlerindeki degisiklikler dogrultusunda guncellenebilir. Guncellemeler platform uzerinden ve/veya e-posta ile bildirilir.
 
-**Son Guncelleme:** 6 Nisan 2026
+**Son Guncelleme:** Temmuz 2026
 **Iletisim:** ${KVKK_EMAIL}`,
   },
 ]
