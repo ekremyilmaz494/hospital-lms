@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, complianceReportEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import type { UserRole } from '@/types/database'
 import { findActivePeriod } from '@/lib/training-periods'
 import { assertCronAuth } from '@/lib/cron-auth'
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
           orgResult.warningEmails++
         } catch (err) {
           emailsFailed++
-          logger.error('Cron ComplianceReport', `Email gonderilemedi: ${admin.email}`, (err as Error).message)
+          logger.error('Cron ComplianceReport', `Email gonderilemedi: ${maskEmail(admin.email)}`, (err as Error).message)
         }
       }
     }

@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getAppUrl } from '@/lib/api-helpers'
 import { createAuthUser, AuthUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { safeDecrypt } from '@/lib/crypto'
 import {
   verifySsoState,
@@ -239,7 +240,7 @@ async function provisionAndLogin({
       })
 
       dbUser = await prisma.user.findUniqueOrThrow({ where: { id: result.dbUser.id } })
-      logger.info('sso:callback', 'Yeni SSO kullanicisi olusturuldu', { email, orgId: org.id })
+      logger.info('sso:callback', 'Yeni SSO kullanicisi olusturuldu', { email: maskEmail(email), orgId: org.id })
     } catch (err) {
       if (err instanceof AuthUserError) {
         logger.error('sso:callback', 'Kullanici olusturulamadi', err.message)
@@ -276,7 +277,7 @@ async function provisionAndLogin({
   // Redirect to Supabase verify endpoint to establish session
   const verifyUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink&redirect_to=${encodeURIComponent(`${appUrl}/auth/callback`)}`
 
-  logger.info('sso:callback', 'SSO giris basarili', { email, orgId: org.id })
+  logger.info('sso:callback', 'SSO giris basarili', { email: maskEmail(email), orgId: org.id })
 
   return NextResponse.redirect(verifyUrl)
 }

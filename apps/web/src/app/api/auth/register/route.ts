@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { checkRateLimit } from '@/lib/redis'
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
       logger.error('Register', 'Hos geldiniz e-postasi gonderilemedi', (err as Error).message)
     }
 
-    logger.info('Register', 'Yeni organizasyon kaydi (self-service)', { orgId: org.id, organizationName, email })
+    logger.info('Register', 'Yeni organizasyon kaydi (self-service)', { orgId: org.id, organizationName, email: maskEmail(email) })
 
     return jsonResponse({
       success: true,

@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, parseBody, ApiError, getOrgUrl } from '@/l
 import { withAdminRoute } from '@/lib/api-handler'
 import { inviteAdminSchema } from '@/lib/validations'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { sendInvitationEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/redis'
 import {
@@ -166,7 +167,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       })
     } catch (err) {
       welcomeEmailSent = false
-      logger.warn('Admin Invite', `Hoş geldiniz maili gönderilemedi: ${newUser.email}`, err instanceof Error ? err.message : err)
+      logger.warn('Admin Invite', `Hoş geldiniz maili gönderilemedi: ${maskEmail(newUser.email)}`, err instanceof Error ? err.message : err)
     }
 
     return jsonResponse(

@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, getOrgUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { sendStaffWelcomeEmail } from '@/lib/email'
 import { checkRateLimit } from '@/lib/redis'
 import { generateTempPassword } from '@/lib/passwords'
@@ -705,7 +706,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
             tempPassword,
             loginUrl,
           }).then(() => undefined).catch(err => {
-            logger.warn('bulk-import', `Hoş geldiniz maili gönderilemedi: ${row.email}`, err instanceof Error ? err.message : err)
+            logger.warn('bulk-import', `Hoş geldiniz maili gönderilemedi: ${maskEmail(row.email)}`, err instanceof Error ? err.message : err)
           }),
         )
       }

@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { checkRateLimit, invalidateOrgCache } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import { z } from 'zod/v4'
@@ -109,7 +110,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     } catch (err) {
       failed++
       failedEmails.push(user.email)
-      logger.error('bulk-rollback', `Silme başarısız: ${user.email}`, err instanceof Error ? err.message : err)
+      logger.error('bulk-rollback', `Silme başarısız: ${maskEmail(user.email)}`, err instanceof Error ? err.message : err)
     }
   }
 

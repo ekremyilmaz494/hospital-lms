@@ -1,5 +1,6 @@
 import { logger } from '@/lib/logger'
 import { BRAND } from '@/lib/brand'
+import { maskPhone } from '@/lib/pii-mask'
 import type { SmsProvider, SmsSendResult } from './types'
 
 /**
@@ -60,7 +61,7 @@ async function sendOtp(params: { phone: string; code: string }): Promise<SmsSend
 
   // TR cep telefonu formatı: 5XXXXXXXXX (10 hane, 5 ile başlar)
   if (!/^5\d{9}$/.test(phone)) {
-    logger.warn('sms:netgsm', 'Geçersiz telefon formatı', { phone: params.phone })
+    logger.warn('sms:netgsm', 'Geçersiz telefon formatı', { phone: maskPhone(params.phone) })
     return {
       success: false,
       errorCode: 'INVALID_PHONE',
@@ -72,9 +73,9 @@ async function sendOtp(params: { phone: string; code: string }): Promise<SmsSend
 
   // Dev/test fallback: credential yoksa console'a bas
   if (isMockMode()) {
-    logger.info('sms:netgsm:mock', `[MOCK SMS] ${params.phone} → ${params.code}`, {
-      phone,
-      message,
+    // Mock mod yalnız credential yokken (dev/test) çalışır; kodu bilinçli gösterir (SMS'siz test).
+    logger.info('sms:netgsm:mock', `[MOCK SMS] ${maskPhone(params.phone)} → ${params.code}`, {
+      phone: maskPhone(phone),
     })
     return { success: true, messageId: `mock-${Date.now()}` }
   }
@@ -105,12 +106,12 @@ async function sendOtp(params: { phone: string; code: string }): Promise<SmsSend
     const data = await response.json() as { code?: string; jobid?: string; description?: string }
 
     if (data.code === '0' || data.code === '00') {
-      logger.info('sms:netgsm', 'SMS başarıyla gönderildi', { jobid: data.jobid, phone })
+      logger.info('sms:netgsm', 'SMS başarıyla gönderildi', { jobid: data.jobid, phone: maskPhone(phone) })
       return { success: true, messageId: data.jobid }
     }
 
     const errorMsg = NETGSM_ERROR_MESSAGES[data.code ?? ''] ?? data.description ?? 'Bilinmeyen NetGSM hatası'
-    logger.error('sms:netgsm', `NetGSM hata: ${data.code} - ${errorMsg}`, { phone })
+    logger.error('sms:netgsm', `NetGSM hata: ${data.code} - ${errorMsg}`, { phone: maskPhone(phone) })
     return {
       success: false,
       errorCode: data.code,
@@ -118,7 +119,7 @@ async function sendOtp(params: { phone: string; code: string }): Promise<SmsSend
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Bilinmeyen hata'
-    logger.error('sms:netgsm', `Gönderim başarısız: ${message}`, { phone })
+    logger.error('sms:netgsm', `Gönderim başarısız: ${message}`, { phone: maskPhone(phone) })
     return {
       success: false,
       errorCode: 'NETWORK_ERROR',
