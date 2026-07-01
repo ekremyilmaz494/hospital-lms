@@ -250,6 +250,10 @@ export async function uploadBuffer(key: string, body: Buffer, contentType: strin
     Key: key,
     Body: body,
     ContentType: contentType,
+    // At-rest şifrelemeyi istek düzeyinde açıkça zorla (defense-in-depth). Bucket
+    // default-encryption kapalı/değiştirilse bile bu nesneler SSE-S3 (AES-256) ile
+    // yazılır. Yedekler ayrıca uygulama katmanında AES-256-GCM ile şifreli.
+    ServerSideEncryption: 'AES256',
   }))
 }
 
