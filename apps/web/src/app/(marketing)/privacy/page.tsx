@@ -6,14 +6,16 @@ export const metadata: Metadata = {
   description: `${BRAND.fullName} gizlilik politikasi - KVKK uyumlu, App Store ve Google Play veri beyanlariyla uyumlu kisisel verilerin korunmasi.`,
 };
 
-// Tüm yasal/iletişim e-postaları tek çalışan kutuya yönlendiriliyor.
-const CONTACT_EMAIL = "ekremyilmaz@klinovax.info";
+// KVKK / yasal basvuru e-postasi (veri sorumlusu irtibat kutusu).
+const CONTACT_EMAIL = "kvkk@klinovax.info";
+// Genel teknik destek kutusu.
+const SUPPORT_EMAIL = "ekremyilmaz@klinovax.info";
 
-const LAST_UPDATED = "20 Haziran 2026";
+const LAST_UPDATED = "Temmuz 2026";
 
 // Veri sorumlusu — gercek kisi (sirket tuzel kisiligi yok).
 const LEGAL_ENTITY = "Ekrem Yilmaz";
-const LEGAL_ADDRESS = "Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu";
+const LEGAL_ADDRESS = "Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu / Konya";
 const VERBIS_NUMBER = "Basvuru surecinde";
 
 const headingPrimary = { color: "var(--color-text-primary)" } as const;
@@ -52,13 +54,13 @@ export default function PrivacyPage() {
               <strong>Veri Sorumlusu:</strong> {LEGAL_ENTITY} (gercek kisi)
             </li>
             <li>
-              <strong>Adres:</strong> {LEGAL_ADDRESS}, {BRAND.contact.city}
+              <strong>Adres:</strong> {LEGAL_ADDRESS}
             </li>
             <li>
               <strong>E-posta:</strong> {CONTACT_EMAIL}
             </li>
             <li>
-              <strong>Genel destek:</strong> {CONTACT_EMAIL}
+              <strong>Genel destek:</strong> {SUPPORT_EMAIL}
             </li>
             <li>
               <strong>Telefon:</strong> {BRAND.contact.phone}
@@ -244,11 +246,11 @@ export default function PrivacyPage() {
           <p>Kisisel verileriniz asagidaki durumlarda ucuncu taraflarla paylasilabilir:</p>
           <ul className="list-disc pl-6 mt-3 space-y-2">
             <li>
-              <strong>Altyapi Saglayicilari:</strong> Sunucu barindirma, kimlik dogrulama ve
-              veritabani (Supabase), dosya/video depolama (Amazon Web Services S3), hosting ve CDN
-              (Vercel / CloudFront), anlik bildirim iletimi (Apple Push Notification service /
-              Firebase Cloud Messaging — Expo Push araciligiyla). Bu saglayicilar GDPR ve/veya
-              esdeger veri koruma standartlarina uymaktadir.
+              <strong>Altyapi ve Hizmet Saglayicilari:</strong> Sunucu barindirma, kimlik
+              dogrulama, veritabani, dosya/video depolama, icerik dagitimi (CDN) ve anlik bildirim
+              iletimi gibi hizmetlerin yurutulmesi amaciyla; yurt ici ve yurt disi bulut/altyapi ve
+              yazilim hizmeti saglayicilari ile, KVKK m.8 ve m.9 kapsaminda gerekli teknik ve idari
+              tedbirler alinarak calisilmaktadir.
             </li>
             <li>
               <strong>Organizasyonunuz:</strong> Bagli oldugunuz saglik kurulusunun yetkili
@@ -260,9 +262,11 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p className="mt-3">
-            Verileriniz yurt disindaki sunucularda islenebilir; bu aktarim KVKK&apos;nin 9. maddesi
-            kapsaminda yeterli guvenceler saglanarak yapilir. Veriler iletimde TLS/SSL ile
-            sifrelenir.
+            Kisisel verileriniz gerektiginde yurt disinda bulunan hizmet saglayicilarinin
+            sunuculari araciligiyla islenebilir. Bu tur yurt disi aktarimlar, KVKK&apos;nin 9.
+            maddesinde ongorulen sartlarin (yeterli korumaya sahip ulke, standart sozlesme,
+            taahhutname veya acik riza) saglanmasi halinde gerceklestirilir. Veriler iletimde
+            TLS/SSL ile sifrelenir.
           </p>
         </section>
 
@@ -475,13 +479,13 @@ export default function PrivacyPage() {
               <strong>Veri Sorumlusu Irtibat:</strong> {CONTACT_EMAIL}
             </li>
             <li>
-              <strong>Genel Destek:</strong> {CONTACT_EMAIL}
+              <strong>Genel Destek:</strong> {SUPPORT_EMAIL}
             </li>
             <li>
               <strong>Telefon:</strong> {BRAND.contact.phone}
             </li>
             <li>
-              <strong>Adres:</strong> {LEGAL_ADDRESS}, {BRAND.contact.city}
+              <strong>Adres:</strong> {LEGAL_ADDRESS}
             </li>
           </ul>
         </section>

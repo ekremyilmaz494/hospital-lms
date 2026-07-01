@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: `${BRAND.fullName} platformu kullanim sartlari ve kosullari.`,
 };
 
-const LAST_UPDATED = "5 Nisan 2026";
+const LAST_UPDATED = "Temmuz 2026";
 
 export default function TermsPage() {
   return (
@@ -156,7 +156,7 @@ export default function TermsPage() {
           <p>
             Bu kullanim sartlarindan dogan uyusmazliklarda Turkiye Cumhuriyeti kanunlari
             uygulanir. Taraflar, oncelikle uzlasma yoluyla cozum aramayi kabul eder.
-            Uzlasma saglanamadigi takdirde Ankara Mahkemeleri ve Icra Daireleri yetkilidir.
+            Uzlasma saglanamadigi takdirde Konya Mahkemeleri ve Icra Daireleri yetkilidir.
           </p>
         </section>
 
@@ -190,10 +190,10 @@ export default function TermsPage() {
               <strong>E-posta:</strong> {BRAND.supportEmail}
             </li>
             <li>
-              <strong>Telefon:</strong> +90 850 000 0000
+              <strong>Telefon:</strong> 0553 953 06 96
             </li>
             <li>
-              <strong>Adres:</strong> Ankara, Turkiye
+              <strong>Adres:</strong> Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu / Konya
             </li>
           </ul>
         </section>

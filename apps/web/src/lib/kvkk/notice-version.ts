@@ -6,5 +6,7 @@
  * (mevcut aydınlatma modalı akışı). Böylece güncel metne yeniden açık rıza/teyit alınır.
  *
  * Edge-safe: yalnız sabit; middleware bunu import eder (ağır bağımlılık yok).
+ *
+ * v2 (Temmuz 2026): kimlik konsolidasyonu + aktarım maddesi genelleştirildi
  */
-export const KVKK_NOTICE_VERSION = 1
+export const KVKK_NOTICE_VERSION = 2
