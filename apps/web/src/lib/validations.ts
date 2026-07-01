@@ -19,6 +19,8 @@ export const selfRegisterSchema = z.object({
   lastName: z.string().min(2, 'Soyad en az 2 karakter olmalıdır').max(100, 'Soyad en fazla 100 karakter olabilir'),
   email: z.email('Geçerli bir e-posta adresi girin'),
   password: passwordSchema,
+  // KVKK: kayıt (veri toplama) anında açık rıza/aydınlatma onayı zorunlu (davet akışıyla aynı desen).
+  kvkkAccepted: z.literal(true, { error: 'KVKK aydınlatma metnini onaylamanız gereklidir' }),
 })
 
 // ── Organization ──

@@ -328,6 +328,9 @@ model User {
   tcAddedAt                DateTime? @map("tc_added_at") @db.Timestamptz
   tcAddedBy                String?   @map("tc_added_by") @db.Uuid
   kvkkNoticeAcknowledgedAt DateTime? @map("kvkk_notice_acknowledged_at") @db.Timestamptz
+  // Onaylanan aydınlatma metni sürümü. KVKK_NOTICE_VERSION artınca (metin güncellenince)
+  // middleware kullanıcıyı yeniden onaya yönlendirir. null = hiç onaylanmamış / eski kayıt.
+  kvkkNoticeVersion        Int?      @map("kvkk_notice_version")
   mustChangePassword       Boolean   @default(false) @map("must_change_password")
   termsAccepted            Boolean   @default(false) @map("terms_accepted")
   termsAcceptedAt          DateTime? @map("terms_accepted_at") @db.Timestamptz

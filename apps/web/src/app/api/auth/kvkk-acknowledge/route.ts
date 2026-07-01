@@ -4,6 +4,7 @@ import { checkRateLimit } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { KVKK_NOTICE_VERSION } from '@/lib/kvkk/notice-version'
 
 /**
  * POST /api/auth/kvkk-acknowledge
@@ -18,12 +19,17 @@ export const POST = withStaffRoute(async ({ dbUser, audit }) => {
   // Idempotency kontrolünü rate limit'ten ÖNCE yap — DB zaten ack'lıysa no-op dön.
   // Aksi halde kullanıcı başarısız bir refresh/race-condition sonrası tekrar denerken
   // 429'a takılıp KVKK modalında kilitlenir (user_metadata JWT ile DB arasında desync).
-  if (dbUser.kvkkNoticeAcknowledgedAt) {
+  // Idempotent yalnızca GÜNCEL sürüm onaylıysa: metin sürümü artmışsa (kvkkNoticeVersion eski)
+  // yeniden onay gerekir → aşağıdaki yazma yoluna düşer.
+  if (dbUser.kvkkNoticeAcknowledgedAt && (dbUser.kvkkNoticeVersion ?? 0) >= KVKK_NOTICE_VERSION) {
     // Metadata senkronizasyonu JWT ile DB arasında drift olmuş olabilir → refresh zorla
     try {
       const supabase = await createClient()
       await supabase.auth.updateUser({
-        data: { kvkk_notice_acknowledged_at: dbUser.kvkkNoticeAcknowledgedAt.toISOString() },
+        data: {
+          kvkk_notice_acknowledged_at: dbUser.kvkkNoticeAcknowledgedAt.toISOString(),
+          kvkk_notice_version: KVKK_NOTICE_VERSION,
+        },
       })
       await supabase.auth.refreshSession()
     } catch {}
@@ -41,7 +47,7 @@ export const POST = withStaffRoute(async ({ dbUser, audit }) => {
 
   await prisma.user.update({
     where: { id: dbUser.id },
-    data: { kvkkNoticeAcknowledgedAt: acknowledgedAt },
+    data: { kvkkNoticeAcknowledgedAt: acknowledgedAt, kvkkNoticeVersion: KVKK_NOTICE_VERSION },
   })
 
   // JWT user_metadata'yı da güncelle — middleware bu alanı JWT'den okuyarak
@@ -55,7 +61,10 @@ export const POST = withStaffRoute(async ({ dbUser, audit }) => {
   try {
     const supabase = await createClient()
     await supabase.auth.updateUser({
-      data: { kvkk_notice_acknowledged_at: acknowledgedAt.toISOString() },
+      data: {
+        kvkk_notice_acknowledged_at: acknowledgedAt.toISOString(),
+        kvkk_notice_version: KVKK_NOTICE_VERSION,
+      },
     })
     // Yeni metadata ile JWT refresh → cookie'ye yeni access_token yazılır
     await supabase.auth.refreshSession()

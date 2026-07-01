@@ -6,6 +6,7 @@ import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-fact
 import { checkRateLimit } from '@/lib/redis'
 import { selfRegisterSchema } from '@/lib/validations'
 import { sendSelfRegistrationEmail } from '@/lib/email'
+import { KVKK_NOTICE_VERSION } from '@/lib/kvkk/notice-version'
 
 export async function POST(request: Request) {
   // Rate limiting — IP bazlı: 3 istek / saat
@@ -100,6 +101,18 @@ export async function POST(request: Request) {
       }
       throw err
     }
+
+    // KVKK: kayıt anında alınan açık rıza/aydınlatma onayını kalıcı olarak damgala
+    // (versiyonla birlikte — metin güncellenince yeniden onay tetiklenir).
+    await prisma.user.update({
+      where: { id: authResult.authUser.id },
+      data: {
+        kvkkNoticeAcknowledgedAt: new Date(),
+        kvkkNoticeVersion: KVKK_NOTICE_VERSION,
+        termsAccepted: true,
+        termsAcceptedAt: new Date(),
+      },
+    }).catch((err) => logger.warn('Register', 'KVKK onay damgasi yazilamadi', (err as Error).message))
 
     // Audit log
     await createAuditLog({
