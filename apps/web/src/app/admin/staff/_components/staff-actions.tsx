@@ -220,7 +220,8 @@ export function StaffActions({ staff, onChanged }: { staff: Staff; onChanged: ()
             </span>
             <h4 className="text-base font-semibold mb-1" style={{ color: 'var(--k-error)' }}>Kalıcı olarak sil</h4>
             <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
-              Kullanıcı hesabı ve kişisel veriler tamamen kaldırılır. Bu işlem geri alınamaz.
+              Kişisel veriler (ad, e-posta, telefon, TC, imza) geri dönüşsüz anonimleştirilir ve giriş
+              hesabı silinir. Sınav/sertifika kayıtları anonim olarak korunur. Bu işlem geri alınamaz.
             </p>
           </button>
         </div>

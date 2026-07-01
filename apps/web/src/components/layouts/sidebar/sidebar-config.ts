@@ -186,6 +186,7 @@ export const adminNav: NavGroup[] = [
           { title: 'Yetkinlik Matrisi', href: '/admin/competency-matrix' },
         ],
       },
+      { title: 'KVKK Talepleri', href: '/admin/kvkk-requests', icon: Shield },
       { title: 'Bildirimler', href: '/admin/notifications', icon: Bell },
       { title: 'İşlem Geçmişi', href: '/admin/audit-logs', icon: History },
     ],

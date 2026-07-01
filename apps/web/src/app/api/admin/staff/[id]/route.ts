@@ -8,6 +8,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
+import { anonymizeUserData } from '@/lib/kvkk/anonymize-user'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
   const orgId = organizationId
@@ -167,6 +168,12 @@ export const PATCH = withAdminRoute<{ id: string }>(async ({ request, params, db
     dataToUpdate.department = deptCheck.name
   }
 
+  // KVKK saklama saati: aktif→pasif geçişinde deactivatedAt damgalanır (cron bunu baz alır),
+  // pasif→aktif geçişinde temizlenir. Değişiklik yoksa alana dokunulmaz.
+  if (typeof parsed.data.isActive === 'boolean' && parsed.data.isActive !== existing.isActive) {
+    dataToUpdate.deactivatedAt = parsed.data.isActive ? null : new Date()
+  }
+
   // Email değişikliği — Supabase Auth ile senkron olmalı (auth identity = email).
   // Sıra: önce Prisma uniqueness kontrolü → Auth update → DB update.
   // Auth başarılı olup DB başarısız olursa kullanıcının auth e-postası ile DB e-postası
@@ -279,8 +286,12 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
   const purge = searchParams.get('purge') === 'true'
 
   // Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)
+  // deactivatedAt yalnız aktif→pasif geçişinde damgalanır (zaten pasifse saklama saati sıfırlanmasın).
   await prisma.$transaction([
-    prisma.user.updateMany({ where: { id, organizationId: orgId }, data: { isActive: false } }),
+    prisma.user.updateMany({
+      where: { id, organizationId: orgId },
+      data: { isActive: false, ...(existing.isActive ? { deactivatedAt: new Date() } : {}) },
+    }),
     prisma.examAttempt.updateMany({
       where: {
         userId: id,
@@ -292,9 +303,21 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
     }),
   ])
 
-  // KVKK purge: Auth tarafındaki kaydı da sil. DB'de kullanıcı soft-deleted kalır
-  // (audit/sertifika referansları için) ama tekrar login olması imkansız hale gelir.
+  // KVKK purge (unutulma hakkı): önce DB'deki tüm PII'yı anonimleştir, SONRA Auth kaydını sil.
+  // Bu sıra kısmi-hata güvenli:
+  //  - anonimleştirme patlarsa Auth'a hiç dokunulmaz (transaction rollback → tutarlı),
+  //  - anonimleştirme başarılı ama Auth silme patlarsa PII zaten gitmiştir ve `isActive=false`
+  //    login'i keser (orphan auth user zararsız, tekrar denenebilir).
+  // DB satırı korunur (audit/sertifika referansları için) ama ad/e-posta/telefon/TC + imza +
+  // cihaz kayıtları temizlenir — UI'nın "kişisel veriler anonimleştirilir" vaadi ancak böyle doğru.
   if (purge) {
+    try {
+      await anonymizeUserData(id)
+    } catch (err) {
+      logger.error('staff-delete', 'KVKK anonimlestirme basarisiz', { userId: id, err })
+      return errorResponse('Kişisel veriler anonimleştirilemedi, destek ekibiyle görüşün', 500)
+    }
+
     try {
       const supabase = await createServiceClient()
       await supabase.auth.admin.deleteUser(id)

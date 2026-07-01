@@ -317,6 +317,10 @@ model User {
   role                     UserRole
   avatarUrl                String?   @map("avatar_url") @db.Text
   isActive                 Boolean   @default(true) @map("is_active")
+  // Kullanıcının pasifleştirildiği (isActive=false yapıldığı) an. KVKK saklama-süresi imha
+  // cron'u (api/cron/cleanup) bunu kullanır: dataRetentionDays'i aşan pasif personeli otomatik
+  // anonimleştirir. Aktifleştirmede null'a döner. Aktif kullanıcıda null.
+  deactivatedAt            DateTime? @map("deactivated_at") @db.Timestamptz
   // TC Kimlik No — KVKK gereği AES-256-GCM ile şifrelenmiş + HMAC-SHA256 ile hash'lenmiş.
   // tcEncrypted: ciphertext (görüntüleme için decrypt). tcHash: deterministic, lookup için.
   tcEncrypted              String?   @map("tc_encrypted") @db.Text
@@ -324,6 +328,9 @@ model User {
   tcAddedAt                DateTime? @map("tc_added_at") @db.Timestamptz
   tcAddedBy                String?   @map("tc_added_by") @db.Uuid
   kvkkNoticeAcknowledgedAt DateTime? @map("kvkk_notice_acknowledged_at") @db.Timestamptz
+  // Onaylanan aydınlatma metni sürümü. KVKK_NOTICE_VERSION artınca (metin güncellenince)
+  // middleware kullanıcıyı yeniden onaya yönlendirir. null = hiç onaylanmamış / eski kayıt.
+  kvkkNoticeVersion        Int?      @map("kvkk_notice_version")
   mustChangePassword       Boolean   @default(false) @map("must_change_password")
   termsAccepted            Boolean   @default(false) @map("terms_accepted")
   termsAcceptedAt          DateTime? @map("terms_accepted_at") @db.Timestamptz

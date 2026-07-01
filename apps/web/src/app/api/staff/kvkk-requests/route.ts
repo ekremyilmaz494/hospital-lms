@@ -4,21 +4,10 @@ import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
-
-const REQUEST_TYPES = [
-  'access',        // Verilerimin islenip islenmedigini ogrenme
-  'detail',        // Islenmisse bilgi talep etme
-  'purpose',       // Isleme amacini ve amacina uygun kullanilip kullanilmadigini ogrenme
-  'third_party',   // Ucuncu kisilere aktarilip aktarilmadigini ogrenme
-  'correction',    // Eksik/yanlis islenmisse duzeltilmesini isteme
-  'deletion',      // Kisisel verilerin silinmesini/yok edilmesini isteme
-  'notification',  // Duzeltme/silme islemlerinin ucuncu kisilere bildirilmesini isteme
-  'objection',     // Otomatik sistemler vasitasiyla aleyhime sonuc cikarilmasina itiraz
-  'damage',        // Kanuna aykiri isleme sebebiyle zararin giderilmesini talep etme
-] as const
+import { KVKK_REQUEST_TYPES } from '@/lib/kvkk/request-types'
 
 const createRequestSchema = z.object({
-  requestType: z.enum(REQUEST_TYPES),
+  requestType: z.enum(KVKK_REQUEST_TYPES),
   description: z.string().min(10, 'Aciklama en az 10 karakter olmalidir').max(2000),
 })
 

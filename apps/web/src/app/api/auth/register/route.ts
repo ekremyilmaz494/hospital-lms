@@ -1,10 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { jsonResponse, errorResponse, parseBody, createAuditLog } from '@/lib/api-helpers'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
 import { checkRateLimit } from '@/lib/redis'
 import { selfRegisterSchema } from '@/lib/validations'
 import { sendSelfRegistrationEmail } from '@/lib/email'
+import { KVKK_NOTICE_VERSION } from '@/lib/kvkk/notice-version'
 
 export async function POST(request: Request) {
   // Rate limiting — IP bazlı: 3 istek / saat
@@ -100,6 +102,18 @@ export async function POST(request: Request) {
       throw err
     }
 
+    // KVKK: kayıt anında alınan açık rıza/aydınlatma onayını kalıcı olarak damgala
+    // (versiyonla birlikte — metin güncellenince yeniden onay tetiklenir).
+    await prisma.user.update({
+      where: { id: authResult.authUser.id },
+      data: {
+        kvkkNoticeAcknowledgedAt: new Date(),
+        kvkkNoticeVersion: KVKK_NOTICE_VERSION,
+        termsAccepted: true,
+        termsAcceptedAt: new Date(),
+      },
+    }).catch((err) => logger.warn('Register', 'KVKK onay damgasi yazilamadi', (err as Error).message))
+
     // Audit log
     await createAuditLog({
       userId: authResult.authUser.id,
@@ -126,7 +140,7 @@ export async function POST(request: Request) {
       logger.error('Register', 'Hos geldiniz e-postasi gonderilemedi', (err as Error).message)
     }
 
-    logger.info('Register', 'Yeni organizasyon kaydi (self-service)', { orgId: org.id, organizationName, email })
+    logger.info('Register', 'Yeni organizasyon kaydi (self-service)', { orgId: org.id, organizationName, email: maskEmail(email) })
 
     return jsonResponse({
       success: true,

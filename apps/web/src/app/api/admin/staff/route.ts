@@ -8,6 +8,7 @@ import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-fact
 import { hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 import { generateSyntheticEmail, isSyntheticEmail } from '@/lib/synthetic-email'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { sendStaffWelcomeEmail, sendInvitationEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/passwords'
 import { checkRateLimit, withCache, invalidateOrgCache } from '@/lib/redis'
@@ -515,7 +516,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       })
       welcomeEmailSent = true
     } catch (err) {
-      logger.warn('Admin Staff', `Hoş geldiniz maili gönderilemedi: ${user.email}`, err instanceof Error ? err.message : err)
+      logger.warn('Admin Staff', `Hoş geldiniz maili gönderilemedi: ${maskEmail(user.email)}`, err instanceof Error ? err.message : err)
     }
   }
 

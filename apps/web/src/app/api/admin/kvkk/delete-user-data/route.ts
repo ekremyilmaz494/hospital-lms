@@ -1,8 +1,8 @@
-import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
+import { anonymizeUserData, ANON_FIRST_NAME, ANON_LAST_NAME } from '@/lib/kvkk/anonymize-user'
 
 interface DeleteUserDataBody {
   userId: string
@@ -57,8 +57,9 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     }
 
     // ── Anonymize user data ──
-    const anonymizedEmail = `deleted_${randomUUID()}@anonymized.local`
-
+    // KVKK m.7: Talep üzerine kişisel veri SİLİNMELİ (yok edilmeli/anonimleştirilmeli).
+    // Anonimleştirme kapsamı tek yerde: `anonymizeUserData` (JSDoc'una bak). Personel purge akışı
+    // (`api/admin/staff/[id]?purge=true`) da aynı helper'ı kullanır — kapsam bir yerden güncellenir.
     const oldData = {
       firstName: targetUser.firstName,
       lastName: targetUser.lastName,
@@ -66,49 +67,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       phone: '[REDACTED]',
     }
 
-    // KVKK Tam Anonimleştirme — tüm ilişkili tablolardaki PII temizlenir
-    await prisma.$transaction([
-      // 1. Ana kullanıcı tablosu — TC dahil tüm PII anonimleştirilir
-      // KVKK m.7: Talep üzerine kişisel veri SİLİNMELİ (yok edilmeli/anonimleştirilmeli)
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          firstName: 'Silinmiş',
-          lastName: 'Kullanıcı',
-          email: anonymizedEmail,
-          phone: null,
-          avatarUrl: null,
-          isActive: false,
-          // TC alanları — şifreli ciphertext ve hash de NULL'lanır
-          tcEncrypted: null,
-          tcHash: null,
-          tcAddedAt: null,
-          tcAddedBy: null,
-        },
-      }),
-      // 2. Audit log — oldData/newData içindeki PII'yı temizle
-      prisma.auditLog.updateMany({
-        where: { entityType: 'User', entityId: userId },
-        data: {
-          oldData: { redacted: true, reason: 'KVKK_DATA_DELETION' },
-          newData: { redacted: true, reason: 'KVKK_DATA_DELETION' },
-        },
-      }),
-      // 3. Kullanıcının oluşturduğu audit loglar — IP ve User-Agent temizle
-      prisma.auditLog.updateMany({
-        where: { userId },
-        data: { ipAddress: null, userAgent: null },
-      }),
-      // 4. Sertifikalar — kullanıcı adı sertifika kodunda olabilir
-      prisma.certificate.updateMany({
-        where: { userId },
-        data: { certificateCode: `CERT-REDACTED-${userId.slice(0, 8)}` },
-      }),
-      // 5. Bildirimler — kişiye özel içerik olabilir
-      prisma.notification.deleteMany({
-        where: { userId },
-      }),
-    ])
+    const { anonymizedEmail } = await anonymizeUserData(userId)
 
     // ── Audit log ──
     await audit({
@@ -117,8 +76,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       entityId: userId,
       oldData,
       newData: {
-        firstName: 'Silinmiş',
-        lastName: 'Kullanıcı',
+        firstName: ANON_FIRST_NAME,
+        lastName: ANON_LAST_NAME,
         email: anonymizedEmail,
         phone: null,
       },

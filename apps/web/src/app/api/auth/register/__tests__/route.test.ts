@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     organization: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn() },
-    user: { findUnique: vi.fn(), create: vi.fn() },
+    user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn().mockResolvedValue({}) },
     subscriptionPlan: { findUnique: vi.fn(), findFirst: vi.fn() },
     organizationSubscription: { create: vi.fn() },
     auditLog: { create: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) },
@@ -57,6 +57,8 @@ const validBody = {
   password: 'SecurePass123!',
   firstName: 'Ahmet',
   lastName: 'Yilmaz',
+  // KVKK: self-register açık rıza onayı zorunlu (Adım 6)
+  kvkkAccepted: true,
 }
 
 describe('POST /api/auth/register', () => {
@@ -81,6 +83,15 @@ describe('POST /api/auth/register', () => {
 
     expect(response.status).toBe(400)
     expect(data.error).toBeTruthy()
+  })
+
+  it('returns 400 when KVKK consent not accepted (self-register açık rıza zorunlu)', async () => {
+    const { kvkkAccepted, ...withoutConsent } = validBody
+    void kvkkAccepted
+    const response = await POST(createRequest(withoutConsent))
+    const data = await response.json()
+    expect(response.status).toBe(400)
+    expect(data.error).toContain('KVKK')
   })
 
   it('returns 400 when organization code already exists', async () => {

@@ -13,18 +13,7 @@ import {
   INK, INK_SOFT, CREAM, GOLD, RULE, OLIVE, CARD_BG,
   FONT_DISPLAY, FONT_BODY, FONT_MONO, TONE_TOKENS,
 } from '@/lib/editorial-palette'
-
-const REQUEST_TYPE_LABELS: Record<string, { label: string; desc: string }> = {
-  access: { label: 'Veri Isleme Sorgusu', desc: 'Kisisel verilerimin islenip islenmedigini ogrenmek istiyorum' },
-  detail: { label: 'Veri Detay Talebi', desc: 'Islenen kisisel verilerim hakkinda bilgi talep ediyorum' },
-  purpose: { label: 'Isleme Amaci Sorgusu', desc: 'Verilerimin isleme amacini ve amacina uygun kullanilip kullanilmadigini ogrenmek istiyorum' },
-  third_party: { label: 'Ucuncu Kisi Aktarim Sorgusu', desc: 'Verilerimin ucuncu kisilere aktarilip aktarilmadigini ogrenmek istiyorum' },
-  correction: { label: 'Duzeltme Talebi', desc: 'Eksik veya yanlis islenen kisisel verilerimin duzeltilmesini istiyorum' },
-  deletion: { label: 'Silme / Yok Etme Talebi', desc: 'Kisisel verilerimin silinmesini veya yok edilmesini talep ediyorum' },
-  notification: { label: 'Ucuncu Kisi Bildirim Talebi', desc: 'Duzeltme/silme islemlerinin verilerimin aktarildigi ucuncu kisilere bildirilmesini istiyorum' },
-  objection: { label: 'Otomatik Karar Itiraz', desc: 'Otomatik sistemler vasitasiyla aleyhime bir sonuc cikarilmasina itiraz ediyorum' },
-  damage: { label: 'Zarar Giderim Talebi', desc: 'Kanuna aykiri isleme nedeniyle ugradim zararin giderilmesini talep ediyorum' },
-}
+import { KVKK_REQUEST_TYPE_LABELS as REQUEST_TYPE_LABELS } from '@/lib/kvkk/request-types'
 
 const STATUS_CONFIG: Record<string, { label: string; tone: typeof TONE_TOKENS[keyof typeof TONE_TOKENS]; icon: typeof Clock }> = {
   pending: { label: 'Beklemede', tone: TONE_TOKENS.warning, icon: Clock },

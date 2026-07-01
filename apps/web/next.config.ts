@@ -170,7 +170,9 @@ const nextConfig: NextConfig = {
             "font-src 'self' data:",
             // unpkg.com: ffmpeg-core.wasm fetch
             // blob:: three.js GLTFLoader gömülü GLB texture'larını blob URL'den fetch eder
-            "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com",
+            // Sentry: *.ingest.de.sentry.io = AB (Frankfurt) bölgesi ingest — KVKK yurt dışı
+            // aktarımını en aza indirmek için AB-bölgesi DSN kullanılır (bkz. .env.production.reference).
+            "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://unpkg.com",
             "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor

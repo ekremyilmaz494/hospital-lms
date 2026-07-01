@@ -5,6 +5,7 @@ import { getRateLimitCount, incrementRateLimit, deleteRateLimit } from '@/lib/re
 import { createLoginClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { maskEmail, maskIp } from '@/lib/pii-mask'
 import { sendEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity-logger'
 import { isDeviceTrusted } from '@/lib/auth/trusted-device'
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
     // differential 401/409 yanıtları) hız limitsizdi. Artık her TC denemesi bütçe tüketir.
     const ip = getTrustedIp(request)
     if ((await getRateLimitCount(`login-ip:${ip}`)) >= 100) {
-      logger.warn('auth:login', 'IP rate limit aşıldı (lookup öncesi)', { ip })
+      logger.warn('auth:login', 'IP rate limit aşıldı (lookup öncesi)', { ip: maskIp(ip) })
       return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
 
@@ -152,11 +153,11 @@ export async function POST(request: NextRequest) {
       getRateLimitCount(`login:${normalizedEmail}`),
     ])
     if (ipCount >= 100) {
-      logger.warn('auth:login', 'IP rate limit aşıldı', { ip })
+      logger.warn('auth:login', 'IP rate limit aşıldı', { ip: maskIp(ip) })
       return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
     if (emailCount >= 30) {
-      logger.warn('auth:login', 'E-posta rate limit aşıldı', { email: normalizedEmail })
+      logger.warn('auth:login', 'E-posta rate limit aşıldı', { email: maskEmail(normalizedEmail) })
       return errorResponse('Çok fazla giriş denemesi. 5 dakika bekleyin.', 429)
     }
 
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
     // (IP rate-limit'in aksine saldırgan IP değiştirse de hesap korunur).
     const accountLock = await getAccountLock(normalizedEmail)
     if (accountLock.locked) {
-      logger.warn('auth:login', 'Kilitli hesaba giriş denemesi', { email: normalizedEmail, ip })
+      logger.warn('auth:login', 'Kilitli hesaba giriş denemesi', { email: maskEmail(normalizedEmail), ip: maskIp(ip) })
       const mins = Math.max(1, Math.ceil(accountLock.retryAfterSec / 60))
       return errorResponse(
         `Çok fazla hatalı deneme nedeniyle hesabınız geçici olarak kilitlendi. ${mins} dakika sonra tekrar deneyin.`,
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest) {
     ])
 
     if (authError) {
-      logger.info('auth:login', 'Başarısız giriş denemesi', { email: normalizedEmail, ip, reason: authError.message, code: authError.status })
+      logger.info('auth:login', 'Başarısız giriş denemesi', { email: maskEmail(normalizedEmail), ip: maskIp(ip), reason: authError.message, code: authError.status })
 
       // Sadece başarısız girişlerde rate limit sayacını artır
       void Promise.all([
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
     // super_admin (platform operatörü) muaftır; SMS MFA muafiyetiyle aynı gerekçe.
     if (dbUser.organization?.ipAllowlistEnabled && dbUser.role !== 'super_admin') {
       if (!isIpAllowed(ip, dbUser.organization.ipAllowlist)) {
-        logger.warn('auth:login', 'IP allowlist disi giris denemesi', { email: normalizedEmail, ip })
+        logger.warn('auth:login', 'IP allowlist disi giris denemesi', { email: maskEmail(normalizedEmail), ip: maskIp(ip) })
         return jsonResponse(
           { error: 'Bu IP adresinden erişime izin verilmiyor. Kurum yöneticinizle iletişime geçin.' },
           403,

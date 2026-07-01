@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { z } from 'zod/v4'
 
 const forgotPasswordSchema = z.object({
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       redirectTo: `${appUrl}/auth/reset-password`,
     })
 
-    logger.info('Auth', `Şifre sıfırlama talebi: ${email}`)
+    logger.info('Auth', `Şifre sıfırlama talebi: ${maskEmail(email)}`)
   } catch (err) {
     logger.error('Auth', 'Şifre sıfırlama hatası', { error: err })
   }

@@ -7,6 +7,7 @@ import {
   certificateExpiryReminderEmail,
 } from '@/lib/email'
 import { logger } from '@/lib/logger'
+import { maskEmail } from '@/lib/pii-mask'
 import { findActivePeriod } from '@/lib/training-periods'
 import { sendExpoPushToUser } from '@/lib/expo-push'
 import { assertCronAuth } from '@/lib/cron-auth'
@@ -111,7 +112,7 @@ export async function GET(request: Request) {
           })
           upcomingEmailsSent++
         } catch (err) {
-          logger.error('Cron Reminders', `Email gonderilemedi: ${a.user.email}`, (err as Error).message)
+          logger.error('Cron Reminders', `Email gonderilemedi: ${maskEmail(a.user.email)}`, (err as Error).message)
         }
       }
 
@@ -177,7 +178,7 @@ export async function GET(request: Request) {
         })
         overdueEmailsSent++
       } catch (err) {
-        logger.error('Cron Reminders', `Overdue email gonderilemedi: ${a.user.email}`, (err as Error).message)
+        logger.error('Cron Reminders', `Overdue email gonderilemedi: ${maskEmail(a.user.email)}`, (err as Error).message)
       }
     }
 
@@ -239,7 +240,7 @@ export async function GET(request: Request) {
           })
           certEmailsSent++
         } catch (err) {
-          logger.error('Cron Reminders', `Cert email gonderilemedi: ${cert.user.email}`, (err as Error).message)
+          logger.error('Cron Reminders', `Cert email gonderilemedi: ${maskEmail(cert.user.email)}`, (err as Error).message)
         }
       }
 

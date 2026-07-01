@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { extractSubdomain } from '@/lib/organization-utils';
 import { getCookieDomain } from './cookie-domain';
 import { verifyAccessToken } from './verify-jwt';
+import { KVKK_NOTICE_VERSION } from '@/lib/kvkk/notice-version';
 
 const PUBLIC_ROUTES = [
   '/',
@@ -183,10 +184,15 @@ export async function updateSession(request: NextRequest) {
       if (sessionUser) {
         const role = sanitizeRole(verified?.role);
         const kvkkAck = sessionUser.user_metadata?.kvkk_notice_acknowledged_at ?? null;
+        // Aydınlatma metni sürümü güncel değilse yeniden onay iste. Sürüm alanı YOKSA
+        // (versiyonlama öncesi onaylayanlar) v1 kabul et → rollout'ta herkes yeniden sorulmaz.
+        const rawKvkkVersion = sessionUser.user_metadata?.kvkk_notice_version;
+        const kvkkVersion = rawKvkkVersion == null ? 1 : Number(rawKvkkVersion);
+        const kvkkOk = Boolean(kvkkAck) && kvkkVersion >= KVKK_NOTICE_VERSION;
 
-        // KVKK onaylanmamış authenticated kullanıcı — /auth/login'de kalması gerek ki modal açılsın.
+        // KVKK onaylanmamış/eski sürüm authenticated kullanıcı — /auth/login'de kalmalı ki modal açılsın.
         // Landing (/) gibi public sayfalardan login'e yönlendir, modal zorunlu.
-        if (!kvkkAck) {
+        if (!kvkkOk) {
           if (pathname === '/auth/login') {
             return supabaseResponse;
           }
@@ -282,12 +288,16 @@ export async function updateSession(request: NextRequest) {
     }
 
     // ── KVKK onay guard ──
-    // user_metadata'da kvkk_notice_acknowledged_at yoksa kullanıcı hiçbir
-    // protected route'a giremez. Login sayfasında ?reason=kvkk-required ile
-    // modal otomatik açılır. Client-side modal bypass (refresh) bu sayede
-    // kapatılır — enforcement middleware'de, JWT'den okunur (DB sorgusu yok).
+    // user_metadata'da kvkk_notice_acknowledged_at yoksa VEYA onaylanan aydınlatma
+    // sürümü güncel değilse kullanıcı hiçbir protected route'a giremez. Login sayfasında
+    // ?reason=kvkk-required ile modal otomatik açılır. Client-side modal bypass (refresh)
+    // bu sayede kapatılır — enforcement middleware'de, JWT'den okunur (DB sorgusu yok).
+    // Sürüm alanı YOKSA v1 kabul (grandfather) — public yol ile aynı mantık.
     const kvkkAck = user.user_metadata?.kvkk_notice_acknowledged_at ?? null;
-    if (!kvkkAck) {
+    const rawKvkkVersion = user.user_metadata?.kvkk_notice_version;
+    const kvkkVersion = rawKvkkVersion == null ? 1 : Number(rawKvkkVersion);
+    const kvkkOk = Boolean(kvkkAck) && kvkkVersion >= KVKK_NOTICE_VERSION;
+    if (!kvkkOk) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/login';
       url.searchParams.set('reason', 'kvkk-required');

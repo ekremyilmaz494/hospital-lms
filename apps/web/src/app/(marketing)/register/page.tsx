@@ -32,6 +32,7 @@ interface FormData {
   email: string
   password: string
   passwordConfirm: string
+  kvkkAccepted: boolean
 }
 
 // Faz 3: Sektör seçenekleri — register form için Türkçe label'larla.
@@ -93,6 +94,9 @@ function validateStep2(data: FormData): FieldErrors {
   }
   if (data.password !== data.passwordConfirm) {
     errors.passwordConfirm = 'Sifreler uyusmuyor'
+  }
+  if (!data.kvkkAccepted) {
+    errors.kvkkAccepted = 'KVKK aydinlatma metnini onaylamaniz gereklidir'
   }
   return errors
 }
@@ -159,11 +163,18 @@ export default function RegisterPage() {
     email: '',
     password: '',
     passwordConfirm: '',
+    kvkkAccepted: false,
   })
 
   function update(field: keyof FormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
     setErrors((prev) => ({ ...prev, [field]: undefined }))
+    setApiError('')
+  }
+
+  function setKvkkAccepted(value: boolean) {
+    setForm((prev) => ({ ...prev, kvkkAccepted: value }))
+    setErrors((prev) => ({ ...prev, kvkkAccepted: undefined }))
     setApiError('')
   }
 
@@ -217,6 +228,7 @@ export default function RegisterPage() {
           lastName: form.lastName,
           email: form.email,
           password: form.password,
+          kvkkAccepted: form.kvkkAccepted,
         }),
       })
 
@@ -614,6 +626,26 @@ export default function RegisterPage() {
                       </button>
                     </div>
                     {errors.passwordConfirm && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.passwordConfirm}</p>}
+                  </div>
+
+                  {/* KVKK açık rıza — kayıt (veri toplama) anında zorunlu onay */}
+                  <div>
+                    <label className="flex items-start gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={form.kvkkAccepted}
+                        onChange={(e) => setKvkkAccepted(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0"
+                        style={{ accentColor: '#0d9668' }}
+                      />
+                      <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                        <a href="/kvkk" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#0d9668' }}>KVKK Aydınlatma Metni</a>
+                        {' '}ve{' '}
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#0d9668' }}>Kullanım Koşulları</a>
+                        &apos;nı okudum, kabul ediyorum. Kişisel verilerimin bu sistemde işlenmesine açık rıza veriyorum.
+                      </span>
+                    </label>
+                    {errors.kvkkAccepted && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.kvkkAccepted}</p>}
                   </div>
 
                   <div className="flex gap-3">

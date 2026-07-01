@@ -22,6 +22,8 @@ import type { NavGroup } from './sidebar-config';
 
 /** Bekleyen ek-hak talepleri rozetinin bağlandığı admin alt-link. */
 const ATTEMPT_REQUESTS_HREF = '/admin/trainings/attempt-requests';
+/** Bekleyen KVKK hak talepleri rozetinin bağlandığı admin üst-link. */
+const KVKK_REQUESTS_HREF = '/admin/kvkk-requests';
 
 /* ─── Editorial palette ───
  * Desktop sidebar is intentionally a fixed dark "masthead" (gazete mast başlığı),
@@ -129,6 +131,13 @@ export const AppSidebar = memo(function AppSidebar({
     canSeeAttemptRequests ? '/api/admin/attempt-requests?status=pending&limit=1' : null,
   );
   const pendingAttemptRequests = pendingReqData?.total ?? 0;
+
+  // Bekleyen KVKK hak talepleri (üst-seviye link). Aynı "nudge" mantığı — cache'li, hata yutulur.
+  const canSeeKvkkRequests = navGroups.some(g => g.items.some(i => i.href === KVKK_REQUESTS_HREF));
+  const { data: pendingKvkkData } = useFetch<{ total: number }>(
+    canSeeKvkkRequests ? '/api/admin/kvkk-requests?status=pending&limit=1' : null,
+  );
+  const pendingKvkkRequests = pendingKvkkData?.total ?? 0;
 
   const toggleExpand = useCallback((href: string) => {
     setExpandedItems(prev =>
@@ -250,7 +259,8 @@ export const AppSidebar = memo(function AppSidebar({
                         />
                       )}
                       <Icon className="h-[18px] w-[18px]" />
-                      {pendingAttemptRequests > 0 && item.children?.some(c => c.href === ATTEMPT_REQUESTS_HREF) && (
+                      {((pendingAttemptRequests > 0 && item.children?.some(c => c.href === ATTEMPT_REQUESTS_HREF)) ||
+                        (pendingKvkkRequests > 0 && item.href === KVKK_REQUESTS_HREF)) && (
                         <span
                           aria-hidden
                           className="absolute top-1.5 right-1.5 rounded-full"
@@ -487,7 +497,20 @@ export const AppSidebar = memo(function AppSidebar({
                               )}
                               <Icon className="h-[18px] w-[18px] shrink-0" style={{ color: active ? GOLD : 'inherit' }} />
                               <span className="flex-1 truncate">{item.title}</span>
-                              {item.badge ? (
+                              {item.href === KVKK_REQUESTS_HREF && pendingKvkkRequests > 0 ? (
+                                <span
+                                  className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+                                  style={{
+                                    color: INK,
+                                    backgroundColor: GOLD,
+                                    borderRadius: '2px',
+                                    fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                                  }}
+                                  aria-label={`${pendingKvkkRequests} bekleyen KVKK talebi`}
+                                >
+                                  {pendingKvkkRequests > 99 ? '99+' : pendingKvkkRequests}
+                                </span>
+                              ) : item.badge ? (
                                 <span
                                   className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
                                   style={{
