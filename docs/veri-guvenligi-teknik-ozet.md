@@ -122,7 +122,7 @@ Anahtar: ENCRYPTION_KEY ortam değişkeni (Base64, 256-bit)
 - **Otomatik yedekleme**: Her gün 03:15 UTC → AWS S3'e şifreli JSON
 - **Doğrulama**: Her yedek upload sonrası S3 HeadObject ile boyut kontrolü
 - **Saklama süresi**: 90 gün
-- **Haftalık kontrol**: `pnpm verify:backup` ile DB + Redis + S3 sağlık testi
+- **Günlük otomatik doğrulama**: `/api/cron/verify-backup` her gün 04:00 UTC'de S3 round-trip (indir → decrypt → parse) kontrolü; `pnpm verify:backup` manuel spot-check için
 
 ---
 
