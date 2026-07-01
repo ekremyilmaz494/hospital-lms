@@ -8,6 +8,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
+import { anonymizeUserData } from '@/lib/kvkk/anonymize-user'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
   const orgId = organizationId
@@ -292,9 +293,21 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
     }),
   ])
 
-  // KVKK purge: Auth tarafındaki kaydı da sil. DB'de kullanıcı soft-deleted kalır
-  // (audit/sertifika referansları için) ama tekrar login olması imkansız hale gelir.
+  // KVKK purge (unutulma hakkı): önce DB'deki tüm PII'yı anonimleştir, SONRA Auth kaydını sil.
+  // Bu sıra kısmi-hata güvenli:
+  //  - anonimleştirme patlarsa Auth'a hiç dokunulmaz (transaction rollback → tutarlı),
+  //  - anonimleştirme başarılı ama Auth silme patlarsa PII zaten gitmiştir ve `isActive=false`
+  //    login'i keser (orphan auth user zararsız, tekrar denenebilir).
+  // DB satırı korunur (audit/sertifika referansları için) ama ad/e-posta/telefon/TC + imza +
+  // cihaz kayıtları temizlenir — UI'nın "kişisel veriler anonimleştirilir" vaadi ancak böyle doğru.
   if (purge) {
+    try {
+      await anonymizeUserData(id)
+    } catch (err) {
+      logger.error('staff-delete', 'KVKK anonimlestirme basarisiz', { userId: id, err })
+      return errorResponse('Kişisel veriler anonimleştirilemedi, destek ekibiyle görüşün', 500)
+    }
+
     try {
       const supabase = await createServiceClient()
       await supabase.auth.admin.deleteUser(id)
