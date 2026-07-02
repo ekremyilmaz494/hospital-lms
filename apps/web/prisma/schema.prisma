@@ -1653,3 +1653,67 @@ model PlatformLicense {
 
   @@map("platform_license")
 }
+
+// Klinovax lisans sunucusu (SaaS tarafı) — on-prem kurulumlara kesilen
+// lisansların kaydı, iptali ve heartbeat telemetrisi. On-prem kurulumda bu üç
+// tablo boş durur (zararsız). License.id == lisans JWT'sinin jti claim'i.
+model License {
+  id               String    @id @db.Uuid
+  customerName     String    @map("customer_name") @db.VarChar(200)
+  contactEmail     String?   @map("contact_email") @db.VarChar(200)
+  // Kayıtlı ham lisans JWT'si — yeniden indirme + heartbeat'te renewedLicense
+  // olarak sunma (elle dosya değişmeden yenileme) için saklanır.
+  licenseJwt       String    @map("license_jwt") @db.Text
+  schemaVersion    Int       @default(1) @map("schema_version")
+  licenseType      String    @default("standard") @map("license_type") @db.VarChar(20)
+  maxOrganizations Int?      @map("max_organizations")
+  maxStaff         Int?      @map("max_staff")
+  graceDays        Int       @default(14) @map("grace_days")
+  validUntil       DateTime? @map("valid_until") @db.Timestamptz
+  status           String    @default("active") @db.VarChar(20) // active | revoked
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  revokeReason     String?   @map("revoke_reason") @db.Text
+  notes            String?   @db.Text
+  createdBy        String?   @map("created_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  activations LicenseActivation[]
+  heartbeats  LicenseHeartbeat[]
+
+  @@map("licenses")
+}
+
+// Bir lisansın aktive edildiği kurulumlar. Aynı lisansın >1 instance'tan
+// düzenli heartbeat'i = paylaşım/kopyalama anomalisi (super-admin bildirimi).
+model LicenseActivation {
+  id          String   @id @default(uuid()) @db.Uuid
+  licenseId   String   @map("license_id") @db.Uuid
+  instanceId  String   @map("instance_id") @db.Uuid
+  appVersion  String?  @map("app_version") @db.VarChar(40)
+  hostname    String?  @db.VarChar(200)
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, instanceId])
+  @@map("license_activations")
+}
+
+// Heartbeat telemetrisi — kullanım anlık görüntüsü (org/personel sayısı, sürüm).
+// Lisans limit aşımı ve sağlık takibi super-admin panelinde buradan okunur.
+model LicenseHeartbeat {
+  id         String   @id @default(uuid()) @db.Uuid
+  licenseId  String   @map("license_id") @db.Uuid
+  instanceId String   @map("instance_id") @db.Uuid
+  orgCount   Int      @map("org_count")
+  staffCount Int      @map("staff_count")
+  appVersion String?  @map("app_version") @db.VarChar(40)
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId, receivedAt], map: "idx_license_heartbeat_license_time")
+  @@map("license_heartbeats")
+}

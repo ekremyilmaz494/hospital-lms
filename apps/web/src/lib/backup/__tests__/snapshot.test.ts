@@ -120,6 +120,11 @@ const INTENTIONALLY_EXCLUDED = new Set([
   // yedeğe girse başka kuruluma restore'da lisans/instanceId taşınırdı (kötüye
   // kullanım + SaaS anomali takibinin kirlenmesi). Kayıpta yeniden aktivasyon yeterli.
   'PlatformLicense',
+  // Lisans sunucusu (SaaS platform-düzeyi) — org verisi değil; kaynak-of-truth
+  // lisans JWT'nin kendisi + super-admin kayıtları, per-org yedek scope'u dışında.
+  'License',
+  'LicenseActivation',
+  'LicenseHeartbeat',
 
   // Backup sisteminin kendisi — kendi metadata'sını yedeklemez (sonsuz döngü)
   'DbBackup',

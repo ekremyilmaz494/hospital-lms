@@ -1,6 +1,7 @@
 packages:
   - 'apps/*'
   - 'tenants/*'
+  - 'tools/*'
 
 ignoredBuiltDependencies:
   - sharp

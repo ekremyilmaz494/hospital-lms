@@ -23,6 +23,7 @@ import {
   UserCog,
   Database,
   FlaskConical,
+  KeyRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { Sector } from '@/generated/prisma/enums';
@@ -84,6 +85,7 @@ export const superAdminNav: NavGroup[] = [
         ],
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
+      { title: 'Lisanslar', href: '/super-admin/licenses', icon: KeyRound },
     ],
   },
   {

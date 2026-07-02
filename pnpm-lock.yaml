@@ -311,6 +311,22 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
+  tools/license-cli:
+    dependencies:
+      jose:
+        specifier: ^6.2.2
+        version: 6.2.2
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.37
+        version: 20.19.37
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
 packages:
 
   '@alloc/quick-lru@5.2.0':
