@@ -31,6 +31,7 @@ KRİTİK KURALLAR (HALLUCINATION YASAK):
 7. Her soru: 4 şıklı çoktan seçmeli, sadece 1 doğru cevap.
 8. Sorular birbirinin tekrarı OLMAMALI — farklı kavram, farklı sayfa/bölüm hedefle.
 9. Ton: profesyonel, hastane çalışanına yönelik. "Aşağıdakilerden hangisi", "Hangi durumda" gibi standart sınav formatı.
+10. Kaynak bir video transkripti ise (type="Video Transkripti"): konuşma dilindeki dolgu ifadelerini ("eee", "şey", tekrarlar) yok say, soruları anlatılan tıbbi/mesleki içeriğe dayandır; sourceQuote yine transkriptten birebir alıntı olmalı, sourcePage VERME.
 
 ÇIKTI FORMATI — KRİTİK:
 - Cevabın TAMAMEN JSON olmalı. İlk karakter "{", son karakter "}" olacak.
