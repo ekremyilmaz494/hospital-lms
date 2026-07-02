@@ -86,8 +86,15 @@ RUN set -eux; \
 COPY --from=build /repo/apps/web/.next/standalone ./
 COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /repo/apps/web/public ./apps/web/public
-# Migration'lar + prisma şeması (entrypoint'te `prisma migrate deploy`)
-COPY --from=build /repo/apps/web/prisma ./apps/web/prisma
+# ── Migration çalıştırıcı (izole /app/migrate) ──
+# Prisma 7 datasource url'i prisma.config.ts'ten okur ve config `prisma/config`'i
+# import eder → prisma LOKAL kurulmalı (global npm node-resolution yolunda değil).
+# İzole dizin: kendi node_modules/prisma + schema + migrations + dotenv'siz config.
+COPY --from=build /repo/apps/web/prisma /app/migrate/prisma
+COPY deploy/onprem/prisma.config.ts /app/migrate/prisma.config.ts
+RUN cd /app/migrate && npm init -y >/dev/null 2>&1 \
+    && npm install --no-audit --no-fund prisma@7.5.0
+
 # İlk-boot bootstrap (self-contained .mjs). Next standalone, app deps'ini
 # .next/server chunk'larına bundle'lar → @supabase/supabase-js/pg ayrı modül
 # olarak node_modules'ta ÇÖZÜLEMEZ. Bu yüzden bootstrap'a KENDİ küçük node_modules'ını
@@ -95,9 +102,6 @@ COPY --from=build /repo/apps/web/prisma ./apps/web/prisma
 COPY --from=build /repo/apps/web/scripts/onprem-bootstrap.mjs /app/bootstrap/onprem-bootstrap.mjs
 RUN cd /app/bootstrap && npm init -y >/dev/null 2>&1 \
     && npm install --no-audit --no-fund pg@8.20.0 @supabase/supabase-js@2.100.0
-# prisma CLI GLOBAL kur (pnpm symlink yapısını kopyalamak yerine — migrate deploy
-# için gereken schema-engine bu pakette gömülü; runtime client standalone'da zaten var).
-RUN npm install -g prisma@7.5.0
 
 COPY deploy/onprem/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

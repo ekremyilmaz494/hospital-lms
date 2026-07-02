@@ -22,14 +22,13 @@ for i in $(seq 1 60); do
 done
 
 # ── 2) Şema migrasyonu (idempotent — her boot'ta güvenli) ──
-# prisma CLI global kurulu (schema-engine gömülü). schema.prisma apps/web/prisma'da.
+# İzole /app/migrate dizininden (lokal prisma + config; datasource url DIRECT_URL/
+# DATABASE_URL env'inden).
 log "prisma migrate deploy çalıştırılıyor…"
-cd /app/apps/web
-prisma migrate deploy || {
+( cd /app/migrate && ./node_modules/.bin/prisma migrate deploy ) || {
   log "HATA: migrate deploy başarısız."
   exit 1
 }
-cd /app
 
 # ── 3) İlk boot bootstrap (idempotent — süper-admin yoksa oluşturur) ──
 # Kendi node_modules'ı olan /app/bootstrap dizininden çalışır (pg + supabase-js).
