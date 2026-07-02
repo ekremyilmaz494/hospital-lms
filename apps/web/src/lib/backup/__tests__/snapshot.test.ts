@@ -116,6 +116,10 @@ const INTENTIONALLY_EXCLUDED = new Set([
   // Global / platform (org-bağımsız) — per-org yedek scope'unda değil
   'SubscriptionPlan',
   'Badge', // global rozet kataloğu (migration seed'i, org-bağımsız)
+  // On-prem platform lisansı — kuruluma (instance) bağlıdır, org verisi DEĞİL;
+  // yedeğe girse başka kuruluma restore'da lisans/instanceId taşınırdı (kötüye
+  // kullanım + SaaS anomali takibinin kirlenmesi). Kayıpta yeniden aktivasyon yeterli.
+  'PlatformLicense',
 
   // Backup sisteminin kendisi — kendi metadata'sını yedeklemez (sonsuz döngü)
   'DbBackup',

@@ -1631,3 +1631,25 @@ model UserBadge {
   @@index([organizationId], map: "idx_user_badge_org")
   @@map("user_badges")
 }
+
+// ═══════════════ Lisans (On-Premise) ═══════════════
+
+// Platform lisansı — ON-PREM kurulumun tek (singleton, id=1) lisans kaydı.
+// licenseJwt/receiptJwt her okunuşta İMZA DOĞRULAMASINDAN geçer (store.ts):
+// satır elle değiştirilirse imza düşer → NO_LICENSE. Bulut deploy'unda tablo
+// boş durur, zararsızdır. clockWatermark = görülen en ileri zaman (saat
+// geri alma tespiti; makbuz iat'i ile ileri sarar).
+model PlatformLicense {
+  id                  Int       @id @default(1)
+  licenseJwt          String    @map("license_jwt") @db.Text
+  licenseId           String    @map("license_id") @db.VarChar(64)
+  instanceId          String    @map("instance_id") @db.Uuid
+  receiptJwt          String?   @map("receipt_jwt") @db.Text
+  lastHeartbeatAt     DateTime? @map("last_heartbeat_at") @db.Timestamptz
+  lastHeartbeatStatus String?   @map("last_heartbeat_status") @db.VarChar(20)
+  clockWatermark      DateTime  @map("clock_watermark") @db.Timestamptz
+  activatedAt         DateTime  @default(now()) @map("activated_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("platform_license")
+}
