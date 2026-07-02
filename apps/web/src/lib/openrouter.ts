@@ -121,6 +121,11 @@ async function buildContentBlocks(
   const lower = source.s3Key.toLowerCase();
   const filename = source.filename ?? source.s3Key.split('/').pop() ?? 'document';
   const isPdf = lower.endsWith('.pdf') || source.mimeType === 'application/pdf';
+  // Otomatik video transkripti — pipeline transcripts/{org}/{seg}/{uuid}.txt yazar
+  // (lib/transcripts.ts). Düz UTF-8 metin; PDF/office gibi <source> bloğuna gömülür.
+  const isTranscript =
+    source.mimeType === 'text/plain' ||
+    (lower.startsWith('transcripts/') && lower.endsWith('.txt'));
   const isImage = /\.(png|jpe?g|webp|gif)$/.test(lower);
   const officeMime =
     source.mimeType && isOfficeMimeType(source.mimeType)
@@ -168,6 +173,31 @@ async function buildContentBlocks(
     ];
   }
 
+  if (isTranscript) {
+    const buffer = await downloadBuffer(source.s3Key);
+    let text = buffer.toString('utf8');
+    if (!text.trim()) {
+      logger.warn('openrouter', 'transcript source yielded empty text', {
+        s3Key: source.s3Key,
+      });
+      return [];
+    }
+    if (text.length > PDF_TEXT_MAX_CHARS) {
+      logger.warn('openrouter', 'transcript text truncated', {
+        s3Key: source.s3Key,
+        originalChars: text.length,
+        cap: PDF_TEXT_MAX_CHARS,
+      });
+      text = text.slice(0, PDF_TEXT_MAX_CHARS);
+    }
+    return [
+      {
+        type: 'text',
+        text: `<source filename="${filename}" type="Video Transkripti">\n${text}\n</source>`,
+      },
+    ];
+  }
+
   if (isImage) {
     const url = await getDownloadUrl(source.s3Key);
     return [{ type: 'image_url', image_url: { url } }];
@@ -199,7 +229,7 @@ async function buildContentBlocks(
   }
 
   throw new OpenRouterError(
-    `Desteklenmeyen kaynak türü: ${source.s3Key}. Sadece PDF, görsel (png/jpg/webp) ve office (DOCX/PPTX/XLSX) destekleniyor.`
+    `Desteklenmeyen kaynak türü: ${source.s3Key}. Sadece PDF, görsel (png/jpg/webp), office (DOCX/PPTX/XLSX) ve video transkripti destekleniyor.`
   );
 }
 

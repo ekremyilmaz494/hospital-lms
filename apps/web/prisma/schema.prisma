@@ -493,6 +493,11 @@ model TrainingVideo {
   // Medya Kütüphanesinden seçildiyse kaynak asset'e soft geri-bağ (silme engellemez,
   // yalnız "N eğitimde kullanılıyor" rozeti + S3 referans-kontrolü için).
   sourceMediaAssetId String? @map("source_media_asset_id") @db.Uuid
+  // Otomatik video transkripti (AI soru üretimi kaynağı). Kanonik kaynak S3'teki
+  // transcripts/{orgId}/{seg}/{uuid}.txt dosyasıdır (videoKey'den türetilir);
+  // bu kolonlar published satırlar için cache'tir — transcribe Lambda + cron backfill yazar.
+  transcriptKey    String? @map("transcript_key") @db.Text
+  transcriptStatus String? @map("transcript_status") @db.VarChar(20) // 'completed' | 'failed'
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

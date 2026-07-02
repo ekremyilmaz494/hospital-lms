@@ -6,7 +6,8 @@ param(
   [string]$LambdaExecRoleArn,
   [string]$SupabaseUrl,
   [string]$SupabaseServiceRoleKey,
-  [string]$CloudfrontDomain
+  [string]$CloudfrontDomain,
+  [string]$OpenRouterApiKey
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,7 +35,9 @@ function Create-Or-Update-Lambda {
     [string]$Name,
     [string]$ZipPath,
     [string]$RoleArn,
-    [hashtable]$EnvVars
+    [hashtable]$EnvVars,
+    [int]$Timeout = 60,
+    [int]$MemorySize = 256
   )
 
   $envJson = ($EnvVars.GetEnumerator() | ForEach-Object { "`"$($_.Key)`":`"$($_.Value)`"" }) -join ','
@@ -51,7 +54,7 @@ function Create-Or-Update-Lambda {
     Write-Host "Updating existing Lambda $Name..."
     aws lambda update-function-code --function-name $Name --zip-file "fileb://$ZipPath" --region $Region | Out-Null
     Start-Sleep -Seconds 3
-    aws lambda update-function-configuration --function-name $Name --environment $envArg --timeout 60 --memory-size 256 --region $Region | Out-Null
+    aws lambda update-function-configuration --function-name $Name --environment $envArg --timeout $Timeout --memory-size $MemorySize --region $Region | Out-Null
   } else {
     Write-Host "Creating new Lambda $Name..."
     aws lambda create-function `
@@ -60,8 +63,8 @@ function Create-Or-Update-Lambda {
       --role $RoleArn `
       --handler index.handler `
       --zip-file "fileb://$ZipPath" `
-      --timeout 60 `
-      --memory-size 256 `
+      --timeout $Timeout `
+      --memory-size $MemorySize `
       --environment $envArg `
       --region $Region | Out-Null
   }
@@ -71,12 +74,16 @@ if (-not $MediaConvertRoleArn) { throw 'MediaConvertRoleArn parameter required' 
 if (-not $LambdaExecRoleArn) { throw 'LambdaExecRoleArn parameter required' }
 if (-not $SupabaseUrl) { throw 'SupabaseUrl parameter required' }
 if (-not $SupabaseServiceRoleKey) { throw 'SupabaseServiceRoleKey parameter required' }
+if (-not $OpenRouterApiKey) { throw 'OpenRouterApiKey parameter required (video-transcribe Lambda icin)' }
 
 Write-Host "=== Building trigger Lambda ==="
 $triggerZip = Build-And-Zip (Join-Path $ScriptDir 'video-transcoder')
 
 Write-Host "=== Building completion Lambda ==="
 $completionZip = Build-And-Zip (Join-Path $ScriptDir 'video-completion')
+
+Write-Host "=== Building transcribe Lambda ==="
+$transcribeZip = Build-And-Zip (Join-Path $ScriptDir 'video-transcribe')
 
 Write-Host "=== Deploying trigger Lambda ==="
 Create-Or-Update-Lambda `
@@ -97,6 +104,20 @@ Create-Or-Update-Lambda `
   -RoleArn $LambdaExecRoleArn `
   -EnvVars $completionEnv
 
+Write-Host "=== Deploying transcribe Lambda ==="
+# Timeout 600s: chunk basina OpenRouter cagrisi dakikalar surebilir (uzun videolar).
+Create-Or-Update-Lambda `
+  -Name 'hospital-lms-video-transcribe' `
+  -ZipPath $transcribeZip `
+  -RoleArn $LambdaExecRoleArn `
+  -Timeout 600 `
+  -MemorySize 512 `
+  -EnvVars @{
+    OPENROUTER_API_KEY = $OpenRouterApiKey
+    SUPABASE_URL = $SupabaseUrl
+    SUPABASE_SERVICE_ROLE_KEY = $SupabaseServiceRoleKey
+  }
+
 Write-Host ""
 Write-Host "=== DEPLOY COMPLETE ==="
 Write-Host "Next steps (manual in AWS Console):"
@@ -104,3 +125,7 @@ Write-Host "1. Add S3 event notification on bucket '$Bucket' for prefix 'videos/
 Write-Host "2. Create EventBridge rule 'mediaconvert-complete' that matches:"
 Write-Host "   { source: ['aws.mediaconvert'], detail-type: ['MediaConvert Job State Change'], detail: { status: ['COMPLETE'] } }"
 Write-Host "   Target: hospital-lms-video-completion Lambda"
+Write-Host "3. Add 'hospital-lms-video-transcribe' as a SECOND target on the same 'mediaconvert-complete' rule"
+Write-Host "   (+ aws lambda add-permission --function-name hospital-lms-video-transcribe --principal events.amazonaws.com ...)"
+Write-Host "4. IAM: grant transcoder exec role s3:PutObject on '$Bucket/transcripts/*';"
+Write-Host "   grant transcribe exec role s3:GetObject/PutObject/DeleteObject on '$Bucket/transcripts/*'"
