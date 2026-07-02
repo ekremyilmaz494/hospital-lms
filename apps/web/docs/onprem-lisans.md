@@ -81,7 +81,7 @@ belirtilmeli (kullanım denetimi + lisans uyum takibi amacı).
 
 ## Manuel uçtan-uca doğrulama (gerçek deploy kapısı)
 
-Otomatik testler (durum makinesi/imza/enforcement/lisans-sunucusu, 89 test) +
+Otomatik testler (durum makinesi/imza/enforcement/lisans-sunucusu, 101 test) +
 `onprem-build` CI job kod tarafını kilitler. Gerçek compose deploy'unda elle:
 
 1. `deploy/onprem/install.sh` → tüm servisler ayağa kalkar, `migrate deploy` geçer.
