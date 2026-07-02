@@ -5,6 +5,8 @@ import { verifyAccessToken } from '@/lib/supabase/verify-jwt'
 import { prisma } from '@/lib/prisma'
 import { checkSubscriptionStatus } from '@/lib/subscription-guard'
 import { computeAuditHash } from '@/lib/audit-hash'
+import { isOnPrem } from '@/lib/deployment'
+import { isReadonlyWriteExempt } from '@/lib/license/enforcement'
 
 /**
  * Mobile/native client'lar JWT'yi `Authorization: Bearer <token>` header'ı ile
@@ -400,6 +402,7 @@ export class ApiError extends Error {
 export async function checkWritePermission(
   organizationId: string,
   method: string,
+  opts?: { pathname?: string },
 ): Promise<Response | null> {
   // GET istekleri her zaman serbest
   const writeMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
@@ -410,9 +413,16 @@ export async function checkWritePermission(
   const subStatus = await checkSubscriptionStatus(organizationId)
 
   if (subStatus.isExpired) {
+    // On-prem READONLY: süresi dolmadan başlamış sınav ilerlemesi + oturum/şifre
+    // yazmaları muaf (personel sınavını kaybetmesin). Bulut'ta muafiyet yok.
+    if (isOnPrem() && opts?.pathname && isReadonlyWriteExempt(opts.pathname)) {
+      return null
+    }
     return NextResponse.json(
       {
-        error: 'Aboneliğiniz sona ermiştir. Yeni kayıt oluşturma kısıtlanmıştır. Lütfen aboneliğinizi yenileyin.',
+        error: isOnPrem()
+          ? 'Lisans süresi doldu — yalnız okuma yapılabilir. Yeni kayıt oluşturulamaz.'
+          : 'Aboneliğiniz sona ermiştir. Yeni kayıt oluşturma kısıtlanmıştır. Lütfen aboneliğinizi yenileyin.',
         subscriptionStatus: subStatus.status,
       },
       { status: 403 },

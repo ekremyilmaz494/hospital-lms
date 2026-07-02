@@ -11,6 +11,7 @@ import { maskEmail } from '@/lib/pii-mask'
 import { findActivePeriod } from '@/lib/training-periods'
 import { sendExpoPushToUser } from '@/lib/expo-push'
 import { assertCronAuth } from '@/lib/cron-auth'
+import { isBusinessCronAllowed } from '@/lib/license/enforcement'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 // Son-gün hatırlatması — org ayarından bağımsız, herkese gider (deadline'a 1 gün kala).
@@ -23,6 +24,11 @@ const BATCH_SIZE = 200
 export async function GET(request: Request) {
   const authErr = assertCronAuth(request)
   if (authErr) return authErr
+
+  // On-prem: READONLY/LOCKED'ta iş cron'ları atlanır (yalnız altyapı cron'ları çalışır). Bulutta no-op.
+  if (!(await isBusinessCronAllowed())) {
+    return NextResponse.json({ ok: true, skipped: 'license' }, { headers: { 'Cache-Control': 'no-store' } })
+  }
 
   const now = Date.now()
 

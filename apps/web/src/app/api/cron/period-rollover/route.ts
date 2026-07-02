@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma'
 import { rolloverIfNeeded } from '@/lib/training-periods'
 import { logger } from '@/lib/logger'
 import { assertCronAuth } from '@/lib/cron-auth'
+import { isBusinessCronAllowed } from '@/lib/license/enforcement'
 
 interface RolloverResult {
   orgId: string
@@ -22,6 +23,11 @@ interface RolloverResult {
 export async function GET(request: Request) {
   const authErr = assertCronAuth(request)
   if (authErr) return authErr
+
+  // On-prem: READONLY/LOCKED'ta iş cron'ları atlanır (yalnız altyapı cron'ları çalışır). Bulutta no-op.
+  if (!(await isBusinessCronAllowed())) {
+    return NextResponse.json({ ok: true, skipped: 'license' }, { headers: { 'Cache-Control': 'no-store' } })
+  }
 
   // Sadece aktif + askıya alınmamış organizasyonlar için rollover yap.
   const orgs = await prisma.organization.findMany({

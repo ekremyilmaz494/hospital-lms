@@ -6,11 +6,17 @@ import { maskEmail } from '@/lib/pii-mask'
 import type { UserRole } from '@/types/database'
 import { findActivePeriod } from '@/lib/training-periods'
 import { assertCronAuth } from '@/lib/cron-auth'
+import { isBusinessCronAllowed } from '@/lib/license/enforcement'
 
 /** Monthly compliance report cron — runs at 08:00 UTC on the 1st of every month (11:00 Istanbul) */
 export async function GET(request: Request) {
   const authErr = assertCronAuth(request)
   if (authErr) return authErr
+
+  // On-prem: READONLY/LOCKED'ta iş cron'ları atlanır (yalnız altyapı cron'ları çalışır). Bulutta no-op.
+  if (!(await isBusinessCronAllowed())) {
+    return NextResponse.json({ ok: true, skipped: 'license' }, { headers: { 'Cache-Control': 'no-store' } })
+  }
 
   let emailsSent = 0
   let emailsFailed = 0

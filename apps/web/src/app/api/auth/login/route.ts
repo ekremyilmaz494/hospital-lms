@@ -13,6 +13,9 @@ import { getAccountLock, registerFailedLogin, LOGIN_LOCK } from '@/lib/auth/logi
 import { isIpAllowed } from '@/lib/auth/ip-allowlist'
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc'
 import { hashTcKimlik } from '@/lib/tc-crypto'
+import { isOnPrem } from '@/lib/deployment'
+import { getLicenseState } from '@/lib/license/cache'
+import { LICENSE_STATE_COOKIE } from '@/lib/license/enforcement'
 
 /**
  * "SMS MFA pending" sentinel cookie.
@@ -253,6 +256,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // On-prem lisans kapısı — kilitli/lisanssızsa staff giremez (temiz ret);
+    // admin/super_admin girip /license aktivasyon ekranına düşer. Sentinel çerezi
+    // aşağıda (başarılı giriş bloğunda) set edilir.
+    if (isOnPrem()) {
+      const licenseState = (await getLicenseState()).state
+      const locked = licenseState === 'LOCKED' || licenseState === 'NO_LICENSE'
+      if (locked && dbUser.role === 'staff') {
+        return jsonResponse(
+          { error: 'Sistem lisansı geçerli değil. Lütfen kurum yöneticinizle iletişime geçin.' },
+          403,
+        )
+      }
+    }
+
     // IP allowlist — org açtıysa yalnız izinli IP/CIDR'lerden giriş yapılabilir.
     // super_admin (platform operatörü) muaftır; SMS MFA muafiyetiyle aynı gerekçe.
     if (dbUser.organization?.ipAllowlistEnabled && dbUser.role !== 'super_admin') {
@@ -354,6 +371,20 @@ export async function POST(request: NextRequest) {
         expires: new Date(0),
         httpOnly: true,
         sameSite: 'lax',
+      })
+    }
+
+    // On-prem lisans durumu sentinel çerezi — middleware kilitli/lisanssızda
+    // sayfa navigasyonunu /license'a yönlendirir (advisory; asıl zorlama API+layout).
+    if (isOnPrem()) {
+      const licenseState = (await getLicenseState()).state
+      const locked = licenseState === 'LOCKED' || licenseState === 'NO_LICENSE'
+      cookieStore.set(LICENSE_STATE_COOKIE, locked ? 'locked' : 'ok', {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60,
       })
     }
 

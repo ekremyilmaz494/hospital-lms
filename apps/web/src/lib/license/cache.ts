@@ -1,6 +1,5 @@
 import { isOnPrem } from '@/lib/deployment'
 import { computeLicenseState, type LicenseState } from '@/lib/license/state'
-import { loadLicenseSnapshot } from '@/lib/license/store'
 
 /**
  * Lisans durumu için 60s in-memory cache — `authCache` deseninin lisans
@@ -33,6 +32,9 @@ export async function getLicenseState(): Promise<LicenseState> {
   if (!isOnPrem()) return CLOUD_VALID_STATE
   if (cached && cached.expiresAt > Date.now()) return cached.state
 
+  // store (→ prisma) yalnız gerçekten on-prem'de yüklenir. Böylece enforcement/
+  // api-handler'ı sadece IMPORT eden bulut testleri prisma'yı eager çekmez.
+  const { loadLicenseSnapshot } = await import('@/lib/license/store')
   const snapshot = await loadLicenseSnapshot()
   const state = computeLicenseState(snapshot, new Date())
   cached = { state, expiresAt: Date.now() + CACHE_TTL_MS }

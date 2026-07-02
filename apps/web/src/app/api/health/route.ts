@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger'
 import { s3 } from '@/lib/s3'
 import { HeadBucketCommand } from '@aws-sdk/client-s3'
 import { isOnPrem } from '@/lib/deployment'
+import { getLicenseState } from '@/lib/license/cache'
 
 const APP_VERSION = process.env.npm_package_version ?? '0.1.0'
 
@@ -93,6 +94,18 @@ export async function GET(request: Request) {
     ? Object.values(services).every(Boolean) ? 'healthy' : 'degraded'
     : 'down'
 
+  // On-prem: lisans durumunu da yansıt (monitör için).
+  const license = onprem
+    ? await (async () => {
+        try {
+          const s = await getLicenseState()
+          return { state: s.state, daysToExpiry: s.daysToExpiry, offlineDaysLeft: s.offlineDaysLeft }
+        } catch {
+          return { state: 'unknown' }
+        }
+      })()
+    : undefined
+
   return NextResponse.json(
     {
       status,
@@ -105,6 +118,7 @@ export async function GET(request: Request) {
         region: dbRegion,
         appUrl: process.env.NEXT_PUBLIC_APP_URL ?? '',
       },
+      ...(license ? { license } : {}),
       timestamp: new Date().toISOString(),
       version: APP_VERSION,
     },

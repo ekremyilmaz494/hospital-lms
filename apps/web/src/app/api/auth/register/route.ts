@@ -7,8 +7,14 @@ import { checkRateLimit } from '@/lib/redis'
 import { selfRegisterSchema } from '@/lib/validations'
 import { sendSelfRegistrationEmail } from '@/lib/email'
 import { KVKK_NOTICE_VERSION } from '@/lib/kvkk/notice-version'
+import { isOnPrem } from '@/lib/deployment'
 
 export async function POST(request: Request) {
+  // On-prem: public self-registration KAPALI. Organizasyonlar yalnız super-admin
+  // tarafından (lisans org limiti kontrolüyle) oluşturulur; self-register lisans
+  // limitini yerelde delerdi. SaaS'ta mevcut davranış korunur.
+  if (isOnPrem()) return errorResponse('Not found', 404)
+
   // Rate limiting — IP bazlı: 3 istek / saat
   const clientIp =
     request.headers.get('x-vercel-forwarded-for') ||

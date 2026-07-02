@@ -51,7 +51,37 @@ async function loadSentry(): Promise<SentryModule | null> {
   return await import('@sentry/nextjs')
 }
 
+/**
+ * On-prem boot doğrulaması — açılışta saat watermark'ını ilerletir (geri-alma
+ * tespiti tabanı) ve lisans durumunu loglar. Best-effort; hata uygulamayı
+ * başlatmayı engellemez. Bulut modunda no-op. Yalnız nodejs runtime'da (prisma).
+ */
+async function registerLicenseBoot() {
+  if (process.env.NEXT_RUNTIME !== 'nodejs') return
+  const onprem =
+    process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === 'onprem' ||
+    process.env.DEPLOYMENT_MODE === 'onprem'
+  if (!onprem) return
+  try {
+    const { ratchetClockWatermark, loadLicenseSnapshot } = await import('@/lib/license/store')
+    const { computeLicenseState } = await import('@/lib/license/state')
+    await ratchetClockWatermark()
+    const snapshot = await loadLicenseSnapshot()
+    const state = computeLicenseState(snapshot, new Date())
+    const { logger } = await import('@/lib/logger')
+    logger.info('license-boot', `Lisans durumu: ${state.state}`, {
+      reasons: state.reasons,
+      daysToExpiry: state.daysToExpiry,
+      offlineDaysLeft: state.offlineDaysLeft,
+    })
+  } catch {
+    /* boot doğrulaması best-effort — DB henüz hazır olmayabilir */
+  }
+}
+
 export async function register() {
+  await registerLicenseBoot()
+
   const Sentry = await loadSentry()
   if (!Sentry) return
 

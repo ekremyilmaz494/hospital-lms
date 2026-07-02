@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { getCached, setCached } from '@/lib/redis'
+import { isOnPrem } from '@/lib/deployment'
+import { getLicenseState } from '@/lib/license/cache'
 
 const SUBSCRIPTION_CACHE_TTL = 120 // 2 dakika
 const GRACE_PERIOD_DAYS = 7
@@ -21,6 +23,25 @@ export interface SubscriptionCheckResult {
 export async function checkSubscriptionStatus(
   organizationId: string
 ): Promise<SubscriptionCheckResult> {
+  // On-prem: abonelik yerine lisans durumu geçerlidir. READONLY → isExpired
+  // (mevcut write-guard yazmayı bloklar); VALID/WARN → active; LOCKED/NO_LICENSE
+  // zaten API kapısında (licenseApiGate) 403'lenmiş olur, buraya nadiren düşer.
+  if (isOnPrem()) {
+    const license = await getLicenseState()
+    if (license.state === 'READONLY') {
+      return { status: 'expired', daysLeft: 0, isExpired: true, isGracePeriod: false }
+    }
+    if (license.state === 'LOCKED' || license.state === 'NO_LICENSE') {
+      return { status: 'suspended', daysLeft: 0, isExpired: true, isGracePeriod: false }
+    }
+    return {
+      status: 'active',
+      daysLeft: license.daysToExpiry ?? 9999,
+      isExpired: false,
+      isGracePeriod: false,
+    }
+  }
+
   const cacheKey = `sub:status:${organizationId}`
 
   // Cache'den kontrol
@@ -97,8 +118,36 @@ function computeExpiryStatus(endDate: Date, now: Date): SubscriptionCheckResult 
  */
 export async function checkSubscriptionLimit(
   organizationId: string,
-  type: 'staff' | 'training'
+  type: 'staff' | 'training' | 'organization'
 ): Promise<Response | null> {
+  // On-prem: limitler lisans claim'lerinden gelir (abonelik planı değil) ve
+  // GLOBAL sayılır (tek kurulum = tüm organizasyonlar). training limiti
+  // lisansta yoktur — serbest.
+  if (isOnPrem()) {
+    const license = await getLicenseState()
+    const limits = license.limits
+    if (!limits) return null // NO_LICENSE zaten API kapısında bloklanır
+    if (type === 'staff' && limits.maxStaff) {
+      const currentStaff = await prisma.user.count({ where: { role: 'staff' } })
+      if (currentStaff >= limits.maxStaff) {
+        return errorResponse(
+          `Lisans personel limitine ulaşıldı (${currentStaff}/${limits.maxStaff}). Klinovax ile iletişime geçin.`,
+          403
+        )
+      }
+    }
+    if (type === 'organization' && limits.maxOrganizations) {
+      const currentOrgs = await prisma.organization.count()
+      if (currentOrgs >= limits.maxOrganizations) {
+        return errorResponse(
+          `Lisans organizasyon limitine ulaşıldı (${currentOrgs}/${limits.maxOrganizations}). Klinovax ile iletişime geçin.`,
+          403
+        )
+      }
+    }
+    return null
+  }
+
   const subscription = await prisma.organizationSubscription.findUnique({
     where: { organizationId },
     include: { plan: true },

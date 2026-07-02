@@ -9,6 +9,7 @@ import {
   CRON_SEED_INSERT_BATCH,
 } from '@/lib/gamification/constants'
 import { assertCronAuth } from '@/lib/cron-auth'
+import { isBusinessCronAllowed } from '@/lib/license/enforcement'
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
@@ -32,6 +33,11 @@ function chunk<T>(arr: T[], size: number): T[][] {
 export async function GET(request: Request) {
   const authErr = assertCronAuth(request)
   if (authErr) return authErr
+
+  // On-prem: READONLY/LOCKED'ta iş cron'ları atlanır (yalnız altyapı cron'ları çalışır). Bulutta no-op.
+  if (!(await isBusinessCronAllowed())) {
+    return NextResponse.json({ ok: true, skipped: 'license' }, { headers: { 'Cache-Control': 'no-store' } })
+  }
 
   const now = new Date()
   const dueUntil = istanbulEndOfDayUTC(now)
