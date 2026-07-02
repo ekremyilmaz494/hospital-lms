@@ -14,9 +14,32 @@ const projectRoot = path.resolve('..', '..');
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+// ── Dağıtım modu ──
+// On-prem imaj build'i NEXT_PUBLIC_DEPLOYMENT_MODE=onprem ile yapılır (bundle'a
+// gömülür — runtime'da değiştirilemez; bkz. src/lib/deployment.ts). Bayrak yokken
+// tüm davranış bulut (mevcut) davranışıyla birebir aynıdır.
+const isOnPremBuild =
+  process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === 'onprem' ||
+  process.env.DEPLOYMENT_MODE === 'onprem';
+
+// On-prem CSP/images için env'den türetilen origin'ler. NEXT_PUBLIC_STORAGE_HOST =
+// tarayıcının eriştiği nesne deposu origin'i (örn. MinIO: https://depo.hastane.local).
+const storageOrigin = (process.env.NEXT_PUBLIC_STORAGE_HOST ?? '').replace(/\/$/, '');
+const supabaseOrigin = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').origin;
+  } catch {
+    return '';
+  }
+})();
+// Realtime websocket aynı host'a ws(s) şemasıyla bağlanır.
+const supabaseWsOrigin = supabaseOrigin.replace(/^http/, 'ws');
+const cspList = (parts: Array<string | false>) => parts.filter(Boolean).join(' ');
+
 // ── Build-time guard: Yanlış Supabase URL ile production build'i engelle ──
 // CI (GitHub Actions) ortamında placeholder URL kullanıldığı için atla.
-if (process.env.NODE_ENV === 'production' && !process.env.CI) {
+// On-prem build'ler müşteriye özel (self-hosted) Supabase kullanır — guard anlamsız.
+if (process.env.NODE_ENV === 'production' && !process.env.CI && !isOnPremBuild) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
   const expectedRef = 'pkkkyyajfmusurcoovwt';
   if (!supabaseUrl.includes(expectedRef)) {
@@ -45,6 +68,10 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  // On-prem Docker imajı self-contained çalışmalı: standalone output,
+  // .next/standalone altına yalnız gereken dosyaları (traced) kopyalar.
+  // Bulut (Vercel) build'inde output ayarlanmaz — Vercel kendi çıktısını yönetir.
+  ...(isOnPremBuild ? { output: 'standalone' as const } : {}),
   serverExternalPackages: ['remotion', '@remotion/cli'],
   turbopack: {
     root: projectRoot,
@@ -60,10 +87,23 @@ const nextConfig: NextConfig = {
       ? '.next.nosync'
       : '.next'),
   images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: '**.supabase.co' },
-      { protocol: 'https', hostname: '**.cloudfront.net' },
-    ],
+    // On-prem: origin'ler müşteri env'inden türetilir (self-hosted Supabase + MinIO).
+    // Bulut: mevcut wildcard'lar aynen korunur.
+    remotePatterns: isOnPremBuild
+      ? ([supabaseOrigin, storageOrigin]
+          .filter(Boolean)
+          .map((origin) => {
+            const u = new URL(origin);
+            return {
+              protocol: u.protocol.replace(':', '') as 'http' | 'https',
+              hostname: u.hostname,
+              ...(u.port ? { port: u.port } : {}),
+            };
+          }))
+      : [
+          { protocol: 'https', hostname: '**.supabase.co' },
+          { protocol: 'https', hostname: '**.cloudfront.net' },
+        ],
   },
   experimental: {
     proxyClientMaxBodySize: '512mb',
@@ -166,15 +206,32 @@ const nextConfig: NextConfig = {
             // unpkg.com: ffmpeg-core.js (client-side video compress). 'wasm-unsafe-eval': WebAssembly icin gerekli.
             `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://unpkg.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: https: blob:",
+            // On-prem'de LAN/http senaryosu için storage origin'i açıkça eklenir
+            // (https: genel izni http origin'i kapsamaz).
+            isOnPremBuild
+              ? cspList(["img-src 'self' data: https: blob:", storageOrigin])
+              : "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
             // unpkg.com: ffmpeg-core.wasm fetch
             // blob:: three.js GLTFLoader gömülü GLB texture'larını blob URL'den fetch eder
             // Sentry: *.ingest.de.sentry.io = AB (Frankfurt) bölgesi ingest — KVKK yurt dışı
             // aktarımını en aza indirmek için AB-bölgesi DSN kullanılır (bkz. .env.production.reference).
-            "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://unpkg.com",
-            "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
-            "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
+            // On-prem: origin'ler env'den (self-hosted Supabase + MinIO); Sentry/CloudFront yok.
+            isOnPremBuild
+              ? cspList([
+                  "connect-src 'self' blob:",
+                  supabaseOrigin,
+                  supabaseWsOrigin,
+                  storageOrigin,
+                  'https://unpkg.com',
+                ])
+              : "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://unpkg.com",
+            isOnPremBuild
+              ? cspList(["media-src 'self' data:", storageOrigin, 'blob:'])
+              : "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
+            isOnPremBuild
+              ? cspList(["frame-src 'self'", storageOrigin, 'blob:'])
+              : "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor
             "worker-src 'self' blob:",
             "manifest-src 'self'",
@@ -220,7 +277,9 @@ const finalConfig = withPWA(nextConfig);
 // SENTRY_REACT_ANNOTATION=1 ile sadece staging'de acik tutulabilir.
 const sentryAnnotationEnabled = process.env.SENTRY_REACT_ANNOTATION === '1';
 
-export default process.env.NODE_ENV === 'development'
+// On-prem build'de Sentry wrapper'ı atlanır: müşteri sunucusunda Sentry hesabı/
+// token'ı yoktur; wrapper source-map upload denemesi yapar ve DSN'siz gereksizdir.
+export default process.env.NODE_ENV === 'development' || isOnPremBuild
   ? finalConfig
   : withSentryConfig(finalConfig, {
       org: process.env.SENTRY_ORG,

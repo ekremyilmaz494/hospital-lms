@@ -111,6 +111,19 @@ const PROD_ONLY_VARS = [
 const PLACEHOLDER_PATTERNS = ['your-', 'generate-a-', 'xxx', 'CHANGE_ME', 'placeholder'];
 const isProduction = env.NODE_ENV === 'production';
 
+// On-prem dağıtım (müşteri sunucusu): Klinovax bulut projesine özgü ref/region
+// kontrolleri anlamsızdır — müşteri kendi self-hosted Supabase + MinIO'suna bağlanır.
+const isOnPrem =
+  env.NEXT_PUBLIC_DEPLOYMENT_MODE === 'onprem' || env.DEPLOYMENT_MODE === 'onprem';
+
+// On-prem'de ek zorunlu env'ler (MinIO endpoint'i olmadan medya çalışmaz).
+if (isOnPrem) {
+  REQUIRED_VARS.push('S3_ENDPOINT');
+  if (env.EMAIL_DRIVER === 'smtp' && !env.SMTP_HOST) {
+    fail('[ENV] EMAIL_DRIVER=smtp ama SMTP_HOST tanımlı değil');
+  }
+}
+
 for (const varName of REQUIRED_VARS) {
   const val = env[varName];
   if (!val || val.trim() === '') {
@@ -152,8 +165,10 @@ const directUrl = env.DIRECT_URL;
 if (supabaseUrl) {
   const urlRef = extractRef(supabaseUrl);
 
-  // 2a) Hardcoded beklenen ref
-  if (urlRef !== EXPECTED_REF) {
+  // 2a) Hardcoded beklenen ref — on-prem'de atlanır (müşteri kendi Supabase'i)
+  if (isOnPrem) {
+    pass();
+  } else if (urlRef !== EXPECTED_REF) {
     fail(`[REF] NEXT_PUBLIC_SUPABASE_URL yanlış projeye işaret ediyor!\n` +
          `       Beklenen ref: ${EXPECTED_REF}\n` +
          `       Bulunan ref:  ${urlRef}\n` +
@@ -192,7 +207,7 @@ if (supabaseUrl) {
 // ══════════════════════════════════════════════
 // KONTROL 3 — Region doğrulaması
 // ══════════════════════════════════════════════
-if (databaseUrl) {
+if (databaseUrl && !isOnPrem) {
   if (!databaseUrl.includes(EXPECTED_REGION)) {
     const detected = databaseUrl.match(/([a-z]{2}-[a-z]+-\d)/)?.[1] ?? 'bilinmiyor';
     warn(`[REGION] DATABASE_URL'de "${EXPECTED_REGION}" (Frankfurt) bulunamadı.\n` +
@@ -245,8 +260,12 @@ const isVercelPreview = env.VERCEL_ENV === 'preview';
 if (errors.length === 0) {
   const ref = extractRef(supabaseUrl) ?? '?';
   console.log('\x1b[32m✅ Tüm %d kontrol geçti — production\'a deploy güvenli\x1b[0m', checks);
-  console.log('\x1b[32m✅ Supabase project: %s (Frankfurt %s)\x1b[0m', ref, EXPECTED_REGION);
-  console.log('\x1b[32m✅ DB URL ref eşleşti\x1b[0m');
+  if (isOnPrem) {
+    console.log('\x1b[32m✅ Dağıtım modu: ON-PREM (ref/region kontrolleri atlandı)\x1b[0m');
+  } else {
+    console.log('\x1b[32m✅ Supabase project: %s (Frankfurt %s)\x1b[0m', ref, EXPECTED_REGION);
+    console.log('\x1b[32m✅ DB URL ref eşleşti\x1b[0m');
+  }
   if (warnings.length > 0) {
     console.log('\x1b[33m⚠  %d uyarı var — yukarıya bakın\x1b[0m', warnings.length);
   }

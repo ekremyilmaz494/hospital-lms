@@ -4,6 +4,7 @@ import { getRedis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { s3 } from '@/lib/s3'
 import { HeadBucketCommand } from '@aws-sdk/client-s3'
+import { isOnPrem } from '@/lib/deployment'
 
 const APP_VERSION = process.env.npm_package_version ?? '0.1.0'
 
@@ -72,10 +73,13 @@ export async function GET(request: Request) {
   } catch { /* S3 check failed */ }
 
   // ── Config ref kontrolü ──
+  // On-prem: müşteri kendi self-hosted Supabase'ine bağlanır — bulut proje
+  // ref'i kontrolü anlamsızdır, her zaman eşleşmiş sayılır.
+  const onprem = isOnPrem()
   const expectedRef = 'pkkkyyajfmusurcoovwt'
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
   const supabaseRef = supabaseUrl.match(/\/\/([^.]+)\.supabase/)?.[1] ?? 'unknown'
-  const refMatch = supabaseRef === expectedRef
+  const refMatch = onprem || supabaseRef === expectedRef
   const dbUrl = process.env.DATABASE_URL ?? ''
   const dbRegion = dbUrl.match(/([a-z]{2}-[a-z]+-\d)/)?.[1] ?? 'unknown'
 
@@ -94,8 +98,9 @@ export async function GET(request: Request) {
       status,
       services,
       config: {
+        mode: onprem ? 'onprem' : 'cloud',
         supabaseRef,
-        expectedRef,
+        expectedRef: onprem ? null : expectedRef,
         refMatch,
         region: dbRegion,
         appUrl: process.env.NEXT_PUBLIC_APP_URL ?? '',

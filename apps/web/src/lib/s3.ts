@@ -15,30 +15,38 @@ import { getSignedUrl as getCloudfrontSignedUrl } from '@aws-sdk/cloudfront-sign
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 
-export const s3 = new S3Client({
+// On-prem: S3_ENDPOINT verilirse (örn. MinIO — http://minio:9000 veya müşteri
+// TLS origin'i) her iki client da bu endpoint'e bağlanır. MinIO virtual-host
+// bucket adreslemeyi desteklemediği için S3_FORCE_PATH_STYLE=true şarttır.
+// Presigned URL'lerin host'u da bu endpoint olur — tarayıcıdan erişilebilir
+// (public) adres verilmelidir. Endpoint yokken davranış AWS default'u (mevcut).
+const S3_ENDPOINT = process.env.S3_ENDPOINT
+const S3_FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE === 'true'
+
+const s3BaseConfig = {
   region: process.env.AWS_REGION!,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
-  requestChecksumCalculation: 'WHEN_REQUIRED',
-  responseChecksumValidation: 'WHEN_REQUIRED',
-})
+  requestChecksumCalculation: 'WHEN_REQUIRED' as const,
+  responseChecksumValidation: 'WHEN_REQUIRED' as const,
+  ...(S3_ENDPOINT ? { endpoint: S3_ENDPOINT, forcePathStyle: S3_FORCE_PATH_STYLE } : {}),
+}
+
+export const s3 = new S3Client(s3BaseConfig)
 
 // Transfer Acceleration enabled client — used for upload presigning only.
 // Türkiye'den eu-central-1'e RTT yüksek; CloudFront edge'leri (İstanbul/Sofya)
 // üzerinden upload AWS backbone'una taşınınca hissedilir hızlanma sağlar.
 // Download/server-side operasyonlarda fark yok, sadece presigned PUT URL'lerinde kullanılır.
-export const s3Accelerate = new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-  useAccelerateEndpoint: true,
-  requestChecksumCalculation: 'WHEN_REQUIRED',
-  responseChecksumValidation: 'WHEN_REQUIRED',
-})
+// Transfer Acceleration AWS'e özgüdür — custom endpoint'te (MinIO) standart client kullanılır.
+export const s3Accelerate = S3_ENDPOINT
+  ? s3
+  : new S3Client({
+      ...s3BaseConfig,
+      useAccelerateEndpoint: true,
+    })
 
 const BUCKET = process.env.AWS_S3_BUCKET!
 

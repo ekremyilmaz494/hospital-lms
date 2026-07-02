@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createCheckoutForm } from '@/lib/iyzico'
 import { logger } from '@/lib/logger'
+import { isOnPrem } from '@/lib/deployment'
 
 /**
  * POST /api/payments/checkout
@@ -10,6 +11,8 @@ import { logger } from '@/lib/logger'
  * Body: { planId: string, billingCycle: 'monthly' | 'annual' }
  */
 export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
+  // On-prem dağıtımda ödeme/abonelik SaaS kavramıdır — lisans kullanılır.
+  if (isOnPrem()) return errorResponse('Not found', 404)
   const body = await parseBody<{ planId: string; billingCycle: 'monthly' | 'annual' }>(request)
   if (!body?.planId || !body?.billingCycle) {
     return errorResponse('planId ve billingCycle zorunlu')
