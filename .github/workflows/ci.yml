@@ -82,6 +82,37 @@ jobs:
           NEXT_PUBLIC_VAPID_KEY: placeholder
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci  # secret-scanner-disable-line
 
+  # On-prem build smoke — DEPLOYMENT_MODE=onprem standalone çıktısı bozulmasın
+  # (ref guard atlanır, output:standalone, CSP env'den). Docker'ı çalıştırmaz;
+  # yalnız `next build`'in onprem modda geçtiğini + standalone üretimini doğrular.
+  onprem-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter web exec prisma generate
+      - name: On-prem build (standalone)
+        run: pnpm --filter web build --webpack
+        env:
+          NEXT_PUBLIC_DEPLOYMENT_MODE: onprem
+          DEPLOYMENT_MODE: onprem
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_STORAGE_HOST: http://localhost:9000
+          NEXT_PUBLIC_VAPID_KEY: placeholder
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci  # secret-scanner-disable-line
+      - name: Verify standalone output
+        run: test -f apps/web/.next/standalone/apps/web/server.js
+
   # E2E job, setup-e2e-users.ts ile PROD Supabase'e dokunduğu için (incident-önleme
   # P0.1/P1) VARSAYILAN OLARAK ATLANIR. Aktive etmek için: ayrı staging/test Supabase
   # hazırla, secret'ları (DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY, REDIS_*) staging'e

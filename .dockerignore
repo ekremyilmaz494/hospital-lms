@@ -1,0 +1,14 @@
+# On-prem Docker build (deploy/onprem/Dockerfile, context = repo kökü) için.
+**/node_modules
+**/.next
+**/.next.nosync
+**/.next-*
+.git
+**/.env
+**/.env.local
+**/*.log
+deploy/onprem/dist
+apps/web/.vercel
+apps/web/coverage
+apps/web/playwright-report
+apps/web/test-results

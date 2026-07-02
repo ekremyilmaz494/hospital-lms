@@ -1,0 +1,246 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# KlinoVax Hospital LMS — On-Premise (tek sunucu) compose.
+# Tüm bileşenler müşteri sunucusunda; dışarıya TEK bağlantı lisans doğrulama
+# (LICENSE_SERVER_URL). Sırları docker-compose değil `.env` sağlar (install.sh üretir).
+#
+# Bileşenler: app · postgres · gotrue(auth) · realtime · gateway(kong) ·
+#             redis · srh(Upstash-REST proxy) · minio(+init) · scheduler · mailpit
+# ─────────────────────────────────────────────────────────────────────────────
+name: klinovax-onprem
+
+x-common-env: &common-env
+  DEPLOYMENT_MODE: onprem
+  NEXT_PUBLIC_DEPLOYMENT_MODE: onprem
+
+services:
+  # ── Uygulama (Next.js standalone) ──
+  app:
+    image: ${APP_IMAGE:-klinovax/hospital-lms:onprem}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      gateway: { condition: service_started }
+      redis: { condition: service_started }
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      <<: *common-env
+      NODE_ENV: production
+      PORT: 3000
+      # DB — app pooler yok, doğrudan postgres. DIRECT_URL migrate için (aynı).
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres # secret-scanner-disable-line (değişken referansı, gerçek sır değil)
+      DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres # secret-scanner-disable-line (değişken referansı)
+      # Auth (self-hosted GoTrue, gateway üzerinden). HS256 shared secret —
+      # verify-jwt.ts SUPABASE_JWT_SECRET fallback'iyle doğrular (kod değişikliği yok).
+      NEXT_PUBLIC_SUPABASE_URL: ${PUBLIC_APP_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_JWT_SECRET: ${JWT_SECRET}
+      # App
+      NEXT_PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+      NEXT_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN}
+      # Nesne deposu (MinIO — S3 uyumlu, path-style)
+      S3_ENDPOINT: ${PUBLIC_STORAGE_URL}
+      S3_FORCE_PATH_STYLE: "true"
+      NEXT_PUBLIC_STORAGE_HOST: ${PUBLIC_STORAGE_URL}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_S3_BUCKET: ${S3_BUCKET:-klinovax-media}
+      # Redis (SRH — Upstash REST uyumlu proxy)
+      REDIS_URL: http://srh:80
+      REDIS_TOKEN: ${SRH_TOKEN}
+      # E-posta (SMTP — mailpit varsayılan; prod'da müşteri relay'i)
+      EMAIL_DRIVER: smtp
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SES_FROM_EMAIL: ${FROM_EMAIL:-noreply@klinovax.local}
+      # Güvenlik/altyapı sırları
+      CRON_SECRET: ${CRON_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY}
+      HEALTH_CHECK_SECRET: ${HEALTH_CHECK_SECRET}
+      # Lisans (dışarı TEK bağlantı)
+      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-https://app.klinovax.com}
+      # İlk-boot bootstrap
+      ONPREM_BOOTSTRAP: "true"
+      ONPREM_ADMIN_EMAIL: ${ONPREM_ADMIN_EMAIL}
+      ONPREM_ADMIN_PASSWORD: ${ONPREM_ADMIN_PASSWORD}
+      SUPABASE_URL: http://gateway:8000
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+  # ── PostgreSQL (uygulama + auth şeması) ──
+  postgres:
+    image: supabase/postgres:15.8.1.060
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Sadece iç ağ — dışarı port AÇMA (hasta verisi).
+    expose:
+      - "5432"
+
+  # ── GoTrue (Supabase Auth) ──
+  auth:
+    image: supabase/gotrue:v2.177.0
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${PUBLIC_APP_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@postgres:5432/postgres # secret-scanner-disable-line (değişken referansı)
+      GOTRUE_SITE_URL: ${PUBLIC_APP_URL}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-mailpit}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-1025}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${FROM_EMAIL:-noreply@klinovax.local}
+    expose:
+      - "9999"
+
+  # ── Realtime (bildirim/presence/sınav kanalları) ──
+  realtime:
+    image: supabase/realtime:v2.34.47
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_ENC_KEY: ${REALTIME_ENC_KEY}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+    expose:
+      - "4000"
+
+  # ── Gateway (Kong) — /auth/v1/* → GoTrue, /realtime/v1/* → Realtime ──
+  gateway:
+    image: kong:2.8.1
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - realtime
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - ./gateway/kong.yml:/home/kong/kong.yml:ro
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+
+  # ── Redis + SRH (Upstash REST uyumlu proxy — @upstash/redis istemcisi değişmez) ──
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    expose:
+      - "6379"
+
+  srh:
+    image: hiett/serverless-redis-http:latest
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: ${SRH_TOKEN}
+      SRH_CONNECTION_STRING: redis://redis:6379
+    expose:
+      - "80"
+
+  # ── MinIO (S3 uyumlu nesne deposu) ──
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    ports:
+      # 9000 = S3 API (presigned URL host'u; tarayıcı erişir). 9001 = konsol.
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "/init/minio-init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-klinovax-media}
+    volumes:
+      - ./scheduler/minio-init.sh:/init/minio-init.sh:ro
+    restart: "no"
+
+  # ── Scheduler (supercronic — Vercel Cron yerine; binary imajda gömülü) ──
+  scheduler:
+    image: ${APP_IMAGE:-klinovax/hospital-lms:onprem}
+    restart: unless-stopped
+    depends_on:
+      app: { condition: service_started }
+    entrypoint: ["/usr/local/bin/supercronic", "/crontab"]
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+      APP_URL: http://app:3000
+    volumes:
+      - ./scheduler/crontab:/crontab:ro
+
+  # ── Mailpit (yerel SMTP yakalama — geliştirme/test; prod'da müşteri relay'i) ──
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    expose:
+      - "1025"
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
