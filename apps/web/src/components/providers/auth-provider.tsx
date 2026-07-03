@@ -24,15 +24,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const { setUser, setUserIfChanged, setLoading, setSessionTimeout } = useAuthStore();
 
   // Render sırasında (useEffect'ten ÖNCE) bir defaya mahsus Zustand'ı hydrate et.
-  // Böylece children ilk render'da `user` dolu + `isLoading=false` görür, skeleton basmaz.
+  // initialUser yoksa "oturum yok" diye erken karar verme: client getSession()
+  // henüz cookie'yi okuyamadan protected layout'lar login'e redirect edip döngü yaratır.
   const hydratedRef = useRef(false);
   if (!hydratedRef.current) {
     hydratedRef.current = true;
     if (initialUser) {
-      useAuthStore.setState({ user: initialUser, isAuthenticated: true, isLoading: false });
+      useAuthStore.setState({ user: initialUser, isAuthenticated: true, isLoading: true });
     } else {
-      // Session yok → loading'i kapat, login sayfası/public route render olsun
-      useAuthStore.setState({ isLoading: false });
+      useAuthStore.setState({ isLoading: true });
     }
   }
   // G3.2 — Track this user's presence in the global active-users channel
@@ -42,11 +42,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   // DB'den guncel role/isActive verisi al (JWT stale olabilir).
   // Aynı sekmede kısa süre içinde tekrar mount olursa fetch atlanır (dev HMR + sayfa
   // geçişleri her seferinde /api/auth/me çağırmasın diye 30s'lik cache).
-  const refreshFromDB = useCallback(async () => {
+  const refreshFromDB = useCallback(async (force = false) => {
     try {
       const cacheKey = 'auth:me:lastFetch';
       const last = typeof window !== 'undefined' ? Number(sessionStorage.getItem(cacheKey) ?? 0) : 0;
-      if (last && Date.now() - last < 30_000) return;
+      if (!force && last && Date.now() - last < 30_000) return;
       const res = await fetch('/api/auth/me');
       if (res.ok) {
         try { sessionStorage.setItem(cacheKey, String(Date.now())); } catch {}
@@ -85,9 +85,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     // Get initial session — use getSession() (local JWT parse, no HTTP round-trip).
     // Middleware already validates the token server-side via getUser().
     // Login sayfası store'u önceden doldurduysa loading gösterme (flash önlenir)
-    const hasExistingUser = !!useAuthStore.getState().user;
-    if (!hasExistingUser) setLoading(true);
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    setLoading(true);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const user = session?.user ?? null;
       if (user) {
         setUser({
@@ -107,9 +106,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           createdAt: user.created_at,
           updatedAt: user.updated_at ?? user.created_at,
         });
-        // JWT hydration sonrası sunucu doğrulaması yap (deaktive kullanıcı tespiti)
-        // 500ms geciktir — kritik render path'i bloklamadan kontrol et
-        setTimeout(refreshFromDB, 500);
+        // İlk protected render'da DB'deki kanonik role/isActive bilgisini bekle.
+        // Auth metadata bayatsa admin layout yanlışlıkla login'e geri dönmesin.
+        await refreshFromDB(true);
       } else {
         setUser(null);
       }
@@ -171,7 +170,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       subscription.unsubscribe();
       clearInterval(interval);
     };
-  }, [setUser, setLoading, router, refreshFromDB]);
+  }, [setUser, setUserIfChanged, setLoading, router, refreshFromDB]);
 
   return <>{children}</>;
 }
