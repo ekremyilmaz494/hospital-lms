@@ -15,6 +15,7 @@ import {
 } from '@/lib/invitations'
 import { encryptTcKimlik, hashTcKimlik, tcAuditRef } from '@/lib/tc-crypto'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
+import { classifyExistingTcUser } from '@/lib/admin/invite-existing-user'
 
 /**
  * POST /api/admin/users/invite
@@ -80,7 +81,15 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
     // TEK-ORG: TC global aranır — başka kuruma kayıtlıysa da reddedilir.
     prisma.user.findFirst({
       where: { tcHash },
-      select: { id: true, organizationId: true },
+      select: {
+        id: true,
+        organizationId: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        adminAccessGranted: true,
+        isActive: true,
+      },
     }),
   ])
 
@@ -89,12 +98,39 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
   }
 
   if (existingTcUser) {
-    return errorResponse(
-      existingTcUser.organizationId === orgId
-        ? 'Bu TC Kimlik No ile bu kurumda zaten kayıtlı bir kullanıcı var'
-        : 'Bu TC Kimlik No başka bir kuruma kayıtlı. Bir kişi yalnızca bir kuruma bağlı olabilir.',
-      409,
-    )
+    // Route owner-only (yukarıda doğrulandı) → grantable-staff durumunda Esas Yönetici
+    // yeni hesap açmak yerine mevcut personele DOĞRUDAN yönetici yetkisi verebilir.
+    const decision = classifyExistingTcUser(existingTcUser, orgId)
+    switch (decision.kind) {
+      case 'other-org':
+        return errorResponse(
+          'Bu TC Kimlik No başka bir kuruma kayıtlı. Bir kişi yalnızca bir kuruma bağlı olabilir.',
+          409,
+        )
+      case 'already-admin':
+        return errorResponse(`${decision.fullName} zaten bu kurumda yönetici olarak kayıtlı.`, 409)
+      case 'already-granted':
+        return errorResponse(`${decision.fullName} zaten yönetici yetkisine sahip bir personel.`, 409)
+      case 'inactive-staff':
+        return errorResponse(
+          `${decision.fullName} bu kurumda pasif bir personel. Yönetici yetkisi vermeden önce personeli aktifleştirin.`,
+          409,
+        )
+      case 'grantable-staff':
+        // Frontend bu yapılandırılmış yanıtı okuyup tek tıkla "Yönetici Yetkisi Ver" sunar.
+        return jsonResponse(
+          {
+            error: `${decision.fullName} zaten personel olarak kayıtlı. Yeni hesap açmak yerine bu personele yönetici yetkisi verebilirsiniz.`,
+            code: 'STAFF_EXISTS',
+            existingStaff: {
+              id: decision.id,
+              firstName: decision.firstName,
+              lastName: decision.lastName,
+            },
+          },
+          409,
+        )
+    }
   }
 
   if (adminCount + pendingInvites >= org.maxAdmins) {
