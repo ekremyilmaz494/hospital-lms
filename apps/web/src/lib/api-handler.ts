@@ -192,7 +192,15 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
 
       if (roles && roles.length > 0) {
         const roleErr = requireRole(dbUser.role, roles)
-        if (roleErr) return roleErr
+        if (roleErr) {
+          // Esas Yönetici'nin ek yönetici yetkisi verdiği personel (adminAccessGranted),
+          // role'ü 'staff' kalsa da admin-SEVİYESİ route'lara girer (dual-capability).
+          // super_admin-only route'lar ('admin' roller listesinde YOKSA) grant'tan ETKİLENMEZ.
+          // Middleware + admin layout ile AYNI mantık (bkz. lib/auth/admin-authority.ts).
+          const grantAllowsAdmin =
+            dbUser.adminAccessGranted && roles.includes('admin' as UserRole)
+          if (!grantAllowsAdmin) return roleErr
+        }
       }
 
       // requireOrganization — super_admin null orgId ile gelirse tenant-scoped

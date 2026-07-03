@@ -1,5 +1,6 @@
 import * as jose from 'jose'
 import { logger } from '@/lib/logger'
+import { extractAdminAccess } from '@/lib/auth/admin-authority'
 
 /**
  * Supabase access_token (JWT) kriptografik doğrulaması.
@@ -45,6 +46,8 @@ export interface VerifiedToken {
   sub: string
   /** app_metadata.role (kanonik değil — API'de DB dbUser.role kullanılır, ama middleware buna güvenir). */
   role: string | null
+  /** app_metadata.admin_access — personele verilmiş ek yönetici yetkisi (dual-capability). */
+  adminAccess: boolean
   payload: jose.JWTPayload
 }
 
@@ -87,7 +90,12 @@ export async function verifyAccessToken(token: string): Promise<VerifiedToken | 
     }
 
     if (!payload.sub) return null
-    return { sub: payload.sub, role: extractRole(payload), payload }
+    return {
+      sub: payload.sub,
+      role: extractRole(payload),
+      adminAccess: extractAdminAccess(payload.app_metadata as Record<string, unknown> | undefined),
+      payload,
+    }
   } catch {
     // İmza/exp/issuer/audience uyumsuzluğu — sessizce reddet (fail-closed).
     return null

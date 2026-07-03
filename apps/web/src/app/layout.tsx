@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/server";
 import type { User } from "@/types/database";
+import { extractAdminAccess } from "@/lib/auth/admin-authority";
 import { ToastProvider } from "@/components/shared/toast";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
@@ -69,6 +70,7 @@ async function getInitialUser(): Promise<User | null> {
       firstName: u.user_metadata?.first_name ?? '',
       lastName: u.user_metadata?.last_name ?? '',
       role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
+      adminAccessGranted: extractAdminAccess(u.app_metadata),
       organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
       phone: u.user_metadata?.phone ?? null,
       departmentId: u.user_metadata?.department_id ?? null,

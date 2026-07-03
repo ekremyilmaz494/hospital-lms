@@ -315,6 +315,12 @@ model User {
   departmentId             String?   @map("department_id") @db.Uuid
   title                    String?   @db.VarChar(100)
   role                     UserRole
+  // Esas Yönetici'nin bir PERSONELE verdiği EK yönetici (hastane-admin) yetkisi.
+  // Kişi role='staff' olarak KALIR (eğitim almaya devam eder) ama /admin paneline erişir.
+  // Yetki kararı TEK kaynaktan: lib/auth/admin-authority.ts hasAdminAuthority(). JWT'ye
+  // app_metadata.admin_access olarak yansır (middleware oradan okur). super_admin ASLA
+  // grant ile verilmez. Yalnız role='staff' için anlamlı; maxAdmins limitine sayılır.
+  adminAccessGranted       Boolean   @default(false) @map("admin_access_granted")
   avatarUrl                String?   @map("avatar_url") @db.Text
   isActive                 Boolean   @default(true) @map("is_active")
   // Kullanıcının pasifleştirildiği (isActive=false yapıldığı) an. KVKK saklama-süresi imha

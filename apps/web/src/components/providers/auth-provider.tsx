@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
+import { extractAdminAccess } from '@/lib/auth/admin-authority';
 import type { User } from '@/types/database';
 
 const DB_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 dakika — deaktive kullanıcı penceresi
@@ -95,6 +96,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           firstName: user.user_metadata?.first_name ?? '',
           lastName: user.user_metadata?.last_name ?? '',
           role: user.app_metadata?.role ?? user.user_metadata?.role ?? 'staff',
+          // JWT app_metadata'dan — middleware ile AYNI kaynak (layout↔middleware tutarlılığı).
+          adminAccessGranted: extractAdminAccess(user.app_metadata),
           organizationId: user.app_metadata?.organization_id ?? user.user_metadata?.organization_id ?? null,
           phone: user.user_metadata?.phone ?? null,
           departmentId: user.user_metadata?.department_id ?? null,
@@ -142,6 +145,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
               firstName: u.user_metadata?.first_name ?? '',
               lastName: u.user_metadata?.last_name ?? '',
               role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
+              adminAccessGranted: extractAdminAccess(u.app_metadata),
               organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
               phone: u.user_metadata?.phone ?? null,
               departmentId: u.user_metadata?.department_id ?? null,

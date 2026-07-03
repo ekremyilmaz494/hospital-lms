@@ -20,6 +20,8 @@ interface AdminListItem {
   isActive: boolean;
   createdAt: string;
   isOwner: boolean;
+  /** Personel olup ek yönetici yetkisi almış kişi (rol hâlâ 'staff'). */
+  isGrantedStaff?: boolean;
 }
 
 interface AdminsPayload {
@@ -202,6 +204,15 @@ export default function YoneticilerPage() {
                         title="Esas Yönetici — yeni admin davet etme yetkisine sahiptir"
                       >
                         Esas Yönetici
+                      </span>
+                    )}
+                    {a.isGrantedStaff && (
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5"
+                        style={{ background: '#fef3c7', color: '#92400e' }}
+                        title="Personel — Esas Yönetici tarafından ek yönetici yetkisi verilmiş (eğitim almaya devam eder)"
+                      >
+                        Personel + Yönetici
                       </span>
                     )}
                   </div>

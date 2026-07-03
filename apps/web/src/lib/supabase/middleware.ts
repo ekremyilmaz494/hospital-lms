@@ -4,6 +4,7 @@ import { extractSubdomain } from '@/lib/organization-utils';
 import { getCookieDomain } from './cookie-domain';
 import { verifyAccessToken } from './verify-jwt';
 import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
+import { hasAdminAuthority } from '@/lib/auth/admin-authority';
 
 const PUBLIC_ROUTES = [
   '/',
@@ -301,16 +302,15 @@ export async function updateSession(request: NextRequest) {
 
     // Role-based access control — DOĞRULANMIŞ JWT payload'ından (imza kontrol edildi)
     const role = sanitizeRole(verified?.role);
+    const adminAccess = verified?.adminAccess ?? false;
 
-    // /super-admin/* → sadece super_admin
+    // /super-admin/* → sadece super_admin (grant ASLA super_admin vermez)
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
     }
-    // /admin/* → admin veya super_admin
-    if (
-      pathname.startsWith('/admin') &&
-      !(['admin', 'super_admin'] as ValidRole[]).includes(role)
-    ) {
+    // /admin/* → admin, super_admin VEYA ek yönetici yetkisi verilmiş personel (dual-capability).
+    // TEK kaynak hasAdminAuthority — api-handler + admin layout ile AYNI kriter (drift yok).
+    if (pathname.startsWith('/admin') && !hasAdminAuthority({ role, adminAccess })) {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
     }
     // /staff/* → staff, admin veya super_admin (tum roller)
