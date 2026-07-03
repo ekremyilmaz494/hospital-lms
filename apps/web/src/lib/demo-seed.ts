@@ -524,7 +524,10 @@ async function seedFilledDemoData({
           create: {
             title: `${item.title} - Tanıtım`,
             videoUrl: `/uploads/${item.video}`, // perf-check-disable-line raw-video-url — demo public upload path'i bilinçli.
-            videoKey: mediaAsset.s3Key,
+            // videoKey boş: resolver /uploads dalını kullanır. mediaAsset.s3Key'e karşılık gelen S3
+            // nesnesi yüklenmez → dolu videoKey, var olmayan nesneye imzalı URL üretip "siyah video"
+            // tuzağına yol açar (CLAUDE.md Video URL Kuralı). sourceMediaAssetId bağ olarak korunur.
+            videoKey: '',
             durationSeconds: 18,
             contentType: 'video',
             sortOrder: 1,
@@ -552,7 +555,9 @@ async function seedFilledDemoData({
 
     for (let si = 0; si < staffIds.length; si++) {
       const userId = staffIds[si]
-      const status = si < 4 ? 'passed' : si < 6 ? 'in_progress' : 'assigned'
+      // 3 geçti / 2 devam ediyor / 3 taze atandı — yönetici panelinde dolu ilerleme grafiği + en az
+      // 3 personel sıfırdan eğitim alabilir (kullanıcı isteği).
+      const status = si < 3 ? 'passed' : si < 5 ? 'in_progress' : 'assigned'
       const completedAt = status === 'passed' ? new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000) : null
       const assignment = await prisma.trainingAssignment.create({
         data: {
