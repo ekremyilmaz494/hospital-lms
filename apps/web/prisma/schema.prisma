@@ -55,6 +55,8 @@ model SubscriptionPlan {
   hasAccreditationModule Boolean  @default(false) @map("has_accreditation_module")
   hasBulkImport          Boolean  @default(false) @map("has_bulk_import")
   hasCustomCertificates  Boolean  @default(false) @map("has_custom_certificates")
+  // İK/HBYS personel senkron entegrasyonu (dosya/push/pull) — /api/integration/v1
+  hasStaffIntegration    Boolean  @default(false) @map("has_staff_integration")
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -180,6 +182,10 @@ model Organization {
   trainingPeriods        TrainingPeriod[]
   // Davet token kayıtları (link tabanlı yeni hesap aktivasyonu)
   invitations            Invitation[]
+  // İK/HBYS personel senkron entegrasyonu
+  staffIntegrations      StaffIntegration[]
+  integrationApiKeys     IntegrationApiKey[]
+  syncRuns               SyncRun[]
 
   @@index([sector], map: "organization_sector_idx")
   @@index([isDemo], map: "organization_is_demo_idx")
@@ -341,6 +347,10 @@ model User {
   termsAccepted            Boolean   @default(false) @map("terms_accepted")
   termsAcceptedAt          DateTime? @map("terms_accepted_at") @db.Timestamptz
   hireDate                 DateTime? @map("hire_date") @db.Timestamptz
+  // İK/HBYS entegrasyonunun dış eşleme anahtarı (personel/sicil no). null = manuel kayıt.
+  // Entegrasyon SADECE externalId'li kullanıcıları yönetir (deaktive dahil) —
+  // manuel eklenen personele/adminlere asla dokunmaz (ingest.ts planSync).
+  externalId               String?   @map("external_id") @db.VarChar(100)
   createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -395,6 +405,9 @@ model User {
   // Aynı TC farklı kurumlarda olabilir (doktor 2 hastanede çalışabilir),
   // o yüzden global unique değil, organizationId+tcHash composite unique.
   @@unique([organizationId, tcHash], name: "user_org_tc_unique", map: "idx_users_org_tc_unique")
+  // İK entegrasyonu dış anahtarı org içinde benzersiz (NULL'lar serbest — Postgres
+  // unique index NULL satırları çakıştırmaz; eski his_external_id partial-index deseni).
+  @@unique([organizationId, externalId], name: "user_org_external_unique", map: "idx_users_org_external_unique")
   @@index([organizationId], map: "idx_users_org")
   @@index([role], map: "idx_users_role")
   @@index([departmentId], map: "idx_users_department")
@@ -1641,4 +1654,197 @@ model UserBadge {
   @@index([userId], map: "idx_user_badge_user")
   @@index([organizationId], map: "idx_user_badge_org")
   @@map("user_badges")
+}
+
+// ═══════════════ İK/HBYS Personel Senkron Entegrasyonu ═══════════════
+// Hastanenin kendi İK/HBYS sisteminden otomatik personel ekleme/güncelleme/
+// deaktivasyon. Kanal-bağımsız: tek ingestion çekirdeği (src/lib/integration/)
+// + 3 adaptör (inbound push API, dosya, zamanlanmış pull). Eski his_integrations
+// (2026-03 eklendi, 2026-06 kaldırıldı) yerine geçer — farkları: API-key servis
+// auth, idempotency, dry-run, satır-bazlı sonuç, güvenli deaktivasyon eşiği.
+
+// Veri akış kanalı
+enum IntegrationChannel {
+  push // hastane sistemi bizim API'mizi çağırır
+  file // gecelik export dosyası (xlsx/csv) yüklenir
+  pull // biz onların API'sini periyodik sorgularız
+
+  @@map("integration_channel")
+}
+
+// Senkron modu: delta = yalnız gönderilen kayıtlar işlenir;
+// snapshot = feed TAM liste kabul edilir, feed'de olmayan entegrasyon-yönetimli
+// (externalId != null) personel deaktive edilebilir (deactivateMissing + eşik).
+enum SyncMode {
+  delta
+  snapshot
+
+  @@map("sync_mode")
+}
+
+// Pull adaptörünün karşı API'ye kimlik doğrulama tipi
+enum PullAuthType {
+  bearer     // Authorization: Bearer <token>
+  basic      // Authorization: Basic base64(user:pass)
+  header_key // özel header (örn. X-Api-Key: <key>)
+
+  @@map("pull_auth_type")
+}
+
+// Senkron koşusunu ne tetikledi
+enum SyncRunTrigger {
+  api      // inbound push (hastane sistemi çağırdı)
+  file     // dosya yükleme
+  schedule // cron pull
+  manual   // admin panelinden "şimdi çalıştır"
+
+  @@map("sync_run_trigger")
+}
+
+enum SyncRunMode {
+  dry_run // yalnız plan çıkar, hiçbir değişiklik uygulanmaz
+  apply
+
+  @@map("sync_run_mode")
+}
+
+enum SyncRunStatus {
+  running
+  completed
+  completed_with_errors
+  failed
+  aborted // güvenlik eşiği (toplu deaktivasyon) veya eşzamanlılık kilidi
+
+  @@map("sync_run_status")
+}
+
+// Satır bazında ne yapıldı/yapılacaktı
+enum SyncRowAction {
+  create
+  update
+  deactivate
+  reactivate
+  skip     // fark yok
+  conflict // TC/e-posta başka org'da — manuel çözüm gerekir
+  error
+
+  @@map("sync_row_action")
+}
+
+// Org başına kanal yapılandırması. Bir org birden çok kanalı aynı anda
+// kullanabilir (örn. gecelik dosya + anlık push) — kanal başına tek kayıt.
+model StaffIntegration {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  channel        IntegrationChannel
+  isActive       Boolean            @default(true) @map("is_active")
+  syncMode       SyncMode           @default(delta) @map("sync_mode")
+  // Kaynak alan adı → StaffRecord alanı eşlemesi (normalize.ts uygular).
+  // null = kimliksel eşleme (kaynak zaten bizim alan adlarımızı kullanıyor).
+  fieldMapping   Json?              @map("field_mapping")
+  // Eksik alanlar için varsayılanlar (örn. { "departmentName": "Genel" })
+  defaults       Json?
+  // snapshot modda feed'de olmayan entegrasyon-yönetimli personeli deaktive et.
+  // Eşik: deaktivasyon sayısı max(5, aktif personelin %deactivateThresholdPct'i)
+  // aşarsa koşu ABORT edilir (boş/yarım export kazası koruması); yalnız admin
+  // manuel tetiği force ile geçebilir.
+  deactivateMissing      Boolean @default(false) @map("deactivate_missing")
+  deactivateThresholdPct Int     @default(20) @map("deactivate_threshold_pct")
+  // ── pull kanalına özgü ──
+  pullBaseUrl              String?       @map("pull_base_url") @db.VarChar(500)
+  pullAuthType             PullAuthType? @map("pull_auth_type")
+  // crypto.encrypt (AES-256-GCM) ile şifreli JSON: { token } | { username, password } | { headerName, key }
+  pullCredentialsEncrypted String?       @map("pull_credentials_encrypted") @db.Text
+  pullIntervalMinutes      Int?          @map("pull_interval_minutes")
+  // Sayfalama stratejisi: { style: 'page'|'offset'|'cursor', pageParam, sizeParam, pageSize, itemsPath, cursorPath? }
+  pullPagination           Json?         @map("pull_pagination")
+  lastRunAt                DateTime?     @map("last_run_at") @db.Timestamptz
+  lastRunStatus            String?       @map("last_run_status") @db.VarChar(30)
+  createdAt                DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  syncRuns     SyncRun[]
+
+  @@unique([organizationId, channel], map: "idx_staff_integrations_org_channel")
+  @@index([organizationId], map: "idx_staff_integrations_org")
+  @@map("staff_integrations")
+}
+
+// Org-scoped makine API anahtarı (inbound push + dosya uçları için).
+// Düz anahtar YALNIZ üretim anında bir kez gösterilir; DB'de SHA-256 hex hash.
+// keyPrefix (örn. "klx_live_a1b2c3") log/UI'da anahtarı ifşa etmeden tanımlar.
+// Rotasyon: yeni anahtar üret + eskiyi revoke et (org başına çoklu aktif anahtar serbest).
+model IntegrationApiKey {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String    @db.VarChar(100)
+  keyPrefix      String    @map("key_prefix") @db.VarChar(20)
+  keyHash        String    @unique(map: "idx_integration_api_keys_hash") @map("key_hash") @db.VarChar(64)
+  lastUsedAt     DateTime? @map("last_used_at") @db.Timestamptz
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  syncRuns     SyncRun[]
+
+  @@index([organizationId], map: "idx_integration_api_keys_org")
+  @@map("integration_api_keys")
+}
+
+// Bir senkron koşusunun başlığı (dry-run dahil). Satır ayrıntıları SyncRowResult'ta.
+model SyncRun {
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  integrationId    String?           @map("integration_id") @db.Uuid
+  channel          IntegrationChannel
+  trigger          SyncRunTrigger
+  mode             SyncRunMode
+  syncMode         SyncMode          @map("sync_mode")
+  status           SyncRunStatus     @default(running)
+  totalRows        Int               @default(0) @map("total_rows")
+  createdRows      Int               @default(0) @map("created_rows")
+  updatedRows      Int               @default(0) @map("updated_rows")
+  deactivatedRows  Int               @default(0) @map("deactivated_rows")
+  reactivatedRows  Int               @default(0) @map("reactivated_rows")
+  skippedRows      Int               @default(0) @map("skipped_rows")
+  failedRows       Int               @default(0) @map("failed_rows")
+  // Koşu-seviyesi hata özeti (abort nedeni, karşı API hatası vb.) — Türkçe.
+  errorSummary     Json?             @map("error_summary")
+  apiKeyId         String?           @map("api_key_id") @db.Uuid
+  requestedById    String?           @map("requested_by_id") @db.Uuid
+  fileName         String?           @map("file_name") @db.VarChar(255)
+  startedAt        DateTime          @default(now()) @map("started_at") @db.Timestamptz
+  completedAt      DateTime?         @map("completed_at") @db.Timestamptz
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integration  StaffIntegration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  apiKey       IntegrationApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  rowResults   SyncRowResult[]
+
+  @@index([organizationId, startedAt], map: "idx_sync_runs_org_time")
+  @@map("sync_runs")
+}
+
+// Koşunun satır-bazlı sonucu. payloadMasked KVKK gereği maskeli tutulur
+// (pii-mask; TC ASLA yazılmaz) ve cron/cleanup 90 günde imha eder.
+model SyncRowResult {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  syncRunId      String        @map("sync_run_id") @db.Uuid
+  rowIndex       Int           @map("row_index")
+  externalId     String?       @map("external_id") @db.VarChar(100)
+  action         SyncRowAction
+  userId         String?       @map("user_id") @db.Uuid
+  message        String?       @db.Text
+  payloadMasked  Json?         @map("payload_masked")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  syncRun SyncRun @relation(fields: [syncRunId], references: [id], onDelete: Cascade)
+
+  @@index([syncRunId], map: "idx_sync_row_results_run")
+  @@index([organizationId, createdAt], map: "idx_sync_row_results_org_time")
+  @@map("sync_row_results")
 }

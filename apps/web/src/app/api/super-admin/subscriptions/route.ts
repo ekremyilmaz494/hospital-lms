@@ -50,6 +50,7 @@ export const GET = withSuperAdminRoute(async () => {
         storage:   p.maxStorageGb,
       },
       features: Array.isArray(p.features) ? (p.features as string[]) : [],
+      hasStaffIntegration: p.hasStaffIntegration,
       organizations: p._count.subscriptions,
     }
   })

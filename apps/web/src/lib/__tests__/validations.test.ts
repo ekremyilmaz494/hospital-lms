@@ -185,6 +185,21 @@ describe('createPlanSchema', () => {
     })
     expect(result.success).toBe(true)
   })
+
+  // zod v4 şemada olmayan anahtarı siler — bu test alanın şemadan düşmesini kilitler
+  it('hasStaffIntegration alanını geçirir ve varsayılanı false olur', () => {
+    const withFlag = createPlanSchema.safeParse({
+      name: 'Kurumsal',
+      slug: 'enterprise',
+      hasStaffIntegration: true,
+    })
+    expect(withFlag.success).toBe(true)
+    if (withFlag.success) expect(withFlag.data.hasStaffIntegration).toBe(true)
+
+    const withoutFlag = createPlanSchema.safeParse({ name: 'Başlangıç', slug: 'starter' })
+    expect(withoutFlag.success).toBe(true)
+    if (withoutFlag.success) expect(withoutFlag.data.hasStaffIntegration).toBe(false)
+  })
 })
 
 describe('trainingFeedbackSubmitSchema', () => {

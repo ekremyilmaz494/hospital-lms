@@ -366,6 +366,9 @@ export const createPlanSchema = z.object({
   priceMonthly: z.number().positive().optional(),
   priceAnnual: z.number().positive().optional(),
   features: z.array(z.string()).default([]),
+  // Feature gate: İK/HBYS personel senkron entegrasyonu (SubscriptionPlan.hasStaffIntegration).
+  // zod v4 şemada olmayan anahtarı SİLER — alan buradan çıkarılırsa route'a hiç ulaşmaz.
+  hasStaffIntegration: z.boolean().default(false),
 })
 
 export const updatePlanSchema = createPlanSchema.partial()

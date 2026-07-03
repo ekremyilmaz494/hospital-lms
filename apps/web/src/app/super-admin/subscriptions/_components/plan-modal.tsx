@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { CreditCard, X } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/shared/toast'
 
 export interface PlanFormValue {
@@ -15,6 +16,7 @@ export interface PlanFormValue {
   priceMonthly?: number
   priceAnnual?: number
   features: string[]
+  hasStaffIntegration: boolean
 }
 
 interface PlanModalProps {
@@ -38,6 +40,7 @@ export default function PlanModal({ initial, onClose, onSaved }: PlanModalProps)
     priceMonthly: initial?.priceMonthly ?? 0,
     priceAnnual: initial?.priceAnnual ?? 0,
     features: initial?.features ?? [],
+    hasStaffIntegration: initial?.hasStaffIntegration ?? false,
   })
   const [featureInput, setFeatureInput] = useState('')
 
@@ -70,6 +73,7 @@ export default function PlanModal({ initial, onClose, onSaved }: PlanModalProps)
         priceMonthly: form.priceMonthly && form.priceMonthly > 0 ? form.priceMonthly : undefined,
         priceAnnual: form.priceAnnual && form.priceAnnual > 0 ? form.priceAnnual : undefined,
         features: form.features,
+        hasStaffIntegration: form.hasStaffIntegration,
       }
 
       const res = await fetch('/api/super-admin/subscriptions', {
@@ -150,6 +154,31 @@ export default function PlanModal({ initial, onClose, onSaved }: PlanModalProps)
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Depolama (GB)</label>
               <input type="number" min={1} className={inputCls} style={inputStyle} value={form.maxStorageGb} onChange={e => setForm(p => ({ ...p, maxStorageGb: Number(e.target.value) }))} />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Modül Erişimi</label>
+            <label
+              className="flex cursor-pointer items-start gap-3 rounded-xl border p-3.5"
+              style={{
+                borderColor: form.hasStaffIntegration ? 'var(--color-primary)' : 'var(--color-border)',
+                background: form.hasStaffIntegration ? 'var(--color-primary-light)' : 'var(--color-surface-hover)',
+              }}
+            >
+              <Checkbox
+                checked={form.hasStaffIntegration}
+                onCheckedChange={checked => setForm(p => ({ ...p, hasStaffIntegration: !!checked }))}
+                className="mt-0.5"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Personel Entegrasyonu (İK/HBYS)
+                </span>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  İK/HBYS sistemleriyle personel senkronizasyonunu bu planda etkinleştirir.
+                </p>
+              </div>
+            </label>
           </div>
 
           <div>

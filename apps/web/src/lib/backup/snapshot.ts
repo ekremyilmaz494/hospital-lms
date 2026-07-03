@@ -22,13 +22,18 @@
 import { prisma } from '@/lib/prisma'
 
 /**
- * schemaVersion 4: kapsam genişletildi — 27 org modeli daha eklendi (MediaAsset, ScormAttempt,
+ * schemaVersion 5: İK entegrasyon konfigürasyonu eklendi — StaffIntegration (İK/HBYS kanal
+ * ayarları; pullCredentialsEncrypted AES-256-GCM şifreli, ENCRYPTION_KEY olmadan açılmaz) +
+ * IntegrationApiKey (yalnız SHA-256 hash, düz anahtar yok). Restore sonrası hastanenin
+ * entegrasyonu çalışmaya devam etmeli. SyncRun/SyncRowResult KASITLI dışarıda (telemetri +
+ * KVKK veri-minimizasyonu — bkz. snapshot.test.ts INTENTIONALLY_EXCLUDED).
+ * v4: kapsam genişletildi — 27 org modeli daha eklendi (MediaAsset, ScormAttempt,
  * TrainingFeedback*, Smg*, Accreditation*, Competency*, QuestionBank*, TrainingCategory/Period,
  * DepartmentTrainingRule, ExamAttemptRequest, Daily*, KvkkRequest). Restore'da bunlar yoksa
  * kalıcı kaybediliyordu.
  * v3: authUsers (parola hash'leri). v2: organization/subscription/auditLogs. v1: 9 dizi.
  */
-export const BACKUP_SCHEMA_VERSION = 4
+export const BACKUP_SCHEMA_VERSION = 5
 
 /** Org `dataRetentionDays` okunamazsa kullanılacak audit-log saklama süresi (DB default'u ile aynı). */
 const DEFAULT_AUDIT_RETENTION_DAYS = 365
@@ -98,6 +103,9 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     kvkkRequests,
     dailyReviews,
     dailySubmissions,
+    // ── v5: İK entegrasyon konfigürasyonu ──
+    staffIntegrations,
+    integrationApiKeys,
     // ── Opsiyonel: Supabase auth.users (en sonda — koşullu) ──
     authUsers,
   ] = await Promise.all([
@@ -145,6 +153,11 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     prisma.kvkkRequest.findMany({ where: { organizationId: orgId } }),
     prisma.dailyReview.findMany({ where: { organizationId: orgId } }),
     prisma.dailySubmission.findMany({ where: { organizationId: orgId } }),
+    // ── v5: İK entegrasyon konfigürasyonu (StaffIntegration.pullCredentialsEncrypted AES-256-GCM
+    // şifreli taşınır — restore için gerekli; download yolu stripSensitiveBackupFields ile soyar.
+    // IntegrationApiKey yalnız SHA-256 hash taşır, düz anahtar hiç DB'ye yazılmaz.) ──
+    prisma.staffIntegration.findMany({ where: { organizationId: orgId } }),
+    prisma.integrationApiKey.findMany({ where: { organizationId: orgId } }),
     // auth.users — parola hash'leri (encrypted_password) SADECE burada. Restore'da public.users'tan
     // ÖNCE INSERT ... ON CONFLICT (id) DO NOTHING ile geri yüklenir. includeAuthUsers=false ise hiç çekilmez.
     options.includeAuthUsers
@@ -200,6 +213,9 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     kvkkRequests,
     dailyReviews,
     dailySubmissions,
+    // v5 — İK entegrasyon konfigürasyonu
+    staffIntegrations,
+    integrationApiKeys,
     // authUsers yalnız includeAuthUsers=true iken eklenir — aksi halde anahtar hiç çıkmaz.
     ...(authUsers ? { authUsers } : {}),
     exportedAt: (options.exportedAt ?? new Date()).toISOString(),

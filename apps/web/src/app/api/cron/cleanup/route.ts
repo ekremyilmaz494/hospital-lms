@@ -164,6 +164,26 @@ export async function GET(request: Request) {
   })
   logger.info('cleanup', 'Suresi dolmus guvenilir cihazlar silindi', { count: expiredDevices.count })
 
+  // 3.7 İK/HBYS senkron telemetri imhası (KVKK veri minimizasyonu):
+  //   - SyncRowResult 90 gün: payloadMasked maskeli de olsa PII izi taşır; sorun-giderme
+  //     penceresi (90g) sonrası tutmanın hukuki dayanağı yok. Yedeğe de girmez (kasıtlı hariç).
+  //   - SyncRun başlıkları 365 gün: yalnız sayaç/durum içerir (PII yok), yıllık denetim izi yeter.
+  //     Silinen run'ların kalan satırları FK cascade ile düşer.
+  const [deletedSyncRows, deletedSyncRuns] = await Promise.all([
+    prisma.syncRowResult.deleteMany({
+      where: { createdAt: { lt: new Date(Date.now() - 90 * dayMs) } },
+    }),
+    prisma.syncRun.deleteMany({
+      where: { startedAt: { lt: new Date(Date.now() - 365 * dayMs) } },
+    }),
+  ])
+  if (deletedSyncRows.count > 0 || deletedSyncRuns.count > 0) {
+    logger.info('cleanup', 'Senkron telemetrisi imha edildi', {
+      rowResults: deletedSyncRows.count,
+      runs: deletedSyncRuns.count,
+    })
+  }
+
   // 3.5 Expo push ticket purge — receipt audit kısa pencere yeter:
   //   - 30 gün eski 'ok' / 'expired' (delivery confirmed, debug penceresi geçti)
   //   - 90 gün eski 'error' (incident root-cause penceresi)
@@ -650,6 +670,8 @@ export async function GET(request: Request) {
     retentionAnonymized,
     deletedExpoTicketsOk: deletedExpoTicketsOk.count,
     deletedExpoTicketsError: deletedExpoTicketsError.count,
+    deletedSyncRowResults: deletedSyncRows.count,
+    deletedSyncRuns: deletedSyncRuns.count,
     deletedBackups: deletedBackups.count,
     skippedBackupsNoRecent: skippedNoRecent.length,
     skippedBackupsVerifyFail: skippedVerifyFail.length,

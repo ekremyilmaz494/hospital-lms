@@ -22,6 +22,8 @@ const { prismaMock, s3Mock, cryptoMock, emailMock, anonymizeMock, auditMock } = 
     organization: { findMany: vi.fn().mockResolvedValue([]) },
     user: { findMany: vi.fn().mockResolvedValue([]) },
     trustedDevice: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    syncRowResult: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    syncRun: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     expoPushTicket: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     certificate: { findMany: vi.fn().mockResolvedValue([]) },
     organizationSubscription: { findMany: vi.fn().mockResolvedValue([]) },
@@ -122,5 +124,25 @@ describe('Cron Cleanup — KVKK saklama-süresi imhası', () => {
     const body = await res.json()
     expect(res.status).toBe(200)
     expect(body.retentionAnonymized).toBe(1) // yalnız user-2 başarılı
+  })
+
+  it('İK senkron telemetrisi imha edilir: SyncRowResult 90 gün, SyncRun 365 gün', async () => {
+    prismaMock.syncRowResult.deleteMany.mockResolvedValueOnce({ count: 12 })
+    prismaMock.syncRun.deleteMany.mockResolvedValueOnce({ count: 3 })
+
+    const before = Date.now()
+    const res = await GET(authedRequest())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.deletedSyncRowResults).toBe(12)
+    expect(body.deletedSyncRuns).toBe(3)
+
+    // Cutoff'lar: satır sonuçları ~90 gün (PII izi), run başlıkları ~365 gün (PII'siz sayaç)
+    const dayMs = 24 * 60 * 60 * 1000
+    const rowCutoff = prismaMock.syncRowResult.deleteMany.mock.calls[0][0].where.createdAt.lt.getTime()
+    const runCutoff = prismaMock.syncRun.deleteMany.mock.calls[0][0].where.startedAt.lt.getTime()
+    expect(Math.abs(rowCutoff - (before - 90 * dayMs))).toBeLessThan(60_000)
+    expect(Math.abs(runCutoff - (before - 365 * dayMs))).toBeLessThan(60_000)
   })
 })
