@@ -469,26 +469,36 @@ async function seedFilledDemoData({
     staffIds.push(user.dbUser.id)
   }
 
+  const activePeriod = await prisma.trainingPeriod.findFirst({
+    where: { organizationId, status: 'active' },
+    select: { id: true, startDate: true },
+    orderBy: { year: 'desc' },
+  })
+
+  const now = new Date()
+  const endDate = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000)
+  // Dönem başlangıcı — hem personel hireDate'i hem assignedAt taban sınırı için.
+  const periodStart = activePeriod?.startDate ?? new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+  // Geriye-tarihli atama, dönem başlangıcından (yıl başı) daha eskiye düşmesin — aksi halde yıl
+  // başında seed edilen demoda assignedAt önceki döneme kayar.
+  const assignedAt = new Date(Math.max(now.getTime() - 25 * 24 * 60 * 60 * 1000, periodStart.getTime()))
+  const scores = [100, 90, 85, 80]
+  let certificateCount = 0
+
+  // hireDate = dönem başlangıcı: personel dashboard "Eğitim özeti" sayaçları atamaları
+  // `assignedAt >= effectiveStart` (= max(hireDate ?? createdAt, dönem başı)) ile eler. hireDate
+  // set edilmezse createdAt (= seed çalışma anı) kullanılır ve geriye-tarihli assignedAt filtreden
+  // düşer → tüm sayaçlar 0 (my-trainings bu filtreyi uygulamaz, o yüzden doğru gösterir). hireDate'i
+  // dönem başına çekince assignedAt >= effectiveStart sağlanır ve dashboard doğru sayar.
   await prisma.user.updateMany({
     where: { id: { in: staffIds } },
     data: {
       kvkkNoticeAcknowledgedAt: new Date(),
       termsAccepted: true,
       termsAcceptedAt: new Date(),
+      hireDate: periodStart,
     },
   })
-
-  const activePeriod = await prisma.trainingPeriod.findFirst({
-    where: { organizationId, status: 'active' },
-    select: { id: true },
-    orderBy: { year: 'desc' },
-  })
-
-  const now = new Date()
-  const endDate = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000)
-  const assignedAt = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000)
-  const scores = [100, 90, 85, 80]
-  let certificateCount = 0
 
   for (let tIdx = 0; tIdx < TRAININGS.length; tIdx++) {
     const item = TRAININGS[tIdx]
