@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, UserCog, Mail, KeyRound, Copy, CheckCheck, FileDown } from 'lucide-react';
+import { Save, UserCog, Mail, KeyRound, Copy, CheckCheck, FileDown, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
@@ -31,6 +31,10 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<SuccessState | null>(null);
   const [mode, setMode] = useState<Mode>('invite');
+  // Girilen TC zaten AYNI kurumun (aktif, yetkisiz) personeliyse: yeni hesap açmak yerine
+  // mevcut personele yönetici yetkisi verme akışını öner (PR #234 grant endpoint'i).
+  const [grantOffer, setGrantOffer] = useState<{ id: string; name: string; message: string } | null>(null);
+  const [granting, setGranting] = useState(false);
   const [form, setForm] = useState({ ad: '', soyad: '', email: '', telefon: '', unvan: '', tc: '', sifre: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<'pwd' | 'tc' | null>(null);
@@ -102,7 +106,20 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
         emailSent?: boolean;
         tempPassword?: string;
         tcKimlik?: string;
+        code?: string;
+        existingStaff?: { id: string; firstName: string; lastName: string };
       };
+
+      // Girilen TC zaten mevcut personel → davet yerine "Yönetici Yetkisi Ver" öner.
+      if (res.status === 409 && body.code === 'STAFF_EXISTS' && body.existingStaff) {
+        setGrantOffer({
+          id: body.existingStaff.id,
+          name: `${body.existingStaff.firstName} ${body.existingStaff.lastName}`.trim(),
+          message: body.error ?? '',
+        });
+        return;
+      }
+
       if (!res.ok) throw new Error(body.error || 'Kayıt başarısız');
 
       setSuccess({
@@ -128,6 +145,27 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Mevcut personele ek yönetici yetkisi verir (dual-capability). Kişi personel olarak
+   * kalır ama /admin paneline de erişir. Koltuk limiti kontrolü sunucuda (grant endpoint).
+   */
+  const handleGrantAccess = async () => {
+    if (!grantOffer) return;
+    setGranting(true);
+    try {
+      const res = await fetch(`/api/admin/staff/${grantOffer.id}/admin-access`, { method: 'POST' });
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(body.error || 'Yetki verilemedi');
+      toast(`${grantOffer.name} artık yönetim paneline erişebilir`, 'success');
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Yetki verilemedi', 'error');
+    } finally {
+      setGranting(false);
     }
   };
 
@@ -206,7 +244,23 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
       size="md"
       disableEscape={saving}
       footer={
-        !success ? (
+        success ? (
+          <PremiumModalFooter
+            actions={<PremiumButton onClick={onClose}>Kapat</PremiumButton>}
+          />
+        ) : grantOffer ? (
+          <PremiumModalFooter
+            summary={<span className="text-sm" style={{ color: 'var(--k-text-muted)' }}>Kişi personel olarak kalır, eğitim almaya devam eder.</span>}
+            actions={
+              <>
+                <PremiumButton variant="ghost" onClick={() => setGrantOffer(null)} disabled={granting}>Geri</PremiumButton>
+                <PremiumButton onClick={handleGrantAccess} loading={granting} icon={<ShieldCheck className="h-4 w-4" />}>
+                  {granting ? 'Veriliyor' : 'Yönetici Yetkisi Ver'}
+                </PremiumButton>
+              </>
+            }
+          />
+        ) : (
           <PremiumModalFooter
             summary={<span className="text-sm" style={{ color: 'var(--k-text-muted)' }}>Zorunlu alanlar * ile işaretli</span>}
             actions={
@@ -217,10 +271,6 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
                 </PremiumButton>
               </>
             }
-          />
-        ) : (
-          <PremiumModalFooter
-            actions={<PremiumButton onClick={onClose}>Kapat</PremiumButton>}
           />
         )
       }
@@ -294,6 +344,30 @@ export function InviteAdminModal({ onClose, onSaved, maxAdmins, currentCount }: 
               Bağlantı 72 saat içinde kullanılmalıdır. Davet edilen kişi linke tıklayıp kendi şifresini belirleyecek.
             </p>
           )}
+        </div>
+      ) : grantOffer ? (
+        <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col items-center text-center gap-3 pt-2">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center"
+                 style={{ background: '#fef3c7', color: '#92400e' }}>
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <h4 className="text-lg font-semibold" style={{ color: 'var(--k-text-primary)' }}>
+              {grantOffer.name} zaten personel
+            </h4>
+            <p className="text-sm" style={{ color: 'var(--k-text-secondary)' }}>
+              {grantOffer.message || `${grantOffer.name} bu kurumda personel olarak kayıtlı. Yeni hesap açmak yerine mevcut personele yönetici yetkisi verebilirsiniz.`}
+            </p>
+          </div>
+          <div className="rounded-lg p-3 border-2 flex flex-col gap-1.5" style={{ background: '#fffbeb', borderColor: '#f59e0b' }}>
+            <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: '#92400e' }}>
+              <ShieldCheck className="h-3.5 w-3.5" /> Yönetici Yetkisi Ver
+            </div>
+            <p className="text-[12px]" style={{ color: 'var(--k-text-secondary)' }}>
+              Bu personel <strong>personel olarak kalır</strong> (atanan eğitimleri almaya devam eder) ama artık
+              yönetim paneline (<code>/admin</code>) de erişebilir. Yetkiyi daha sonra personel sayfasından kaldırabilirsiniz.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
