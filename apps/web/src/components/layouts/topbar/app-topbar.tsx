@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, Search, X, User, Bell, LogOut, Check } from 'lucide-react';
+import { Menu, Search, X, User, Bell, LogOut, Check, ShieldCheck } from 'lucide-react';
 import { performLogout } from '@/lib/auth/logout';
 import { useAuthStore } from '@/store/auth-store';
 import { NotificationBell } from '@/components/shared/notification-bell';
@@ -325,6 +325,13 @@ export function AppTopbar({
                 onClick={() => router.push(notificationsPath)}
                 badge={unreadNotifications > 0 ? unreadNotifications : undefined}
               />
+              {user?.adminAccessGranted && (
+                <KlinovaMenuItem
+                  icon={ShieldCheck}
+                  label="Yönetim Paneli"
+                  onClick={() => router.push('/admin/dashboard')}
+                />
+              )}
             </div>
 
             <DropdownMenuSeparator style={{ backgroundColor: K.BORDER_LIGHT }} />

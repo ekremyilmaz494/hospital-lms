@@ -15,6 +15,7 @@ import { useMobile } from '@/hooks/use-mobile';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { performLogout } from '@/lib/auth/logout';
+import { hasAdminAuthority } from '@/lib/auth/admin-authority';
 import { UploadManagerProvider } from '@/components/admin/upload-manager';
 import { UploadManagerWidget } from '@/components/admin/upload-manager-widget';
 
@@ -62,7 +63,7 @@ export default function AdminLayout({
   };
 
   useEffect(() => {
-    if (!isLoading && (!user || !['admin', 'super_admin'].includes(user.role))) {
+    if (!isLoading && (!user || !hasAdminAuthority({ role: user.role, adminAccess: user.adminAccessGranted }))) {
       router.replace('/auth/login');
     }
   }, [user, isLoading, router]);
@@ -70,7 +71,7 @@ export default function AdminLayout({
   if (isLoading) {
     return <LayoutSkeleton variant="admin" />;
   }
-  if (!user || !['admin', 'super_admin'].includes(user.role)) {
+  if (!user || !hasAdminAuthority({ role: user.role, adminAccess: user.adminAccessGranted })) {
     return null;
   }
 

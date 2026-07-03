@@ -22,6 +22,7 @@ export async function GET() {
       firstName: true,
       lastName: true,
       role: true,
+      adminAccessGranted: true,
       organizationId: true,
       departmentId: true,
       title: true,

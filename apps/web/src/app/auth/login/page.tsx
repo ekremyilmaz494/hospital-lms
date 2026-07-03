@@ -15,6 +15,7 @@ import { BRAND } from '@/lib/brand';
 import { useAuthStore } from '@/store/auth-store';
 import { getRolePath } from '@/lib/route-helpers';
 import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
+import { extractAdminAccess } from '@/lib/auth/admin-authority';
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/super-admin/dashboard',
@@ -241,6 +242,7 @@ function LoginForm() {
           firstName: u.user_metadata?.first_name ?? '',
           lastName: u.user_metadata?.last_name ?? '',
           role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
+          adminAccessGranted: extractAdminAccess(u.app_metadata),
           organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
           phone: u.user_metadata?.phone ?? null,
           departmentId: u.user_metadata?.department_id ?? null,

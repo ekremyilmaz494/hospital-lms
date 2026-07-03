@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Menu, User, LogOut } from 'lucide-react';
+import { Menu, User, LogOut, GraduationCap } from 'lucide-react';
 import { performLogout } from '@/lib/auth/logout';
 import { useAuthStore } from '@/store/auth-store';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -100,6 +100,15 @@ export function AdminTopbar({
                 <User className="h-4 w-4" />
                 <span>Profilim</span>
               </DropdownMenuItem>
+              {user?.adminAccessGranted && (
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => router.push('/staff/dashboard')}
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Eğitimlerim</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem

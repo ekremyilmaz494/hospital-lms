@@ -56,6 +56,7 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
     select: {
       id: true, firstName: true, lastName: true, email: true,
       phone: true, departmentId: true, title: true, isActive: true,
+      role: true, adminAccessGranted: true,
       assignments: {
         orderBy: { assignedAt: 'desc' },
         select: {
@@ -97,6 +98,8 @@ export const GET = withAdminRoute<{ id: string }>(async ({ request, params, orga
     firstName: staff.firstName,
     lastName: staff.lastName,
     email: staff.email,
+    role: staff.role,
+    adminAccessGranted: staff.adminAccessGranted,
     department: departmentName,
     departmentId: staff.departmentId,
     title: staff.title ?? '',

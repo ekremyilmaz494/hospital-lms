@@ -19,8 +19,13 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
       where: { id: orgId },
       select: { ownerUserId: true, maxAdmins: true },
     }),
+    // Yönetici yetkisi olanlar = gerçek admin'ler + ek yönetici yetkisi verilmiş personel
+    // (dual-capability). Koltuk limiti (maxAdmins) İKİSİNİ de kapsar → gelir koruması.
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'admin' },
+      where: {
+        organizationId: orgId,
+        OR: [{ role: 'admin' }, { role: 'staff', adminAccessGranted: true }],
+      },
       select: {
         id: true,
         email: true,
@@ -28,6 +33,8 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
         lastName: true,
         title: true,
         phone: true,
+        role: true,
+        adminAccessGranted: true,
         isActive: true,
         createdAt: true,
       },
@@ -48,6 +55,8 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
         ...a,
         email: a.email?.endsWith('@klinovax.internal') ? null : a.email,
         isOwner: a.id === ownerUserId,
+        // Personel olup ek yönetici yetkisi almış kişi (rol hâlâ 'staff'); UI ayırt etsin.
+        isGrantedStaff: a.role === 'staff',
       })),
     },
     200,
