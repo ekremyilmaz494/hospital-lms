@@ -248,4 +248,28 @@ describe('stripSensitiveBackupFields (indirme parola/PII koruması)', () => {
     expect(out).not.toContain('bcrypt-leak')
     expect(JSON.parse(out).error).toBe('backup_unreadable')
   })
+
+  it('v5: staffIntegrations[].pullCredentialsEncrypted soyulur, diğer alanlar korunur', () => {
+    const json = JSON.stringify({
+      users: [{ id: 'u1' }],
+      staffIntegrations: [
+        { id: 'si1', channel: 'pull', pullBaseUrl: 'https://hbys.example', pullCredentialsEncrypted: 'iv:tag:cipher' },
+        { id: 'si2', channel: 'api', pullCredentialsEncrypted: null },
+      ],
+      schemaVersion: 5,
+    })
+    const out = JSON.parse(stripSensitiveBackupFields(json))
+    expect(out.staffIntegrations).toHaveLength(2)
+    expect(out.staffIntegrations[0].pullCredentialsEncrypted).toBeUndefined()
+    expect(out.staffIntegrations[1].pullCredentialsEncrypted).toBeUndefined()
+    // Konfigürasyonun geri kalanı dursun — indirilen dosya yine işe yarar olmalı
+    expect(out.staffIntegrations[0].pullBaseUrl).toBe('https://hbys.example')
+    expect(out.staffIntegrations[0].channel).toBe('pull')
+    expect(out.users).toEqual([{ id: 'u1' }])
+  })
+
+  it('v5: staffIntegrations yoksa (v4 ve öncesi yedek) veri aynen döner', () => {
+    const json = JSON.stringify({ users: [{ id: 'u1' }], schemaVersion: 4 })
+    expect(JSON.parse(stripSensitiveBackupFields(json))).toEqual({ users: [{ id: 'u1' }], schemaVersion: 4 })
+  })
 })

@@ -23,6 +23,7 @@ import {
   UserCog,
   Database,
   FlaskConical,
+  Cable,
   type LucideIcon,
 } from 'lucide-react';
 import type { Sector } from '@/generated/prisma/enums';
@@ -196,6 +197,7 @@ export const adminNav: NavGroup[] = [
     items: [
       // Yalnızca Esas Yönetici görür — sıradan admin'lerde gizli
       { title: 'Yönetici Yönetimi', href: '/admin/yoneticiler', icon: UserCog, ownerOnly: true },
+      { title: 'Entegrasyon', href: '/admin/settings/integration', icon: Cable },
       {
         title: 'Ayarlar',
         href: '/admin/settings',

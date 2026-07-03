@@ -489,4 +489,95 @@ describe('POST /api/super-admin/restore', () => {
       expect(data.counts.kvkkRequests).toBe(0)
     })
   })
+
+  // ─── v5: İK entegrasyon konfigürasyonu (StaffIntegration + IntegrationApiKey) ───
+  describe('v5 İK entegrasyon modelleri', () => {
+    // tx mock'u: hangi model accessor'ında hangi metodun çağrıldığını "model.metod" olarak kaydeder
+    function methodTrackingTransaction(calls: Set<string>) {
+      return async (fn: (tx: unknown) => Promise<void>) => {
+        const tx = new Proxy({}, {
+          get: (_t, prop) => {
+            if (prop === '$executeRaw') return vi.fn().mockResolvedValue(1)
+            return new Proxy({}, {
+              get: (__t, method) => {
+                return (arg: { data?: unknown[] }) => {
+                  calls.add(`${String(prop)}.${String(method)}`)
+                  return Promise.resolve({ count: arg?.data?.length ?? 0 })
+                }
+              },
+            })
+          },
+        })
+        await fn(tx)
+      }
+    }
+
+    it('v5 backup: staffIntegration + integrationApiKey delete+insert edilir, schemaVersion=5 kabul', async () => {
+      const calls = new Set<string>()
+      prismaMock.$transaction.mockImplementation(methodTrackingTransaction(calls))
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 5,
+        staffIntegrations: [{ id: 'si1', organizationId: 'org-1', channel: 'pull', pullCredentialsEncrypted: 'iv:tag:cipher' }],
+        integrationApiKeys: [{ id: 'ak1', organizationId: 'org-1', keyHash: 'a'.repeat(64) }],
+      }))
+
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect(calls.has('staffIntegration.deleteMany')).toBe(true)
+      expect(calls.has('staffIntegration.createMany')).toBe(true)
+      expect(calls.has('integrationApiKey.deleteMany')).toBe(true)
+      expect(calls.has('integrationApiKey.createMany')).toBe(true)
+    })
+
+    it('v4 backup (v5 alanları undefined): yine geçerli kabul edilir + entegrasyon tablolarına DOKUNULMAZ', async () => {
+      const calls = new Set<string>()
+      prismaMock.$transaction.mockImplementation(methodTrackingTransaction(calls))
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 4,
+        mediaAssets: [{ id: 'm1', fileSizeBytes: '1024' }],
+      }))
+
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect(calls.has('staffIntegration.deleteMany')).toBe(false)
+      expect(calls.has('staffIntegration.createMany')).toBe(false)
+      expect(calls.has('integrationApiKey.deleteMany')).toBe(false)
+      expect(calls.has('integrationApiKey.createMany')).toBe(false)
+    })
+
+    it('400: v5 alanı array değilse şema geçersiz', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 5,
+        staffIntegrations: 'bozuk-veri',
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toMatch(/yapısı geçersiz/i)
+    })
+
+    it('preview counts v5 modellerini sayar (yedekte yoksa 0)', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 5,
+        staffIntegrations: [{ id: 'si1' }, { id: 'si2' }],
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.counts.staffIntegrations).toBe(2)
+      expect(data.counts.integrationApiKeys).toBe(0)
+    })
+
+    it('400: schemaVersion 6 (v5 kodundan yeni) reddedilir', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({ ...validBackupData, schemaVersion: 6 }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toMatch(/daha yeni|güncelleyin/i)
+    })
+  })
 })

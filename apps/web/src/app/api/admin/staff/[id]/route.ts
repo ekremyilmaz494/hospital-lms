@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger'
 import { z } from 'zod/v4'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
 import { anonymizeUserData } from '@/lib/kvkk/anonymize-user'
+import { deactivateStaff } from '@/lib/staff-deactivate'
 
 export const GET = withAdminRoute<{ id: string }>(async ({ request, params, organizationId }) => {
   const orgId = organizationId
@@ -288,23 +289,10 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, d
   const { searchParams } = new URL(request.url)
   const purge = searchParams.get('purge') === 'true'
 
-  // Soft delete: deactivate + aktif sınavları iptal et (multi-tenant güvenli)
-  // deactivatedAt yalnız aktif→pasif geçişinde damgalanır (zaten pasifse saklama saati sıfırlanmasın).
-  await prisma.$transaction([
-    prisma.user.updateMany({
-      where: { id, organizationId: orgId },
-      data: { isActive: false, ...(existing.isActive ? { deactivatedAt: new Date() } : {}) },
-    }),
-    prisma.examAttempt.updateMany({
-      where: {
-        userId: id,
-        // Multi-tenant guard: examAttempt user'ı aynı organizasyonda olmalı (CLAUDE.md)
-        user: { organizationId: orgId },
-        status: { in: ['pre_exam', 'watching_videos', 'post_exam'] },
-      },
-      data: { status: 'expired', isPassed: false, postExamCompletedAt: new Date() },
-    }),
-  ])
+  // Soft delete primitifi ortak helper'a çıkarıldı (İK/HBYS senkron da kullanır):
+  // isActive=false + deactivatedAt (yalnız aktif→pasif geçişinde) + aktif sınavları
+  // expire etme — tek transaction, multi-tenant güvenli. Davranış birebir aynı.
+  await deactivateStaff(id, { organizationId: orgId, wasActive: existing.isActive })
 
   // KVKK purge (unutulma hakkı): önce DB'deki tüm PII'yı anonimleştir, SONRA Auth kaydını sil.
   // Bu sıra kısmi-hata güvenli:

@@ -117,6 +117,7 @@ export interface SubscriptionPlan {
   priceAnnual: number | null;
   features: string[];
   isActive: boolean;
+  hasStaffIntegration: boolean;
   createdAt: string;
   updatedAt: string;
 }

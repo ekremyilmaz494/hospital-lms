@@ -10,6 +10,7 @@ export type FeatureName =
   | 'accreditationModule'
   | 'bulkImport'
   | 'customCertificates'
+  | 'staffIntegration'
 
 /** Numeric limit names matching SubscriptionPlan columns */
 export type LimitName = 'maxStaff' | 'maxTrainings' | 'maxStorageGb'
@@ -29,6 +30,7 @@ const FEATURE_TO_COLUMN: Record<FeatureName, string> = {
   accreditationModule: 'hasAccreditationModule',
   bulkImport: 'hasBulkImport',
   customCertificates: 'hasCustomCertificates',
+  staffIntegration: 'hasStaffIntegration',
 }
 
 const PLAN_CACHE_PREFIX = 'feature-gate:plan:'

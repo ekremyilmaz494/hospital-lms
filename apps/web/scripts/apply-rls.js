@@ -24,7 +24,8 @@ async function run() {
     'competency_evaluations','competency_answers',
     'training_categories','question_bank','question_bank_options',
     'smg_periods','smg_activities',
-    'his_integrations','sync_logs',
+    // İK/HBYS personel senkron entegrasyonu (eski his_integrations/sync_logs 2026-06'da düşürüldü)
+    'staff_integrations','integration_api_keys','sync_runs','sync_row_results',
     'kvkk_requests','push_subscriptions',
     'department_training_rules','scorm_attempts',
     // Training Feedback (EY.FR.40)
@@ -212,13 +213,16 @@ async function run() {
     [`CREATE POLICY "admin_smg_activities_all" ON smg_activities FOR ALL USING (public.get_user_role() = 'admin' AND period_id IN (SELECT id FROM smg_periods WHERE organization_id = public.get_user_org_id()))`],
     [`CREATE POLICY "staff_smg_activities_own" ON smg_activities FOR ALL USING (user_id = auth.uid())`],
 
-    // --- HIS INTEGRATIONS ---
-    [`CREATE POLICY "super_admin_his_all" ON his_integrations FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_his_all" ON his_integrations FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
-
-    // --- SYNC LOGS ---
-    [`CREATE POLICY "super_admin_sync_logs_all" ON sync_logs FOR ALL USING (public.get_user_role() = 'super_admin')`],
-    [`CREATE POLICY "admin_sync_logs_select" ON sync_logs FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    // --- İK/HBYS PERSONEL SENKRON ENTEGRASYONU ---
+    // Yazımlar server-side Prisma/service_role ile (RLS bypass); bunlar defense-in-depth.
+    [`CREATE POLICY "super_admin_staff_integrations_all" ON staff_integrations FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_staff_integrations_all" ON staff_integrations FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "super_admin_integration_api_keys_all" ON integration_api_keys FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_integration_api_keys_all" ON integration_api_keys FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "super_admin_sync_runs_all" ON sync_runs FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_sync_runs_select" ON sync_runs FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "super_admin_sync_row_results_all" ON sync_row_results FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_sync_row_results_select" ON sync_row_results FOR SELECT USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
 
     // --- KVKK REQUESTS ---
     [`CREATE POLICY "super_admin_kvkk_all" ON kvkk_requests FOR ALL USING (public.get_user_role() = 'super_admin')`],

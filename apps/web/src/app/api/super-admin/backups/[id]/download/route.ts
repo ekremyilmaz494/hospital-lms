@@ -61,5 +61,8 @@ export const GET = withSuperAdminRoute<{ id: string }>(async ({ request, params 
     includeAuthUsers: false,
   })
 
-  return new Response(stringifyBackup(backupData), { headers })
+  // DB-fallback yolu da S3 yoluyla AYNI sanitizasyondan geçmeli: snapshot v5'ten itibaren
+  // staffIntegrations.pullCredentialsEncrypted taşır — indirilen dosyaya sızmasın
+  // (authUsers zaten includeAuthUsers=false ile hiç çekilmiyor; defense-in-depth).
+  return new Response(stripSensitiveBackupFields(stringifyBackup(backupData)), { headers })
 })
