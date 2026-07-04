@@ -3,6 +3,8 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { sendEmail } from '@/lib/email'
 import { BRAND } from '@/lib/brand'
+import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 /** Simple email validation */
 function isValidEmail(email: string): boolean {
@@ -96,8 +98,43 @@ export async function POST(request: NextRequest) {
       message: message ? escapeHtml(message.trim().slice(0, 1000)) : '',
     }
 
+    // ── Kalıcı kayıt (e-postadan BAĞIMSIZ) — mesaj asla kaybolmaz ──
+    // İletişim formu, message'ı "[ILETISIM FORMU] ..." önekiyle gönderir; demo
+    // formu düz gönderir. Kaynağı buradan ayırıp super-admin panelde gösteriyoruz.
+    const isContactForm =
+      typeof message === 'string' && message.trim().startsWith('[ILETISIM FORMU]')
+    const cleanMessage = isContactForm
+      ? message!.trim().replace(/^\[ILETISIM FORMU\]\s*/, '')
+      : (message?.trim() ?? '')
+    const composedName =
+      lastName && lastName.trim() && lastName.trim() !== '-'
+        ? `${firstName.trim()} ${lastName.trim()}`
+        : firstName.trim()
+    const cleanPhone = phone && phone.trim() !== '-' ? phone.trim().slice(0, 30) : null
+    const cleanStaff = staffCount && staffCount.trim() !== '-' ? staffCount.trim().slice(0, 20) : null
+
+    try {
+      await prisma.contactMessage.create({
+        data: {
+          source: isContactForm ? 'contact' : 'demo',
+          name: composedName.slice(0, 200),
+          email: sanitized.email, // trim + lowercase edilmiş
+          phone: cleanPhone,
+          organization: isContactForm ? null : organizationName.trim().slice(0, 200),
+          staffCount: cleanStaff,
+          subject: isContactForm ? organizationName.trim().slice(0, 300) : null,
+          message: cleanMessage.slice(0, 1000) || null,
+          ipAddress: ip.slice(0, 45),
+        },
+      })
+    } catch (err) {
+      // Kayıt başarısız olsa bile kullanıcıya hata döndürme — e-posta backstop var.
+      logger.error('demo-request', 'İletişim mesajı DB kaydı başarısız', { err })
+    }
+
     // ── Send notification email to admin ──
-    const adminEmail = process.env.ADMIN_ALERT_EMAIL
+    // ADMIN_ALERT_EMAIL boşsa destek adresine düş — sessiz kayıp olmasın.
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL || BRAND.supportEmail
     if (adminEmail) {
       try {
         await sendEmail({
@@ -145,7 +182,7 @@ export async function POST(request: NextRequest) {
         })
       } catch {
         // Email failure should not block the response
-        console.error('Demo request email failed to send')
+        logger.error('demo-request', 'Demo request email failed to send')
       }
     }
 

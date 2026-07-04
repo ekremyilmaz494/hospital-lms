@@ -804,6 +804,31 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// ── İLETİŞİM / DEMO TALEP MESAJLARI ──
+// Platform geneli (tenant-dışı) gelen mesajlar. Web sitesindeki iletişim formu
+// ve demo talep formu buraya yazılır. organizationId YOK — henüz müşteri olmayan
+// kişilerden gelir. Sadece super_admin görür (RLS: super_admin_contact_messages_all).
+model ContactMessage {
+  id           String    @id @default(uuid()) @db.Uuid
+  source       String    @default("contact") @db.VarChar(30) // 'contact' | 'demo'
+  name         String    @db.VarChar(200)
+  email        String    @db.VarChar(200)
+  phone        String?   @db.VarChar(30)
+  organization String?   @db.VarChar(200)
+  staffCount   String?   @map("staff_count") @db.VarChar(20)
+  subject      String?   @db.VarChar(300)
+  message      String?   @db.Text
+  ipAddress    String?   @map("ip_address") @db.VarChar(45)
+  isRead       Boolean   @default(false) @map("is_read")
+  isArchived   Boolean   @default(false) @map("is_archived")
+  readAt       DateTime? @map("read_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([isRead, createdAt], map: "idx_contact_messages_unread")
+  @@index([source, createdAt], map: "idx_contact_messages_source")
+  @@map("contact_messages")
+}
+
 // ── VERİTABANI YEDEKLERİ ──
 model DbBackup {
   id             String   @id @default(uuid()) @db.Uuid
