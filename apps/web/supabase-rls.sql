@@ -27,6 +27,7 @@ ALTER TABLE video_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE db_backups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kvkk_requests ENABLE ROW LEVEL SECURITY;
@@ -132,6 +133,8 @@ CREATE POLICY "admin_audit_select" ON audit_logs FOR SELECT USING ((SELECT auth.
 
 -- DB BACKUPS
 CREATE POLICY "super_admin_backups_all" ON db_backups FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+-- İletişim/demo mesajları: platform geneli (tenant-dışı), yalnızca super_admin
+CREATE POLICY "super_admin_contact_messages_all" ON contact_messages FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_backups_all" ON db_backups FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- DEPARTMENTS

@@ -20,6 +20,7 @@ import {
   ClipboardList,
   Activity,
   MessageSquare,
+  Inbox,
   UserCog,
   Database,
   FlaskConical,
@@ -85,6 +86,7 @@ export const superAdminNav: NavGroup[] = [
         ],
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
+      { title: 'İletişim Mesajları', href: '/super-admin/messages', icon: Inbox },
     ],
   },
   {
