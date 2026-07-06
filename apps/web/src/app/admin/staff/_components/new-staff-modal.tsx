@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton } from '@/components/shared/premium-modal';
 import { Field } from './field';
+import { StaffLimitModal, type StaffLimitInfo } from './staff-limit-modal';
 import { isValidTcKimlik, normalizeTcKimlik } from '@/lib/tc';
 import { passwordSchema } from '@/lib/password-policy';
 import type { Department } from '../_types';
@@ -30,6 +31,7 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<'pwd' | 'tc' | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<StaffLimitInfo | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -128,10 +130,19 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
       });
       const body = await res.json().catch(() => ({})) as {
         error?: string;
+        code?: string;
+        limit?: number;
+        used?: number;
+        requested?: number;
         emailSent?: boolean;
         tempPassword?: string;
         tcKimlik?: string;
       };
+      // Personel (seat) limiti dolu → toast yerine belirgin uyarı modalı göster
+      if (res.status === 403 && body.code === 'STAFF_LIMIT_REACHED' && typeof body.limit === 'number' && typeof body.used === 'number') {
+        setLimitInfo({ limit: body.limit, used: body.used, requested: body.requested ?? 1, message: body.error });
+        return;
+      }
       if (!res.ok) throw new Error(body.error || 'Kayıt başarısız');
 
       const deptName = departments.find(d => d.id === assignedDeptId)?.name;
@@ -224,6 +235,11 @@ export function NewStaffModal({ onClose, departments, onSaved }: { onClose: () =
     background: 'var(--k-surface)',
     borderColor: errors[field] ? 'var(--k-error)' : 'var(--k-border)',
   });
+
+  // Limit dolu uyarısı açıldıysa: kapatınca tüm ekleme modalını kapat (form artık anlamsız).
+  if (limitInfo) {
+    return <StaffLimitModal open onClose={onClose} info={limitInfo} />;
+  }
 
   return (
     <PremiumModal

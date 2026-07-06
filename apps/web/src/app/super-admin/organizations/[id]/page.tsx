@@ -41,6 +41,12 @@ interface OrganizationDetail {
   staffCount: number;
   trainingCount: number;
   completionRate: number;
+  // Personel (seat) limiti — GET route hesaplar. maxStaff: bu org'a özel override (null =
+  // yok); effectiveStaffLimit: org.maxStaff ?? plan.maxStaff ?? sınırsız (null);
+  // staffSeatUsage: aktif personel + bekleyen davet.
+  maxStaff?: number | null;
+  effectiveStaffLimit?: number | null;
+  staffSeatUsage?: number;
   admins?: AdminRow[];
   recentActivity?: { action: string; detail: string; time: string; user: string }[];
 }
@@ -219,6 +225,56 @@ export default function OrganizationDetailPage() {
               <div><span style={{ color: 'var(--color-text-muted)' }}>Kayıt Tarihi:</span><p style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{organization.createdAt}</p></div>
             </div>
           </div>
+
+          {/* Personel Koltukları (Seat Limit) */}
+          {(() => {
+            const limit = organization.effectiveStaffLimit;
+            const used = organization.staffSeatUsage ?? 0;
+            const hasLimit = typeof limit === 'number';
+            const pct = hasLimit && limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+            const atLimit = hasLimit && used >= limit;
+            const near = hasLimit && !atLimit && pct >= 90;
+            const barColor = atLimit ? 'var(--color-error)' : near ? 'var(--color-warning)' : 'var(--color-primary)';
+            return (
+              <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-bold">Personel Limiti</h3>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/super-admin/organizations/${organization.id}/edit`)}
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-opacity hover:opacity-80"
+                    style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
+                  >
+                    <Edit className="h-3 w-3" /> Değiştir
+                  </button>
+                </div>
+                <div className="flex items-end justify-between">
+                  <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>
+                    {used}
+                    <span className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}> / {hasLimit ? limit : '∞'}</span>
+                  </div>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{
+                      background: atLimit ? 'var(--color-error-bg)' : near ? 'var(--color-warning-bg)' : 'var(--color-success-bg)',
+                      color: atLimit ? 'var(--color-error)' : near ? 'var(--color-warning)' : 'var(--color-success)',
+                    }}>
+                    {!hasLimit ? 'Sınırsız' : atLimit ? 'Limit dolu' : near ? 'Limite yakın' : 'Uygun'}
+                  </span>
+                </div>
+                {hasLimit && (
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--color-border)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor }} />
+                  </div>
+                )}
+                <p className="mt-2 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                  Aktif personel + bekleyen davet sayılır.
+                  {typeof organization.maxStaff === 'number'
+                    ? ' Bu kuruma özel sözleşme limiti uygulanıyor.'
+                    : ' Org-özel limit yok — plan limiti/sınırsız geçerli.'}
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Admin Users */}
           <div className="rounded-xl border p-5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>

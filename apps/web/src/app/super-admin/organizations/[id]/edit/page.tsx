@@ -21,6 +21,8 @@ interface OrganizationData {
   status: string;
   plan: string;
   expiresAt: string;
+  maxStaff: number | null;
+  _count?: { users: number };
 }
 
 export default function EditOrganizationPage() {
@@ -47,6 +49,10 @@ export default function EditOrganizationPage() {
     setSaving(true);
     setSaveError(null);
     const formData = new FormData(e.currentTarget);
+    // Personel limiti: boş = null (limit kaldır → plan limitine düş / sınırsız);
+    // aksi halde pozitif tamsayı. Geçersiz/0 girişi de null'a düşürülür (schema pozitif ister).
+    const rawMaxStaff = String(formData.get('maxStaff') ?? '').trim();
+    const parsedMaxStaff = rawMaxStaff === '' ? null : Number(rawMaxStaff);
     const body = {
       name: formData.get('name'),
       address: formData.get('address'),
@@ -56,6 +62,9 @@ export default function EditOrganizationPage() {
       status: formData.get('status'),
       plan: formData.get('plan'),
       expiresAt: formData.get('expiresAt'),
+      maxStaff: parsedMaxStaff !== null && Number.isFinite(parsedMaxStaff) && parsedMaxStaff > 0
+        ? Math.floor(parsedMaxStaff)
+        : null,
     };
     try {
       const res = await fetch(`/api/super-admin/organizations/${id}`, {
@@ -178,6 +187,26 @@ export default function EditOrganizationPage() {
               <div>
                 <Label style={{ color: 'var(--color-text-secondary)' }}>Abonelik Bitiş Tarihi</Label>
                 <Input name="expiresAt" type="date" defaultValue={organization.expiresAt ?? ''} className="mt-1.5" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }} />
+              </div>
+              <div>
+                <Label style={{ color: 'var(--color-text-secondary)' }}>Personel Limiti (Seat)</Label>
+                <Input
+                  name="maxStaff"
+                  type="number"
+                  min={1}
+                  step={1}
+                  defaultValue={organization.maxStaff ?? ''}
+                  placeholder="Sınırsız (boş bırak)"
+                  className="mt-1.5"
+                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }}
+                />
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)', opacity: 0.75 }}>
+                  Sözleşmeli personel sayısı. Doldurulduğunda kurum bu sayıya ulaşınca yeni personel/davet
+                  engellenir (aktif personel + bekleyen davet sayılır). Boş bırakılırsa sınır kalkar (plan limitine düşer).
+                  {typeof organization._count?.users === 'number' && (
+                    <> Şu an kayıtlı kullanıcı: <strong>{organization._count.users}</strong>.</>
+                  )}
+                </p>
               </div>
             </div>
           </div>

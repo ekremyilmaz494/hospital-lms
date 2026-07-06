@@ -4,8 +4,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    organization: { findUnique: vi.fn() },
     organizationSubscription: { findUnique: vi.fn() },
     user: { count: vi.fn() },
+    invitation: { count: vi.fn() },
     training: { count: vi.fn() },
   },
 }))
@@ -30,11 +32,17 @@ const { checkSubscriptionStatus, checkSubscriptionLimit } = await import('../sub
 
 const mockSubFindUnique = prisma.organizationSubscription.findUnique as ReturnType<typeof vi.fn>
 const mockUserCount = prisma.user.count as ReturnType<typeof vi.fn>
+const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>
+const mockInviteCount = prisma.invitation.count as ReturnType<typeof vi.fn>
 
 const ORG_ID = 'org-subscription-test'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Staff seat guard varsayılanları: org override yok, bekleyen davet yok.
+  // Limit çözümü plan.maxStaff'a düşer (mevcut testlerin beklentisi korunur).
+  mockOrgFindUnique.mockResolvedValue({ maxStaff: null })
+  mockInviteCount.mockResolvedValue(0)
 })
 
 // ── Tests ──

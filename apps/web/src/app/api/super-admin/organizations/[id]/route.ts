@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { updateOrganizationSchema } from '@/lib/validations'
+import { countStaffSeats, resolveStaffLimit } from '@/lib/subscription-guard'
 
 export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
   const { id } = params
@@ -37,7 +38,15 @@ export const GET = withSuperAdminRoute<{ id: string }>(async ({ params }) => {
     email: u.email,
   }))
 
-  return jsonResponse({ ...rest, admins }, 200, {
+  // Personel (seat) kullanımı — süper-admin'in limiti anlamlı ayarlayabilmesi için
+  // "kaç koltuk dolu / etkin limit" bilgisini döndür. staffSeatUsage = aktif personel +
+  // bekleyen davet; effectiveStaffLimit = org.maxStaff ?? plan.maxStaff ?? sınırsız(null).
+  const [staffSeatUsage, effectiveStaffLimit] = await Promise.all([
+    countStaffSeats(id),
+    resolveStaffLimit(id),
+  ])
+
+  return jsonResponse({ ...rest, admins, staffSeatUsage, effectiveStaffLimit }, 200, {
     'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
   })
 })
