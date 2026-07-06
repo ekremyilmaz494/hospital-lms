@@ -85,6 +85,10 @@ export const updateOrganizationSchema = createOrganizationSchema.partial().exten
   isDemo: z.boolean().optional(),
   slug: z.string().min(3).max(50).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanılabilir').optional(),
   customDomain: z.string().min(3).max(255).optional(),
+  // Org-bazında personel (seat) limiti. Pozitif tamsayı = sözleşmeli sınır; null = sınır
+  // kaldır (plan limitine düş / sınırsız). zod v4 bilinmeyen anahtarı siler — bu alan
+  // şemada olmazsa PATCH route onu HİÇ görmez (super-admin limiti kaydedemez).
+  maxStaff: z.number().int().positive().max(1_000_000).nullable().optional(),
 })
 
 /** Slug doğrulama şeması — sadece küçük harf, rakam ve tire */

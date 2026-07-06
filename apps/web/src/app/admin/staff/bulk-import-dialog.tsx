@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { BRAND } from '@/lib/brand';
 import { useToast } from '@/components/shared/toast';
 import { PremiumModal, PremiumModalFooter, PremiumButton, type PremiumModalStep } from '@/components/shared/premium-modal';
+import { StaffLimitModal, type StaffLimitInfo } from './_components/staff-limit-modal';
 import { K } from './_lib/palette';
 
 type Stage = 'idle' | 'uploading' | 'preview' | 'importing' | 'done';
@@ -82,6 +83,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [skipErrors, setSkipErrors] = useState(true);
+  const [limitInfo, setLimitInfo] = useState<StaffLimitInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -175,7 +177,14 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows: editedRows }),
       });
-      const result: ImportResult | { error: string } = await res.json();
+      const result = await res.json() as ImportResult | { error: string; code?: string; limit?: number; used?: number; requested?: number };
+      // Personel (seat) limiti dolu → belirgin uyarı modalı (toast yerine)
+      if (res.status === 403 && 'code' in result && result.code === 'STAFF_LIMIT_REACHED'
+          && typeof result.limit === 'number' && typeof result.used === 'number') {
+        setLimitInfo({ limit: result.limit, used: result.used, requested: result.requested ?? editedRows.length, message: result.error });
+        setStage('preview');
+        return;
+      }
       if ('error' in result) throw new Error(result.error);
       setImportResult(result as ImportResult);
       setStage('done');
@@ -376,6 +385,7 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
   })();
 
   return (
+    <>
     <PremiumModal
       isOpen={open}
       onClose={handleClose}
@@ -1044,6 +1054,8 @@ export function BulkImportDialog({ open, onClose, onImported }: { open: boolean;
         .bid-err-btn:hover { background: #b91c1c; }
       `}</style>
     </PremiumModal>
+    <StaffLimitModal open={!!limitInfo} onClose={() => setLimitInfo(null)} info={limitInfo} />
+    </>
   );
 }
 

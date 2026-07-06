@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, getOrgUrl } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
+import { checkStaffLimit } from '@/lib/subscription-guard'
 import { logger } from '@/lib/logger'
 import { maskEmail } from '@/lib/pii-mask'
 import { sendStaffWelcomeEmail } from '@/lib/email'
@@ -137,6 +138,14 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       parsedRows: rows,        // ← inline edit için tam satır verisi
       unknownHeaders: unknownHeaders && unknownHeaders.length > 0 ? unknownHeaders : undefined,
     })
+  }
+
+  // Personel (seat) limiti — toplu import sözleşmeli sınırı aşamaz. Yalnız GEÇERLİ
+  // satır sayısı koltuğa sayılır; kalan koltuktan fazlaysa tüm batch reddedilir
+  // (hiçbir kayıt oluşturulmaz), müşteri limit artışı için iletişime yönlendirilir.
+  if (validRows.length > 0) {
+    const seatLimitError = await checkStaffLimit(orgId, validRows.length)
+    if (seatLimitError) return seatLimitError
   }
 
   // ── Gerçek import — TÜM SATIRLAR DIRECT MODE ─────────────────────────────

@@ -147,6 +147,13 @@ model Organization {
   ownerUserId String? @unique @map("owner_user_id") @db.Uuid
   maxAdmins   Int     @default(5) @map("max_admins")
 
+  // Org-bazında personel (seat) limiti — sözleşmeli kişi sayısı. null = plan limitine
+  // düş (SubscriptionPlan.maxStaff), o da yoksa sınırsız. Super-admin bunu istediği zaman
+  // değiştirebilir (Devakent: 150 kişilik sözleşme). Yeni personel/davet, kullanım
+  // (aktif personel + bekleyen davet) bu limite ulaşınca 403 ile reddedilir → müşteri
+  // limiti aşınca yeni ücret talep edilir. Enforcement: src/lib/subscription-guard.ts
+  maxStaff Int? @map("max_staff")
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

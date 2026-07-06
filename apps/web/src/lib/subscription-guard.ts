@@ -119,16 +119,9 @@ export async function checkSubscriptionLimit(
 
   const plan = subscription.plan
 
-  if (type === 'staff' && plan.maxStaff) {
-    const currentStaff = await prisma.user.count({
-      where: { organizationId, role: 'staff' },
-    })
-    if (currentStaff >= plan.maxStaff) {
-      return errorResponse(
-        `Personel limitine ulaştınız (${currentStaff}/${plan.maxStaff}). Planınızı yükseltin.`,
-        403
-      )
-    }
+  if (type === 'staff') {
+    // Tek kaynak: org override (super-admin) → plan → sınırsız + bekleyen davet sayımı.
+    return checkStaffLimit(organizationId, 1)
   }
 
   if (type === 'training' && plan.maxTrainings) {
@@ -144,4 +137,86 @@ export async function checkSubscriptionLimit(
   }
 
   return null
+}
+
+// ── PERSONEL (SEAT) LİMİTİ ──────────────────────────────────────────────────
+// Org-bazında sözleşmeli personel sınırı. Super-admin `Organization.maxStaff` ile
+// istediği zaman değiştirir (ör. Devakent = 150). Limit aşılınca yeni personel/davet
+// 403 ile reddedilir → müşteriden yeni ücret talep edilir.
+
+/**
+ * Bir organizasyona atanabilecek personel (seat) sayısının ETKİN limiti.
+ * Öncelik sırası:
+ *   1. `Organization.maxStaff` — super-admin override (bu org'a özel sözleşme)
+ *   2. `SubscriptionPlan.maxStaff` — plan limiti
+ *   3. `null` — sınırsız (ikisi de tanımsızsa)
+ *
+ * @returns Etkin limit veya sınırsızsa `null`.
+ */
+export async function resolveStaffLimit(organizationId: string): Promise<number | null> {
+  const [org, subscription] = await Promise.all([
+    prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { maxStaff: true },
+    }),
+    prisma.organizationSubscription.findUnique({
+      where: { organizationId },
+      select: { plan: { select: { maxStaff: true } } },
+    }),
+  ])
+
+  if (org?.maxStaff != null) return org.maxStaff
+  return subscription?.plan?.maxStaff ?? null
+}
+
+/**
+ * Bir org'un ŞU AN dolu tuttuğu personel koltuğu sayısı:
+ *   aktif personel kullanıcıları + bekleyen personel davetleri
+ * (kabul edilmemiş + iptal edilmemiş + süresi geçmemiş).
+ *
+ * Davetleri de saymak kritik: aksi halde limit dolusuna kadar davet gönderilip,
+ * hepsi kabul edildiğinde sözleşme sınırı sessizce aşılır. Pasif (deaktif) personel
+ * koltuk tüketmez — deaktivasyon koltuğu boşaltır.
+ */
+export async function countStaffSeats(organizationId: string): Promise<number> {
+  const now = new Date()
+  const [staff, pendingInvites] = await Promise.all([
+    prisma.user.count({ where: { organizationId, role: 'staff', isActive: true } }),
+    prisma.invitation.count({
+      where: { organizationId, role: 'staff', acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
+    }),
+  ])
+  return staff + pendingInvites
+}
+
+/**
+ * Personel oluşturma/davet AKIŞLARININ ÖNÜNDE çağrılan seat-limit guard'ı.
+ *
+ * @param organizationId Hedef organizasyon.
+ * @param adding Eklenmek istenen kişi sayısı (tekli create/davet = 1, toplu içe
+ *   aktarımda geçerli satır sayısı).
+ * @returns Limit aşılacaksa 403 `Response` (Türkçe, kalan koltuk bilgisiyle); yoksa `null`.
+ */
+export async function checkStaffLimit(
+  organizationId: string,
+  adding = 1
+): Promise<Response | null> {
+  const limit = await resolveStaffLimit(organizationId)
+  if (limit == null) return null // sınırsız
+
+  const used = await countStaffSeats(organizationId)
+  if (used + adding <= limit) return null
+
+  const remaining = Math.max(0, limit - used)
+  const message =
+    adding <= 1
+      ? `Personel limitine ulaşıldı (${used}/${limit}). Yeni personel eklemek için lütfen Klinovax ile iletişime geçin.`
+      : `Personel limiti aşılıyor: ${used}/${limit} koltuk dolu (${remaining} boş), ancak ${adding} kişi eklenmek isteniyor. Lütfen Klinovax ile iletişime geçin.`
+
+  // Yapısal 403 — frontend `code` ile güvenilir şekilde limit-uyarı modalı gösterir
+  // (metin eşleştirmesi kırılgan). limit/used/remaining alanları modalda sayı göstermek için.
+  return new Response(
+    JSON.stringify({ error: message, code: 'STAFF_LIMIT_REACHED', limit, used, remaining, requested: adding }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } },
+  )
 }

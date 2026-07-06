@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAppUrl } from '@/lib/api-helpers'
 import { createAuthUser, AuthUserError } from '@/lib/auth-user-factory'
+import { checkStaffLimit } from '@/lib/subscription-guard'
 import { logger } from '@/lib/logger'
 import { maskEmail } from '@/lib/pii-mask'
 import { safeDecrypt } from '@/lib/crypto'
@@ -229,6 +230,19 @@ async function provisionAndLogin({
       // değer güvenli varsayılan 'staff'a düşer. (`as 'admin'|'staff'` cast'i runtime'da
       // hiçbir koruma sağlamıyordu; defense-in-depth: config PUT allow-list'i ilk kapı.)
       const provisionRole: 'admin' | 'staff' = org.ssoDefaultRole === 'admin' ? 'admin' : 'staff'
+
+      // Personel (seat) limiti — SSO auto-provision de sözleşmeli sınırı AŞAMAZ. Aksi halde
+      // "yeni personel eklemeyi engelle" kuralı SSO kanalından sessizce delinir. Yalnız staff
+      // rolü koltuk tüketir (admin ayrı). Limit doluysa provision reddedilir; kullanıcı
+      // manuel eklenene / limit artırılana kadar giremez.
+      if (provisionRole === 'staff') {
+        const seatLimitError = await checkStaffLimit(org.id, 1)
+        if (seatLimitError) {
+          logger.warn('sso:callback', 'SSO provision personel limitine takildi', { email: maskEmail(email), orgId: org.id })
+          return NextResponse.redirect(new URL('/auth/login?error=sso_seat_limit', request.url))
+        }
+      }
+
       const result = await createAuthUser({
         email,
         firstName,
