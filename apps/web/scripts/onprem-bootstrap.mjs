@@ -52,6 +52,14 @@ async function main() {
 
     // 1) GoTrue auth kullanıcısı — app_metadata.role=super_admin (kanonik rol),
     //    KVKK önceden onaylı (yoksa middleware her girişte login'e atar).
+    // KRİTİK: acknowledged_at + notice_version BİRLİKTE yazılmalı. Yalnız
+    // acknowledged_at yazılırsa middleware (isKvkkNoticeCurrent) sürüm alanını v1
+    // sayar; güncel sürüm >1 ise ilk süper-admin login modalına düşer. #233
+    // (tek-kaynak isKvkkNoticeCurrent) döngüyü keser ama sürümü de basmak
+    // ilk-giriş modalını tamamen atlatır. Değer app kaynağındaki
+    // KVKK_NOTICE_VERSION (src/lib/kvkk/notice-version.ts) ile SENKRON tutulmalı;
+    // drift olursa etki yalnız ilk girişte tek modal (döngü DEĞİL, self-healing).
+    const KVKK_NOTICE_VERSION = 2
     const supabase = createClient(supabaseUrl, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -63,6 +71,7 @@ async function main() {
         first_name: 'Sistem',
         last_name: 'Yöneticisi',
         kvkk_notice_acknowledged_at: new Date().toISOString(),
+        kvkk_notice_version: KVKK_NOTICE_VERSION,
       },
       app_metadata: { role: 'super_admin' },
     })
