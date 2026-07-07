@@ -38,6 +38,9 @@ interface QuestionsStepProps {
    *  Sayfa yenilendiğinde admin tekrar dosya yüklemek zorunda kalmaz. */
   aiUploadedSources: AiUploadedSource[];
   setAiUploadedSources: (sources: AiUploadedSource[]) => void;
+  /** Draft (Training) ID'si — AI tab'ında video transkriptlerinin kaynak
+   *  olarak seçilebilmesi için AiQuestionGenerator'a geçirilir. */
+  draftId?: string;
 }
 
 export default function QuestionsStep({
@@ -48,6 +51,7 @@ export default function QuestionsStep({
   activeMode, setActiveMode,
   aiPending, setAiPending,
   aiUploadedSources, setAiUploadedSources,
+  draftId,
 }: QuestionsStepProps) {
   const { toast } = useToast();
   // AI'dan az önce eklenen soruların id'leri — 3 sn boyunca kart üzerinde "yeni eklendi"
@@ -336,6 +340,7 @@ export default function QuestionsStep({
             onStateChange={setAiPending}
             initialSources={aiUploadedSources}
             onSourcesChange={setAiUploadedSources}
+            trainingId={draftId}
           />
         </TabsContent>
       </Tabs>

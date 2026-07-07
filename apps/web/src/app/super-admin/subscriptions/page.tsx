@@ -18,6 +18,7 @@ interface Plan {
   price: { monthly: number; annual: number };
   limits: { staff: number | null; trainings: number | null; storage: number };
   features: string[];
+  hasStaffIntegration: boolean;
   color: string;
   organizations: number;
   popular?: boolean;
@@ -76,6 +77,7 @@ export default function SubscriptionsPage() {
       priceMonthly: plan.price?.monthly ?? 0,
       priceAnnual: plan.price?.annual ?? 0,
       features: plan.features ?? [],
+      hasStaffIntegration: plan.hasStaffIntegration ?? false,
     });
     setModalOpen(true);
   };

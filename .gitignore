@@ -68,6 +68,9 @@ apps/web/src/generated/prisma/
 
 # Uploaded files (dev only)
 apps/web/public/uploads/
+# Exception: süper-admin "Dolu Demo" videoları prod'da /uploads'tan servis edilir → izlenmeli
+!apps/web/public/uploads/egitim-el-hijyeni.webm
+!apps/web/public/uploads/egitim-yangin-guvenligi.webm
 
 # Screenshots (dev only)
 /screenshots/

@@ -42,14 +42,30 @@ export function stringifyBackup(data: unknown): string {
  * sıradan hastane admini tüm personelin parola hash'lerini indirebiliyordu (KVKK/güvenlik).
  * Bu fonksiyon decrypt edilmiş JSON'dan `authUsers`'ı ayıklar.
  *
+ * v5: `staffIntegrations[].pullCredentialsEncrypted` (İK/HBYS pull kimlik bilgileri) de
+ * soyulur — AES-256-GCM şifreli olsa da dışa inen dosyada durmasına gerek yok
+ * (defense-in-depth); restore S3'teki ham yedeği sunucu tarafında okur, indirilen
+ * dosyayı kullanmaz.
+ *
  * @param backupJson decrypt edilmiş yedek JSON string'i
- * @returns authUsers çıkarılmış JSON string (parse edilemezse ham veriyi DÖNDÜRMEZ)
+ * @returns hassas alanları çıkarılmış JSON string (parse edilemezse ham veriyi DÖNDÜRMEZ)
  */
 export function stripSensitiveBackupFields(backupJson: string): string {
   try {
     const data = JSON.parse(backupJson)
     if (data && typeof data === 'object') {
-      delete (data as Record<string, unknown>).authUsers
+      const d = data as Record<string, unknown>
+      delete d.authUsers
+      if (Array.isArray(d.staffIntegrations)) {
+        d.staffIntegrations = d.staffIntegrations.map((si: unknown) => {
+          if (si && typeof si === 'object') {
+            const rest = { ...(si as Record<string, unknown>) }
+            delete rest.pullCredentialsEncrypted
+            return rest
+          }
+          return si
+        })
+      }
     }
     return JSON.stringify(data)
   } catch {

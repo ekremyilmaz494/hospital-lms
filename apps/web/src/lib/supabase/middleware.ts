@@ -4,7 +4,8 @@ import { extractSubdomain } from '@/lib/organization-utils';
 import { getCookieDomain } from './cookie-domain';
 import { verifyAccessToken } from './verify-jwt';
 import { getServerSupabaseUrl, getSupabaseCookieOptions } from './onprem-config';
-import { KVKK_NOTICE_VERSION } from '@/lib/kvkk/notice-version';
+import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
+import { hasAdminAuthority } from '@/lib/auth/admin-authority';
 
 const PUBLIC_ROUTES = [
   '/',
@@ -187,12 +188,10 @@ export async function updateSession(request: NextRequest) {
         session && verified && verified.sub === session.user.id ? session.user : undefined;
       if (sessionUser) {
         const role = sanitizeRole(verified?.role);
-        const kvkkAck = sessionUser.user_metadata?.kvkk_notice_acknowledged_at ?? null;
-        // Aydınlatma metni sürümü güncel değilse yeniden onay iste. Sürüm alanı YOKSA
-        // (versiyonlama öncesi onaylayanlar) v1 kabul et → rollout'ta herkes yeniden sorulmaz.
-        const rawKvkkVersion = sessionUser.user_metadata?.kvkk_notice_version;
-        const kvkkVersion = rawKvkkVersion == null ? 1 : Number(rawKvkkVersion);
-        const kvkkOk = Boolean(kvkkAck) && kvkkVersion >= KVKK_NOTICE_VERSION;
+        // Aydınlatma metni sürümü güncel değilse yeniden onay iste. TEK kaynak
+        // isKvkkNoticeCurrent — login sayfasının modal-tetiğiyle AYNI kriter (sürüm-duyarlı);
+        // aksi halde v1 onaylı kullanıcı login ⇄ dashboard sonsuz döngüsüne girer.
+        const kvkkOk = isKvkkNoticeCurrent(sessionUser.user_metadata);
 
         // KVKK onaylanmamış/eski sürüm authenticated kullanıcı — /auth/login'de kalmalı ki modal açılsın.
         // Landing (/) gibi public sayfalardan login'e yönlendir, modal zorunlu.
@@ -311,10 +310,7 @@ export async function updateSession(request: NextRequest) {
     // ?reason=kvkk-required ile modal otomatik açılır. Client-side modal bypass (refresh)
     // bu sayede kapatılır — enforcement middleware'de, JWT'den okunur (DB sorgusu yok).
     // Sürüm alanı YOKSA v1 kabul (grandfather) — public yol ile aynı mantık.
-    const kvkkAck = user.user_metadata?.kvkk_notice_acknowledged_at ?? null;
-    const rawKvkkVersion = user.user_metadata?.kvkk_notice_version;
-    const kvkkVersion = rawKvkkVersion == null ? 1 : Number(rawKvkkVersion);
-    const kvkkOk = Boolean(kvkkAck) && kvkkVersion >= KVKK_NOTICE_VERSION;
+    const kvkkOk = isKvkkNoticeCurrent(user.user_metadata);
     if (!kvkkOk) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/login';
@@ -324,16 +320,15 @@ export async function updateSession(request: NextRequest) {
 
     // Role-based access control — DOĞRULANMIŞ JWT payload'ından (imza kontrol edildi)
     const role = sanitizeRole(verified?.role);
+    const adminAccess = verified?.adminAccess ?? false;
 
-    // /super-admin/* → sadece super_admin
+    // /super-admin/* → sadece super_admin (grant ASLA super_admin vermez)
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
     }
-    // /admin/* → admin veya super_admin
-    if (
-      pathname.startsWith('/admin') &&
-      !(['admin', 'super_admin'] as ValidRole[]).includes(role)
-    ) {
+    // /admin/* → admin, super_admin VEYA ek yönetici yetkisi verilmiş personel (dual-capability).
+    // TEK kaynak hasAdminAuthority — api-handler + admin layout ile AYNI kriter (drift yok).
+    if (pathname.startsWith('/admin') && !hasAdminAuthority({ role, adminAccess })) {
       return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
     }
     // /staff/* → staff, admin veya super_admin (tum roller)

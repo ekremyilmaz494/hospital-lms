@@ -18,6 +18,7 @@ import type { UserRole } from '@/types/database'
 import { UUID_RE, buildStaffOrderBy } from './_query-helpers'
 import { getPeriodById, getEffectiveStartDate } from '@/lib/training-periods'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
+import { checkStaffLimit } from '@/lib/subscription-guard'
 import { buildDepartmentHierarchy, expandDepartmentSubtree } from '@/app/api/admin/reports/_shared'
 import {
   generateInvitationToken,
@@ -352,6 +353,13 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
       )
     }
   }
+
+  // Personel (seat) limiti — sözleşmeli kişi sayısı aşılıyorsa hem davet hem direct
+  // oluşturmayı engelle. Kullanım = aktif personel + bekleyen davet; limit org.maxStaff
+  // (super-admin) → plan → sınırsız. Duplikat/validasyon kontrollerinden SONRA: geçersiz
+  // istek koltuk saymasın, sadece gerçek bir ekleme koltuğa karşı ölçülsün.
+  const seatLimitError = await checkStaffLimit(orgId, 1)
+  if (seatLimitError) return seatLimitError
 
   // ── INVITE MODE — davet linki gönder, hesap kabul anında oluşur ────────────
   if (data.mode === 'invite') {

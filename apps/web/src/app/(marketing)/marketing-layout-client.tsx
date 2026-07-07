@@ -201,6 +201,7 @@ function MarketingFooter() {
         { label: 'Kullanim Sartlari', href: '/terms' },
         { label: 'Gizlilik Politikasi', href: '/privacy' },
         { label: 'KVKK Aydinlatma', href: '/kvkk' },
+        { label: 'Cerez Politikasi', href: '/cerez-politikasi' },
         { label: 'Veri Saklama Politikasi', href: '/data-retention' },
       ],
     },
@@ -258,10 +259,15 @@ function MarketingFooter() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            {['KVKK', 'Gizlilik', 'Sartlar'].map((label) => (
+            {[
+              { label: 'KVKK', href: '/kvkk' },
+              { label: 'Gizlilik', href: '/privacy' },
+              { label: 'Cerez', href: '/cerez-politikasi' },
+              { label: 'Sartlar', href: '/terms' },
+            ].map(({ label, href }) => (
               <Link
                 key={label}
-                href={`/${label.toLowerCase()}`}
+                href={href}
                 className="text-xs transition-colors hover:text-[#0d9668]"
                 style={{ color: '#94a3b8' }}
               >

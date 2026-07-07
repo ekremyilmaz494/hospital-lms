@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Sparkles, CheckCircle2, Trash2, RefreshCw, AlertCircle,
   Loader2, PlusCircle, Zap, BookOpenCheck,
-  UploadCloud, X,
+  UploadCloud, X, FileText,
 } from 'lucide-react';
 import { CURATED_MODELS, DEFAULT_MODEL_ID, getModel } from '@/lib/openrouter-models';
 import { K } from '@/app/admin/trainings/new/_steps/types';
@@ -49,7 +49,23 @@ export interface AiQuestionGeneratorProps {
   initialSources?: AiUploadedSource[];
   /** Her upload/remove sonrası parent'a snapshot — draft'a kaydetmek için. */
   onSourcesChange?: (sources: AiUploadedSource[]) => void;
+  /** Eğitim/draft ID'si — verilirse videoların otomatik transkriptleri
+   *  kaynak olarak seçilebilir ("Video Transkripti" bölümü görünür). */
+  trainingId?: string;
 }
+
+/** GET /api/admin/trainings/[id]/transcripts yanıtındaki tek video girdisi. */
+interface TranscriptEntry {
+  videoKey: string;
+  title: string;
+  status: 'none' | 'processing' | 'completed' | 'failed';
+  transcriptKey: string | null;
+  sizeBytes: number | null;
+}
+
+// Transkript hazırken poll gereksiz; işlenirken 15s'de bir durum tazele
+// (endpoint Cache-Control max-age=10 — poll aralığı cache'ten uzun, hep taze).
+const TRANSCRIPT_POLL_MS = 15_000;
 
 type UploadedSource = AiUploadedSource;
 
@@ -78,6 +94,7 @@ export default function AiQuestionGenerator({
   onStateChange,
   initialSources,
   onSourcesChange,
+  trainingId,
 }: AiQuestionGeneratorProps) {
   // initialSources sadece ilk mount'ta tohum; sonraki güncellemeler onSourcesChange üzerinden parent'a iletilir.
   // Tek kaynak sınırı: eski (çoklu kaynaklı) draft restore edilse bile yalnızca ilkini al.
@@ -90,6 +107,40 @@ export default function AiQuestionGenerator({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Video transkriptleri — trainingId verildiyse durumları yüklenir ve
+  // herhangi biri 'processing' iken poll edilir (hepsi terminal olunca durur).
+  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
+  useEffect(() => {
+    if (!trainingId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/admin/trainings/${trainingId}/transcripts`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { transcripts?: TranscriptEntry[] };
+        if (cancelled || !Array.isArray(data.transcripts)) return;
+        setTranscripts(data.transcripts);
+        if (data.transcripts.some((t) => t.status === 'processing')) {
+          timer = setTimeout(() => void load(), TRANSCRIPT_POLL_MS);
+        }
+      } catch {
+        // Sessiz: transkript bölümü opsiyonel yardımcı UI — dosya yükleme
+        // akışını bloklamasın. Bir sonraki mount/poll'da tekrar denenir.
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [trainingId]);
+
+  // 'none' (transkripti hiç olmayan — özellik-öncesi/medya kütüphanesi videosu)
+  // satırlar gizlenir; kullanıcıya sadece anlamlı durumlar gösterilir.
+  const visibleTranscripts = transcripts.filter((t) => t.status !== 'none');
 
   // Model seçimi kaldırıldı — sistem her zaman premium Claude Sonnet 4.6 kullanır.
   // selectedModel yalnızca yükleme bandındaki etiket için tutuluyor.
@@ -139,6 +190,32 @@ export default function AiQuestionGenerator({
     setUploadedSources((prev) => prev.filter((s) => s.s3Key !== s3Key));
   };
 
+  /** Hazır transkripti kaynak listesine ekler — sıradan bir AiUploadedSource
+   *  olarak (mimeType text/plain); queue hook'u ve draft restore değişmeden çalışır. */
+  const addTranscriptSource = (t: TranscriptEntry) => {
+    const key = t.transcriptKey;
+    if (!key) return;
+    if (uploadedSources.some((s) => s.s3Key === key)) return;
+    if (uploadedSources.length >= MAX_SOURCES) {
+      setUploadError(`En fazla ${MAX_SOURCES} kaynak yüklenebilir. Yeni dosya için mevcut bir kaynağı kaldırın.`);
+      return;
+    }
+    setUploadError(null);
+    setUploadedSources((prev) =>
+      prev.some((s) => s.s3Key === key) || prev.length >= MAX_SOURCES
+        ? prev
+        : [
+            ...prev,
+            {
+              s3Key: key,
+              fileName: `${t.title} — transkript`,
+              mimeType: 'text/plain',
+              sizeBytes: t.sizeBytes ?? 0,
+            },
+          ],
+    );
+  };
+
   const uploadFile = useCallback(async (file: File) => {
     setUploadError(null);
     if (!ACCEPTED_TYPES.includes(file.type)) {
@@ -149,7 +226,11 @@ export default function AiQuestionGenerator({
       setUploadError(`En fazla ${MAX_SOURCES} kaynak yüklenebilir. Yeni dosya için mevcut bir kaynağı kaldırın.`);
       return;
     }
-    const totalMb = (uploadedSources.reduce((sum, s) => sum + s.sizeBytes, 0) + file.size) / (1024 * 1024);
+    // Transkript kaynakları toplam boyut limitine sayılmaz — sunucu tarafında
+    // KB ölçeğinde metin, dosya upload bandwidth'i tüketmez.
+    const totalMb = (uploadedSources
+      .filter((s) => s.mimeType !== 'text/plain')
+      .reduce((sum, s) => sum + s.sizeBytes, 0) + file.size) / (1024 * 1024);
     if (totalMb > MAX_TOTAL_SIZE_MB) {
       setUploadError(`Toplam dosya boyutu ${MAX_TOTAL_SIZE_MB}MB'ı aşamaz.`);
       return;
@@ -351,6 +432,62 @@ export default function AiQuestionGenerator({
                   </span>
                 </div>
               </label>
+            )}
+
+            {/* Video Transkripti — eğitimin videolarından otomatik çıkarılan
+                transkriptler kaynak olarak eklenebilir. */}
+            {visibleTranscripts.length > 0 && (
+              <div className="aiq-transcripts">
+                <p className="aiq-transcripts-label">
+                  <FileText size={11} strokeWidth={2.5} />
+                  Video Transkripti
+                </p>
+                <ul className="aiq-transcript-list">
+                  {visibleTranscripts.map((t) => {
+                    const added = t.transcriptKey
+                      ? uploadedSources.some((s) => s.s3Key === t.transcriptKey)
+                      : false;
+                    return (
+                      <li key={t.videoKey} className="aiq-transcript-row">
+                        <span className="aiq-transcript-title" title={t.title}>{t.title}</span>
+                        {t.status === 'processing' && (
+                          <span className="aiq-transcript-chip aiq-transcript-chip--busy">
+                            <span className="aiq-pulse-dot" />
+                            Hazırlanıyor…
+                          </span>
+                        )}
+                        {t.status === 'failed' && (
+                          <span className="aiq-transcript-chip aiq-transcript-chip--fail">
+                            <AlertCircle size={11} strokeWidth={2.5} />
+                            Oluşturulamadı
+                          </span>
+                        )}
+                        {t.status === 'completed' && (added ? (
+                          <span className="aiq-transcript-chip aiq-transcript-chip--added">
+                            <CheckCircle2 size={11} strokeWidth={2.5} />
+                            Eklendi
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="aiq-transcript-add"
+                            onClick={() => addTranscriptSource(t)}
+                            disabled={uploadedSources.length >= MAX_SOURCES}
+                            title={
+                              uploadedSources.length >= MAX_SOURCES
+                                ? `En fazla ${MAX_SOURCES} kaynak — önce bir kaynağı kaldırın`
+                                : 'Transkripti kaynak olarak ekle'
+                            }
+                          >
+                            <PlusCircle size={12} strokeWidth={2.5} />
+                            Kaynak olarak ekle
+                          </button>
+                        ))}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
 
             {uploadError && (
@@ -935,6 +1072,103 @@ function Styles() {
       .aiq-source-remove:hover {
         background: ${K.ERROR_BG};
         color: var(--aiq-error);
+      }
+
+      /* TRANSCRIPTS — video transkript kaynak seçici */
+      .aiq-transcripts {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px dashed var(--aiq-border-soft);
+      }
+      .aiq-transcripts-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin: 0 0 8px;
+        font-family: var(--aiq-display);
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--aiq-soft-ink);
+      }
+      .aiq-transcript-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .aiq-transcript-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border: 1px solid var(--aiq-border-soft);
+        border-radius: 10px;
+        background: var(--aiq-cream);
+      }
+      .aiq-transcript-title {
+        flex: 1;
+        min-width: 0;
+        font-family: var(--aiq-display);
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--aiq-ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .aiq-transcript-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-family: var(--aiq-display);
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+      }
+      .aiq-transcript-chip--busy {
+        background: var(--aiq-emerald-soft);
+        color: var(--aiq-emerald-deep);
+      }
+      .aiq-transcript-chip--fail {
+        background: ${K.ERROR_BG};
+        color: var(--aiq-error);
+      }
+      .aiq-transcript-chip--added {
+        background: var(--aiq-success-bg);
+        color: var(--aiq-success);
+      }
+      .aiq-transcript-add {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+        padding: 4px 10px;
+        background: var(--aiq-surface);
+        border: 1px solid var(--aiq-border);
+        border-radius: 999px;
+        font-family: var(--aiq-display);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--aiq-emerald-deep);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 140ms ease, border-color 140ms ease;
+      }
+      .aiq-transcript-add:hover:not(:disabled) {
+        background: var(--aiq-emerald-pale);
+        border-color: var(--aiq-emerald);
+      }
+      .aiq-transcript-add:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       /* UPLOADER */

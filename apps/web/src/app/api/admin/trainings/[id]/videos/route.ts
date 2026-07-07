@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { getUploadUrl, videoKey, documentKey, audioKey, deleteObject, checkStorageQuota } from '@/lib/s3'
+import { deriveTranscriptSiblingKeys } from '@/lib/transcripts'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 
@@ -139,6 +140,14 @@ export const DELETE = withAdminRoute<{ id: string }>(async ({ request, params, o
         videoKey: video.videoKey,
         error: s3Err,
       })
+    }
+
+    // 2b. Transkript kardeş dosyaları (.txt/.mp3/.queued/.failed) — videoKey'den
+    // türetilir (lib/transcripts.ts). Best-effort, paralel; olmayan key'lerde
+    // deleteObject sessizce başarılı olur.
+    const siblingKeys = deriveTranscriptSiblingKeys(video.videoKey)
+    if (siblingKeys.length > 0) {
+      await Promise.allSettled(siblingKeys.map((k) => deleteObject(k)))
     }
 
     // 3. Audit log (KVKK uyumluluğu)

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { sendEmail, certificateExpiryReminderEmail, overdueTrainingReminderEmail } from '@/lib/email'
 import { BRAND } from '@/lib/brand'
 import { deleteObject, downloadBuffer, verifyS3Object } from '@/lib/s3'
+import { deriveTranscriptSiblingKeys, resolveTranscriptStatus } from '@/lib/transcripts'
 import { decryptBackup } from '@/lib/backup-crypto'
 import { logger } from '@/lib/logger'
 import { ATTEMPT_TERMINAL_STATUSES, type AttemptStatus, type AssignmentStatus } from '@/lib/exam-state-machine'
@@ -162,6 +163,26 @@ export async function GET(request: Request) {
     where: { expiresAt: { lt: new Date() } },
   })
   logger.info('cleanup', 'Suresi dolmus guvenilir cihazlar silindi', { count: expiredDevices.count })
+
+  // 3.7 İK/HBYS senkron telemetri imhası (KVKK veri minimizasyonu):
+  //   - SyncRowResult 90 gün: payloadMasked maskeli de olsa PII izi taşır; sorun-giderme
+  //     penceresi (90g) sonrası tutmanın hukuki dayanağı yok. Yedeğe de girmez (kasıtlı hariç).
+  //   - SyncRun başlıkları 365 gün: yalnız sayaç/durum içerir (PII yok), yıllık denetim izi yeter.
+  //     Silinen run'ların kalan satırları FK cascade ile düşer.
+  const [deletedSyncRows, deletedSyncRuns] = await Promise.all([
+    prisma.syncRowResult.deleteMany({
+      where: { createdAt: { lt: new Date(Date.now() - 90 * dayMs) } },
+    }),
+    prisma.syncRun.deleteMany({
+      where: { startedAt: { lt: new Date(Date.now() - 365 * dayMs) } },
+    }),
+  ])
+  if (deletedSyncRows.count > 0 || deletedSyncRuns.count > 0) {
+    logger.info('cleanup', 'Senkron telemetrisi imha edildi', {
+      rowResults: deletedSyncRows.count,
+      runs: deletedSyncRuns.count,
+    })
+  }
 
   // 3.5 Expo push ticket purge — receipt audit kısa pencere yeter:
   //   - 30 gün eski 'ok' / 'expired' (delivery confirmed, debug penceresi geçti)
@@ -399,7 +420,12 @@ export async function GET(request: Request) {
     const keys: string[] = []
     if (dd?.videos && Array.isArray(dd.videos)) {
       for (const v of dd.videos) {
-        if (v.url) keys.push(v.url)
+        if (v.url) {
+          keys.push(v.url)
+          // Transkript kardeşleri (.txt/.mp3/.queued/.failed) — draft videoyla
+          // birlikte üretilmiş olabilir; orphan kalmasın.
+          keys.push(...deriveTranscriptSiblingKeys(v.url))
+        }
         if (v.documentKey) keys.push(v.documentKey)
       }
     }
@@ -586,6 +612,56 @@ export async function GET(request: Request) {
     )
   }
 
+  // 9.5 Transcript backfill sweep — transcribe Lambda, transkript tamamlandığında
+  // DB satırı bulamamışsa (wizard draft'ı: satır publish'te doğar) transcript_status
+  // null kalır. S3'teki gerçek durumu (lib/transcripts.ts key türetmesi) DB cache'ine
+  // yaz. createdAt son 60 günle sınırlı: özellik-öncesi videoların (S3'te hiç
+  // transkripti olmayan) her koşumda boşuna HEAD'lenmesini engeller.
+  const transcriptCandidates = await prisma.trainingVideo.findMany({
+    where: {
+      contentType: 'video',
+      transcriptStatus: null,
+      createdAt: { gt: new Date(Date.now() - 60 * dayMs) },
+    },
+    select: { id: true, videoKey: true },
+    take: 200, // heap guard — kalanı sonraki cron koşumunda
+  })
+
+  let transcriptBackfilled = 0
+  for (let i = 0; i < transcriptCandidates.length; i += SWEEP_BATCH) {
+    const batch = transcriptCandidates.slice(i, i + SWEEP_BATCH)
+    const resolved = await Promise.all(
+      batch.map(async (v) => {
+        if (!v.videoKey) return null
+        const r = await resolveTranscriptStatus(v.videoKey)
+        // Yalnız terminal durumları cache'le — 'processing' geçici, 'none'
+        // (özellik-öncesi) null kalarak pencere dolana dek yeniden denenir.
+        return r.status === 'completed' || r.status === 'failed'
+          ? { id: v.id, status: r.status, transcriptKey: r.transcriptKey }
+          : null
+      }),
+    )
+    const updates = resolved.filter(
+      (x): x is { id: string; status: 'completed' | 'failed'; transcriptKey: string | null } => x !== null,
+    )
+    await Promise.all(
+      updates.map(async (u) => {
+        try {
+          await prisma.trainingVideo.update({
+            where: { id: u.id },
+            data: { transcriptStatus: u.status, transcriptKey: u.transcriptKey },
+          })
+          transcriptBackfilled++
+        } catch (err) {
+          logger.error('cleanup', 'Transcript backfill basarisiz', {
+            id: u.id,
+            err: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }),
+    )
+  }
+
   return NextResponse.json({
     success: true,
     deletedNotifications: deletedNotifications.count,
@@ -594,6 +670,8 @@ export async function GET(request: Request) {
     retentionAnonymized,
     deletedExpoTicketsOk: deletedExpoTicketsOk.count,
     deletedExpoTicketsError: deletedExpoTicketsError.count,
+    deletedSyncRowResults: deletedSyncRows.count,
+    deletedSyncRuns: deletedSyncRuns.count,
     deletedBackups: deletedBackups.count,
     skippedBackupsNoRecent: skippedNoRecent.length,
     skippedBackupsVerifyFail: skippedVerifyFail.length,
@@ -606,6 +684,7 @@ export async function GET(request: Request) {
     examRemindersSent,
     transcodeRepointed,
     transcodeStillMissing,
+    transcriptBackfilled,
     timestamp: new Date().toISOString(),
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

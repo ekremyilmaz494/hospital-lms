@@ -21,12 +21,13 @@ export const maxDuration = 300
  * düşerdi → veri kaybı. Guard bunu 400 hatasına çevirir: "önce kodu güncelle".
  * Yeni model eklerken snapshot.ts BACKUP_SCHEMA_VERSION ile birlikte BURAYI da artır.
  */
-const MAX_SUPPORTED_SCHEMA_VERSION = 4
+const MAX_SUPPORTED_SCHEMA_VERSION = 5
 
 /**
  * Expected shape of a backup JSON file (mirrors backup cron output).
  * schemaVersion 1: v1 (9 arrays). v2: organization, subscription, auditLogs eklendi.
  * v3: authUsers (Supabase parola hash'leri). v4: 27 org modeli daha (aşağıdaki v4 bloğu).
+ * v5: İK entegrasyon konfigürasyonu (staffIntegrations + integrationApiKeys).
  */
 interface BackupData {
   users: unknown[]
@@ -75,6 +76,9 @@ interface BackupData {
   kvkkRequests?: unknown[]
   dailyReviews?: unknown[]
   dailySubmissions?: unknown[]
+  // v5+ — İK entegrasyon konfigürasyonu. v4 ve öncesi yedeklerde undefined → restore dokunmaz.
+  staffIntegrations?: unknown[]
+  integrationApiKeys?: unknown[]
   schemaVersion?: number
 }
 
@@ -89,6 +93,9 @@ const V4_MODEL_KEYS = [
   'competencyForms', 'competencyCategories', 'competencyItems', 'competencyEvaluations', 'competencyAnswers',
   'examAttemptRequests', 'kvkkRequests', 'dailyReviews', 'dailySubmissions',
 ] as const
+
+/** v5 opsiyonel model anahtarları — İK entegrasyon konfigürasyonu (v4 desenini izler). */
+const V5_MODEL_KEYS = ['staffIntegrations', 'integrationApiKeys'] as const
 
 /** Validate that parsed JSON has the expected backup structure */
 function isValidBackupData(data: unknown): data is BackupData {
@@ -117,8 +124,8 @@ function isValidBackupData(data: unknown): data is BackupData {
   // v2+ opsiyonel alanlar — varsa tip kontrol
   if (d.auditLogs !== undefined && !Array.isArray(d.auditLogs)) return false
   if (d.authUsers !== undefined && !Array.isArray(d.authUsers)) return false
-  // v4 opsiyonel modeller — varsa array olmalı
-  for (const key of V4_MODEL_KEYS) {
+  // v4/v5 opsiyonel modeller — varsa array olmalı
+  for (const key of [...V4_MODEL_KEYS, ...V5_MODEL_KEYS]) {
     if (d[key] !== undefined && !Array.isArray(d[key])) return false
   }
 
@@ -225,9 +232,9 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       authUsers: backupData.authUsers?.length ?? 0,
       hasOrganization: backupData.organization ? 1 : 0,
       hasSubscription: backupData.subscription ? 1 : 0,
-      // v4 modelleri (yedekte yoksa 0)
+      // v4/v5 modelleri (yedekte yoksa 0)
       ...Object.fromEntries(
-        V4_MODEL_KEYS.map((k) => [k, (backupData[k] as unknown[] | undefined)?.length ?? 0]),
+        [...V4_MODEL_KEYS, ...V5_MODEL_KEYS].map((k) => [k, (backupData[k] as unknown[] | undefined)?.length ?? 0]),
       ),
     }
 
@@ -306,6 +313,12 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       if (backupData.departmentTrainingRules) await tx.departmentTrainingRule.deleteMany({ where: { organizationId: orgId } })
       if (backupData.examAttemptRequests) await tx.examAttemptRequest.deleteMany({ where: { organizationId: orgId } })
       if (backupData.kvkkRequests) await tx.kvkkRequest.deleteMany({ where: { organizationId: orgId } })
+
+      // v5 — İK entegrasyon konfigürasyonu. SyncRun.integrationId/apiKeyId FK'ları SetNull →
+      // org'daki mevcut sync_runs satırları (yedekte YOK, kasıtlı: telemetri) silinmez,
+      // yalnız referansları NULL'a düşer; FK ihlali oluşmaz.
+      if (backupData.staffIntegrations) await tx.staffIntegration.deleteMany({ where: { organizationId: orgId } })
+      if (backupData.integrationApiKeys) await tx.integrationApiKey.deleteMany({ where: { organizationId: orgId } })
 
       // ── Mevcut çekirdek (child → parent) ──
       await tx.certificate.deleteMany({ where: { training: { organizationId: orgId } } })
@@ -408,6 +421,14 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       }
       if (backupData.trainingFeedbackForms?.length) {
         await tx.trainingFeedbackForm.createMany({ data: backupData.trainingFeedbackForms as NonNullable<Parameters<typeof tx.trainingFeedbackForm.createMany>[0]>['data'] })
+      }
+      // v5 — İK entegrasyon konfigürasyonu: yalnız Organization'a bağlı (IntegrationApiKey.createdById
+      // FK relation'ı YOK, düz uuid kolonu) → Tier-A'da güvenle eklenir.
+      if (backupData.staffIntegrations?.length) {
+        await tx.staffIntegration.createMany({ data: backupData.staffIntegrations as NonNullable<Parameters<typeof tx.staffIntegration.createMany>[0]>['data'] })
+      }
+      if (backupData.integrationApiKeys?.length) {
+        await tx.integrationApiKey.createMany({ data: backupData.integrationApiKeys as NonNullable<Parameters<typeof tx.integrationApiKey.createMany>[0]>['data'] })
       }
 
       // ── auth.users (Supabase parola hash'leri) — public.users'tan ÖNCE geri yükle ──

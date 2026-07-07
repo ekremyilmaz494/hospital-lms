@@ -307,14 +307,27 @@ export async function verifyS3Object(key: string): Promise<number | null> {
   }
 }
 
+/** Boyuttan bağımsız varlık kontrolü — 0-byte marker dosyaları için
+ *  (verifyS3Object size>0 şartı koyar, örn. transkript `.queued` marker'ını göremez). */
+export async function s3ObjectExists(key: string): Promise<boolean> {
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Multipart sign/complete/abort gibi raw key kabul eden endpoint'lerde IDOR guard.
- * Key formatı `videos|documents|audio/{orgId}/{trainingId}/{uuid}.{ext}` —
+ * Key formatı `videos|documents|audio|transcripts/{orgId}/{trainingId}/{uuid}.{ext}` —
  * çağıran admin'in orgId'si key'in 2. segmentine eşit olmalı, aksi halde başka
  * org'un (uploadId,key) çiftini ele geçirmiş bir kullanıcı imzalama/iptal/birleştirme
  * yapabilir. UploadId pratikte unguessable ama bu defense-in-depth.
+ * `transcripts/` — otomatik video transkriptleri (AI soru üretimi kaynağı);
+ * videoKey'den türetilir, orgId segmenti korunur (bkz. lib/transcripts.ts).
  */
-const _S3_KEY_RE = /^(videos|documents|audio)\/([^/]+)\/([^/]+)\/[^/]+\.[a-zA-Z0-9]+$/
+const _S3_KEY_RE = /^(videos|documents|audio|transcripts)\/([^/]+)\/([^/]+)\/[^/]+\.[a-zA-Z0-9]+$/
 export function isValidS3KeyForOrg(key: unknown, orgId: string): boolean {
   if (typeof key !== 'string' || key.length === 0) return false
   if (key.includes('://') || key.includes('..')) return false

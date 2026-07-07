@@ -30,6 +30,8 @@ const { prismaMock, s3Mock, cryptoMock, emailMock } = vi.hoisted(() => ({
     auditLog: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     organization: { findMany: vi.fn().mockResolvedValue([]) },
     trustedDevice: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    syncRowResult: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    syncRun: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     expoPushTicket: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     certificate: { findMany: vi.fn().mockResolvedValue([]) },
     organizationSubscription: { findMany: vi.fn().mockResolvedValue([]) },

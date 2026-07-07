@@ -27,6 +27,7 @@ ALTER TABLE video_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE db_backups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kvkk_requests ENABLE ROW LEVEL SECURITY;
@@ -132,6 +133,8 @@ CREATE POLICY "admin_audit_select" ON audit_logs FOR SELECT USING ((SELECT auth.
 
 -- DB BACKUPS
 CREATE POLICY "super_admin_backups_all" ON db_backups FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+-- İletişim/demo mesajları: platform geneli (tenant-dışı), yalnızca super_admin
+CREATE POLICY "super_admin_contact_messages_all" ON contact_messages FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "admin_backups_all" ON db_backups FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
 
 -- DEPARTMENTS
@@ -526,13 +529,47 @@ CREATE POLICY "super_admin_badges_all" ON badges
 -- ── RECONCILIATION: apply-rls.js ile parite ──
 -- Önceden yalnız kanonik apply-rls.js'de tanımlıydı; iki dosya aynı tablo kümesini korusun diye eklendi.
 
--- HIS INTEGRATIONS (hastane bilgi sistemi entegrasyonları)
-ALTER TABLE his_integrations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "super_admin_his_all" ON his_integrations FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_his_all" ON his_integrations FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+-- NOT: Eski his_integrations/sync_logs tabloları 20260616120000_remove_his_integration
+-- ile DÜŞÜRÜLDÜ — bayat policy'leri kaldırıldı (fresh DB'de ALTER patlıyordu).
 
--- SYNC LOGS (HIS senkronizasyon kayıtları)
-ALTER TABLE sync_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "super_admin_sync_logs_all" ON sync_logs FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
-CREATE POLICY "admin_sync_logs_select" ON sync_logs FOR SELECT USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+-- ── İK/HBYS PERSONEL SENKRON ENTEGRASYONU RLS ──
+-- Yazımlar server-side Prisma/service_role ile yapılır (RLS bypass); aşağıdaki
+-- policy'ler defense-in-depth. integration_api_keys yalnız HASH taşır (düz anahtar
+-- DB'de yok); staff_integrations.pull_credentials_encrypted AES-256-GCM şifreli.
+ALTER TABLE staff_integrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE integration_api_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_row_results ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "super_admin_staff_integrations_all" ON staff_integrations
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_staff_integrations_all" ON staff_integrations
+  FOR ALL USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+
+CREATE POLICY "super_admin_integration_api_keys_all" ON integration_api_keys
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_integration_api_keys_all" ON integration_api_keys
+  FOR ALL USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+
+CREATE POLICY "super_admin_sync_runs_all" ON sync_runs
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_sync_runs_select" ON sync_runs
+  FOR SELECT USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
+
+CREATE POLICY "super_admin_sync_row_results_all" ON sync_row_results
+  FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_sync_row_results_select" ON sync_row_results
+  FOR SELECT USING (
+    (SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+    AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid)
+  );
 

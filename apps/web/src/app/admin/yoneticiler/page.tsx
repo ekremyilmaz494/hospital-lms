@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserCog, UserPlus, ShieldCheck, Mail, AlertCircle, Clock, X, KeyRound } from 'lucide-react';
+import { UserCog, UserPlus, ShieldCheck, ShieldOff, Ban, UserCheck, Mail, AlertCircle, Clock, X, KeyRound } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { useAuth } from '@/hooks/use-auth';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -20,6 +20,8 @@ interface AdminListItem {
   isActive: boolean;
   createdAt: string;
   isOwner: boolean;
+  /** Personel olup ek yönetici yetkisi almış kişi (rol hâlâ 'staff'). */
+  isGrantedStaff?: boolean;
 }
 
 interface AdminsPayload {
@@ -50,6 +52,8 @@ export default function YoneticilerPage() {
   const { toast } = useToast();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminListItem | null>(null);
+  // Yetki-kaldırma/aktiflik işlemi devam eden satır (çift tık + eşzamanlı istek önleme).
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useFetch<AdminsPayload>('/api/admin/users');
   const { data: invitesData, refetch: refetchInvites } = useFetch<InvitationsPayload>('/api/admin/invitations');
@@ -71,6 +75,64 @@ export default function YoneticilerPage() {
       refetchInvites();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
+    }
+  };
+
+  const fullName = (a: AdminListItem) => `${a.firstName} ${a.lastName}`.trim();
+
+  /** Yetki verilmiş personelin (Personel + Yönetici) yönetici yetkisini kaldırır → düz personel. */
+  const handleRevokeGrant = async (a: AdminListItem) => {
+    if (!confirm(`${fullName(a)} kişisinin yönetici yetkisini kaldırmak istiyor musunuz?\n\nPersonel olarak kalacak (eğitim almaya devam eder) ama yönetim paneline erişemeyecek.`)) return;
+    setBusyId(a.id);
+    try {
+      const res = await fetch(`/api/admin/staff/${a.id}/admin-access`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Yetki kaldırılamadı');
+      }
+      toast(`${fullName(a)} artık yalnızca personel`, 'success');
+      refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** Gerçek yöneticiyi pasife alır → giriş engellenir, oturum iptal edilir, koltuk boşalır. */
+  const handleDeactivate = async (a: AdminListItem) => {
+    if (!confirm(`${fullName(a)} adlı yöneticiyi pasife almak istiyor musunuz?\n\nGiriş yapamayacak ve yönetim paneline erişemeyecek. Bir yönetici koltuğu boşalır. İstediğinizde tekrar aktifleştirebilirsiniz.`)) return;
+    setBusyId(a.id);
+    try {
+      const res = await fetch(`/api/admin/users/${a.id}/status`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Pasife alınamadı');
+      }
+      toast(`${fullName(a)} pasife alındı`, 'success');
+      refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** Pasif yöneticiyi tekrar aktifleştirir (koltuk limiti müsaitse). */
+  const handleReactivate = async (a: AdminListItem) => {
+    setBusyId(a.id);
+    try {
+      const res = await fetch(`/api/admin/users/${a.id}/status`, { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Aktifleştirilemedi');
+      }
+      toast(`${fullName(a)} aktifleştirildi`, 'success');
+      refetch();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Bir hata oluştu', 'error');
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -204,6 +266,15 @@ export default function YoneticilerPage() {
                         Esas Yönetici
                       </span>
                     )}
+                    {a.isGrantedStaff && (
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5"
+                        style={{ background: '#fef3c7', color: '#92400e' }}
+                        title="Personel — Esas Yönetici tarafından ek yönetici yetkisi verilmiş (eğitim almaya devam eder)"
+                      >
+                        Personel + Yönetici
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-5 py-3 text-sm" style={{ color: 'var(--k-text-secondary)' }}>
@@ -235,24 +306,66 @@ export default function YoneticilerPage() {
                 </td>
                 {isOwner && (
                   <td className="px-5 py-3 text-right">
-                    {/* Esas Yönetici kendi şifresini bu yoldan sıfırlayamaz — Profil > Şifre Değiştir kullansın */}
-                    {a.id !== user?.id && a.isActive ? (
-                      <button
-                        type="button"
-                        onClick={() => setResetTarget(a)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--k-surface-hover)]"
-                        style={{
-                          borderColor: 'var(--k-border)',
-                          color: 'var(--k-text-secondary)',
-                          background: 'var(--k-surface)',
-                        }}
-                        title="Bu yöneticinin şifresini sıfırla"
-                      >
-                        <KeyRound className="h-3.5 w-3.5" />
-                        Şifre Sıfırla
-                      </button>
-                    ) : (
+                    {/* Esas Yönetici kendi satırında işlem yok (şifre için Profil > Şifre Değiştir) */}
+                    {a.isOwner || a.id === user?.id ? (
                       <span style={{ color: 'var(--k-text-muted)', fontSize: 12 }}>—</span>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2">
+                        {a.isActive && (
+                          <button
+                            type="button"
+                            onClick={() => setResetTarget(a)}
+                            disabled={busyId === a.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[var(--k-surface-hover)] disabled:opacity-50"
+                            style={{ borderColor: 'var(--k-border)', color: 'var(--k-text-secondary)', background: 'var(--k-surface)' }}
+                            title="Bu yöneticinin şifresini sıfırla"
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                            Şifre Sıfırla
+                          </button>
+                        )}
+
+                        {a.isGrantedStaff ? (
+                          /* Yetki verilmiş personel → yetkiyi kaldır (düz personele döner) */
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeGrant(a)}
+                            disabled={busyId === a.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                            style={{ borderColor: '#f59e0b', color: '#92400e', background: '#fffbeb' }}
+                            title="Yönetici yetkisini kaldır — kişi personel olarak kalır"
+                          >
+                            <ShieldOff className="h-3.5 w-3.5" />
+                            Yetkiyi Kaldır
+                          </button>
+                        ) : a.isActive ? (
+                          /* Gerçek yönetici, aktif → pasife al */
+                          <button
+                            type="button"
+                            onClick={() => handleDeactivate(a)}
+                            disabled={busyId === a.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                            style={{ borderColor: '#fecaca', color: '#b91c1c', background: '#fef2f2' }}
+                            title="Bu yöneticiyi pasife al — giriş engellenir, koltuk boşalır (geri alınabilir)"
+                          >
+                            <Ban className="h-3.5 w-3.5" />
+                            Pasife Al
+                          </button>
+                        ) : (
+                          /* Gerçek yönetici, pasif → aktifleştir */
+                          <button
+                            type="button"
+                            onClick={() => handleReactivate(a)}
+                            disabled={busyId === a.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                            style={{ borderColor: '#bbf7d0', color: '#166534', background: '#f0fdf4' }}
+                            title="Bu yöneticiyi tekrar aktifleştir (koltuk limiti müsaitse)"
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            Aktifleştir
+                          </button>
+                        )}
+                      </div>
                     )}
                   </td>
                 )}

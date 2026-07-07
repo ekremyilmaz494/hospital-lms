@@ -752,6 +752,7 @@ export default function DraftWizardPage() {
               activeMode={questionsActiveMode} setActiveMode={setQuestionsActiveMode}
               aiPending={aiPending} setAiPending={setAiPending}
               aiUploadedSources={aiUploadedSources} setAiUploadedSources={setAiUploadedSources}
+              draftId={draftId}
             />
           )}
           {currentStep === 4 && (

@@ -20,10 +20,12 @@ import {
   ClipboardList,
   Activity,
   MessageSquare,
+  Inbox,
   UserCog,
   Database,
   FlaskConical,
   KeyRound,
+  Cable,
   type LucideIcon,
 } from 'lucide-react';
 import type { Sector } from '@/generated/prisma/enums';
@@ -85,6 +87,7 @@ export const superAdminNav: NavGroup[] = [
         ],
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
+      { title: 'İletişim Mesajları', href: '/super-admin/messages', icon: Inbox },
       { title: 'Lisanslar', href: '/super-admin/licenses', icon: KeyRound },
     ],
   },
@@ -198,6 +201,7 @@ export const adminNav: NavGroup[] = [
     items: [
       // Yalnızca Esas Yönetici görür — sıradan admin'lerde gizli
       { title: 'Yönetici Yönetimi', href: '/admin/yoneticiler', icon: UserCog, ownerOnly: true },
+      { title: 'Entegrasyon', href: '/admin/settings/integration', icon: Cable },
       {
         title: 'Ayarlar',
         href: '/admin/settings',

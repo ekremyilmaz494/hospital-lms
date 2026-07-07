@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, parseBody, getOrgUrl } from '@/lib/api-hel
 import { withSuperAdminRoute } from '@/lib/api-handler'
 import { createUserSchema } from '@/lib/validations'
 import { createAuthUser, AuthUserError, DbUserError } from '@/lib/auth-user-factory'
+import { checkStaffLimit } from '@/lib/subscription-guard'
 import { sendOrganizationWelcomeEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { logger } from '@/lib/logger'
 
@@ -35,6 +36,14 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         409,
       )
     }
+  }
+
+  // Personel (seat) limiti — staff rolü sözleşmeli sınırı aşamaz (admin ayrı, sayılmaz).
+  // Super-admin limiti kendisi belirlediği için, aşmak isterse önce limiti yükseltmeli:
+  // hard cap TÜM oluşturma yollarında (admin panel, davet, bulk, SSO, super-admin) tutarlı.
+  if (parsed.data.role === 'staff') {
+    const seatLimitError = await checkStaffLimit(parsed.data.organizationId, 1)
+    if (seatLimitError) return seatLimitError
   }
 
   const tempPassword = parsed.data.password || crypto.randomBytes(12).toString('base64url')

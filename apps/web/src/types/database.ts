@@ -62,6 +62,9 @@ export interface User {
   departmentId: string | null;
   title: string | null;
   role: UserRole;
+  /** Esas Yönetici'nin verdiği ek yönetici (hastane-admin) yetkisi (dual-capability).
+   *  role='staff' kalır ama /admin paneline erişir. Karar: lib/auth/admin-authority.ts */
+  adminAccessGranted: boolean;
   avatarUrl: string | null;
   isActive: boolean;
   kvkkNoticeAcknowledgedAt: string | null;
@@ -114,6 +117,7 @@ export interface SubscriptionPlan {
   priceAnnual: number | null;
   features: string[];
   isActive: boolean;
+  hasStaffIntegration: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -58,6 +58,9 @@ const prismaMock = vi.hoisted(() => ({
   kvkkRequest: { findMany: vi.fn().mockResolvedValue([]) },
   dailyReview: { findMany: vi.fn().mockResolvedValue([]) },
   dailySubmission: { findMany: vi.fn().mockResolvedValue([]) },
+  // v5 — İK entegrasyon konfigürasyonu
+  staffIntegration: { findMany: vi.fn().mockResolvedValue([]) },
+  integrationApiKey: { findMany: vi.fn().mockResolvedValue([]) },
   // auth.users raw sorgusu (includeAuthUsers=true iken)
   $queryRaw: vi.fn().mockResolvedValue([]),
 }))
@@ -110,6 +113,12 @@ const INCLUDED_MODELS = new Set([
   'DailyReview',
   'DailySubmission',
   'KvkkRequest',
+  // ── v5: İK entegrasyon konfigürasyonu (per-org; restore sonrası hastanenin İK/HBYS
+  // entegrasyonu ve API anahtarları çalışmaya devam etmeli). StaffIntegration'ın
+  // pullCredentialsEncrypted alanı AES-256-GCM şifreli (ENCRYPTION_KEY olmadan açılmaz);
+  // IntegrationApiKey yalnız SHA-256 hash taşır, düz anahtar yok. ──
+  'StaffIntegration',
+  'IntegrationApiKey',
 ])
 
 const INTENTIONALLY_EXCLUDED = new Set([
@@ -125,6 +134,10 @@ const INTENTIONALLY_EXCLUDED = new Set([
   'License',
   'LicenseActivation',
   'LicenseHeartbeat',
+
+  // İletişim/demo formu mesajları — platform-düzeyi (org-bağımsız, super-admin gelen
+  // kutusu). ContactMessage'da organizationId yok → per-org yedek scope'unda değil.
+  'ContactMessage',
 
   // Backup sisteminin kendisi — kendi metadata'sını yedeklemez (sonsuz döngü)
   'DbBackup',
@@ -147,6 +160,14 @@ const INTENTIONALLY_EXCLUDED = new Set([
 
   // Davet (geçici/expire eden link, restore edilmemeli — sahte invite'ı reanimate eder)
   'Invitation',
+
+  // İK/HBYS senkron TELEMETRİSİ — operasyonel koşu geçmişi, restore değeri yok.
+  // KVKK veri-minimizasyonu: SyncRowResult.payloadMasked maskeli de olsa PII izi taşır
+  // ve cron/cleanup 90 günde imha eder — yedeğe girse imha edilmiş veriyi reanimate
+  // ederdi. Yüksek hacim (satır-bazlı sonuç) yedek boyutunu şişirir. Konfigürasyon
+  // (StaffIntegration/IntegrationApiKey) INCLUDED — telemetri değil.
+  'SyncRun',
+  'SyncRowResult',
 ])
 
 describe('Backup Snapshot — Schema Drift Guard', () => {
@@ -215,7 +236,7 @@ describe('Backup Snapshot — Schema Drift Guard', () => {
     expect(typeof result.exportedAt).toBe('string')
   })
 
-  it('v4 payload 27 kapsam modelinin TAMAMINI içerir + schemaVersion=4', async () => {
+  it('v4 payload 27 kapsam modelinin TAMAMINI içerir', async () => {
     const result = await buildBackupSnapshot('org-1') as Record<string, unknown>
     const v4Keys = [
       'mediaAssets', 'trainingCategories', 'trainingPeriods', 'scormAttempts',
@@ -231,7 +252,17 @@ describe('Backup Snapshot — Schema Drift Guard', () => {
     for (const k of v4Keys) {
       expect(result[k], `v4 model ${k} snapshot payload'ında eksik`).toBeDefined()
     }
-    expect(result.schemaVersion).toBe(4)
+  })
+
+  it('v5 payload İK entegrasyon konfigürasyonunu içerir + schemaVersion=5', async () => {
+    const result = await buildBackupSnapshot('org-1') as Record<string, unknown>
+    for (const k of ['staffIntegrations', 'integrationApiKeys']) {
+      expect(result[k], `v5 model ${k} snapshot payload'ında eksik`).toBeDefined()
+    }
+    // Org-scope: her iki sorgu da organizationId filtresiyle çağrılmalı (multi-tenant izolasyon)
+    expect(prismaMock.staffIntegration.findMany).toHaveBeenCalledWith({ where: { organizationId: 'org-1' } })
+    expect(prismaMock.integrationApiKey.findMany).toHaveBeenCalledWith({ where: { organizationId: 'org-1' } })
+    expect(result.schemaVersion).toBe(5)
   })
 
   it('training.findMany nested videos/questions/options include eder (nested drift\'i de yakala)', async () => {

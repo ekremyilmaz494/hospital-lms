@@ -14,6 +14,8 @@ import { createClient } from '@/lib/supabase/client';
 import { BRAND } from '@/lib/brand';
 import { useAuthStore } from '@/store/auth-store';
 import { getRolePath } from '@/lib/route-helpers';
+import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
+import { extractAdminAccess } from '@/lib/auth/admin-authority';
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/super-admin/dashboard',
@@ -126,8 +128,11 @@ function LoginForm() {
         const r = (session.user.app_metadata?.role ?? session.user.user_metadata?.role) as string | undefined;
         const target = ROLE_ROUTES[r ?? 'staff'] ?? '/staff/dashboard';
 
-        // Başka sekmede onaylandıysa direkt dashboard'a çık
-        if (session.user.user_metadata?.kvkk_notice_acknowledged_at) {
+        // GÜNCEL sürümü onaylamışsa (başka sekmede onay dahil) dashboard'a çık.
+        // KRİTİK: yalnız onay-tarihi-dolu-mu bakma — SÜRÜM de güncel olmalı (middleware
+        // ile AYNI kriter: isKvkkNoticeCurrent). Aksi halde v1 onaylı kullanıcı burada
+        // panele atılır, middleware v2 ister → sonsuz döngü (2026-07 canlı olay).
+        if (isKvkkNoticeCurrent(session.user.user_metadata)) {
           window.location.href = target;
           return;
         }
@@ -237,6 +242,7 @@ function LoginForm() {
           firstName: u.user_metadata?.first_name ?? '',
           lastName: u.user_metadata?.last_name ?? '',
           role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
+          adminAccessGranted: extractAdminAccess(u.app_metadata),
           organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
           phone: u.user_metadata?.phone ?? null,
           departmentId: u.user_metadata?.department_id ?? null,
@@ -250,8 +256,11 @@ function LoginForm() {
         });
       }
 
-      const kvkkAcknowledged = session?.user?.user_metadata?.kvkk_notice_acknowledged_at ?? null;
-      if (!kvkkAcknowledged) {
+      // GÜNCEL sürüm onaylı değilse (v1 onaylı veya hiç onaysız) yeniden-onay modalını aç.
+      // Sürüm-duyarlı: yalnız onay-tarihi bakılırsa v1 kullanıcı panele gider → middleware
+      // v2 ister → sonsuz döngü. middleware ile AYNI kriter (isKvkkNoticeCurrent).
+      const kvkkCurrent = isKvkkNoticeCurrent(session?.user?.user_metadata);
+      if (!kvkkCurrent) {
         // Cookie'ler okunamıyorsa Bearer token fallback: login API'nin döndürdüğü
         // accessToken'ı KVKK endpoint için sakla (getAuthUser Bearer path'i destekliyor).
         if (data.session?.accessToken) setKvkkBearerToken(data.session.accessToken);

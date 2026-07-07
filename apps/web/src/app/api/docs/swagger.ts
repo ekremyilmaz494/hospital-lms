@@ -17,6 +17,8 @@ export const openApiSpec = {
       '## Kimlik Dogrulama\n' +
       'API, Supabase JWT token ile Bearer Authentication kullanir.\n' +
       'Giris yaptiktan sonra donen `access_token` degerini `Authorization: Bearer <token>` header\'i ile gonderin.\n\n' +
+      '`/integration/v1/*` uclari ise kullanici oturumu YERINE org-scoped entegrasyon API anahtari kullanir: ' +
+      '`Authorization: Bearer klx_live_...` (bkz. Entegrasyon tag\'i ve `integrationApiKey` security scheme).\n\n' +
       '## Roller\n' +
       '- **super_admin** — Platform yonetimi (tum organizasyonlar)\n' +
       '- **admin** — Organizasyon yonetimi (kendi organizasyonu)\n' +
@@ -47,6 +49,16 @@ export const openApiSpec = {
     { name: 'Sinav', description: 'Sinav baslat, cevap kaydet, sinavi bitir' },
     { name: 'Super Admin', description: 'Platform yonetimi — organizasyonlar, abonelikler, raporlar' },
     { name: 'Sistem', description: 'Saglik kontrolu ve cron islemleri' },
+    {
+      name: 'Entegrasyon',
+      description:
+        'IK/HBYS personel entegrasyonu (Integration API) — makine-makine (M2M) uclar. ' +
+        'Kimlik dogrulama org-scoped API anahtari ile yapilir (`Authorization: Bearer klx_live_...`); ' +
+        'anahtar admin panelinde Ayarlar → Entegrasyon → API Anahtarlari bolumunden uretilir ve YALNIZ bir kez gosterilir. ' +
+        'Plan gereksinimi: `hasStaffIntegration` ozelligi acik olmali (degilse 403). ' +
+        'Rate limitler: IP basina 60/dk, anahtar basina 120/dk, toplu senkron 10/saat/kurum, dosya yukleme 6/saat/kurum. ' +
+        'Yazma uclari opsiyonel `Idempotency-Key` header\'i destekler (ayni anahtarla tekrarlanan istek 24 saat boyunca ilk yanitla `Idempotency-Replayed: true` header\'i eslinde yeniden dondurulur).',
+    },
   ],
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -1097,6 +1109,266 @@ export const openApiSpec = {
         description: 'Otomatik veritabani yedeklemesi olusturur. Vercel Cron ile tetiklenir.',
         tags: ['Sistem'],
         responses: { 200: { description: 'Yedekleme tamamlandi' } },
+      },
+    },
+
+    // ── Entegrasyon (IK/HBYS makine API'si) ──────────────────────────────────
+    '/integration/v1/staff': {
+      post: {
+        summary: 'Tekil personel upsert (olustur veya guncelle)',
+        description:
+          'IK/HBYS sisteminden tek personel kaydi gonderir. `externalId` (sicil no) upsert anahtaridir ve ZORUNLUDUR. ' +
+          'Eslesme onceligi: externalId → TC Kimlik No → e-posta. Kayit yoksa olusturulur (201), varsa guncellenir (200). ' +
+          'Admin panelinde Alan Esleme (fieldMapping) tanimlandiysa kaynak sistem alan adlari da gonderilebilir. ' +
+          'Yonetici (admin) hesaplari bu API ile YONETILEMEZ — eslesme `conflict` uretir (422).',
+        tags: ['Entegrasyon'],
+        security: [{ integrationApiKey: [] }],
+        parameters: [
+          { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', minLength: 1, maxLength: 200 }, description: 'Opsiyonel idempotency anahtari (1-200 gorunur ASCII karakter). Ayni anahtarla tekrarlanan istek 24 saat boyunca ilk yaniti dondurur.', example: 'upsert-EMP-1042-v1' },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/IntegrationStaffUpsertRequest' },
+              example: {
+                externalId: 'EMP-1042',
+                firstName: 'Ali',
+                lastName: 'Yilmaz',
+                email: 'ali.yilmaz@hastane.com',
+                tcKimlik: '10000000146',
+                departmentName: 'Acil Servis',
+                title: 'Hemsire',
+                hireDate: '2024-03-15',
+                active: true,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Mevcut kayit guncellendi (action: update/skip/reactivate/deactivate)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationSingleRowResponse' }, example: { runId: '3f6b9a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b', action: 'update', userId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d' } } },
+          },
+          201: {
+            description: 'Yeni personel olusturuldu (action: create)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationSingleRowResponse' }, example: { runId: '3f6b9a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b', action: 'create', userId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d' } } },
+          },
+          400: { description: 'Gecersiz istek govdesi veya gecersiz Idempotency-Key', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { description: 'Kimlik dogrulanamadi — eksik/gecersiz API anahtari', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          403: { description: 'Erisim engellendi — entegrasyon ozelligi planda kapali, kurum pasif/askida, IP allowlist reddi veya push kanali devre disi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          409: { description: 'Ayni Idempotency-Key ile islem halen suruyor veya es zamanli baska bir senkron calisiyor', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          422: {
+            description: 'Kayit islenemedi (error) veya cakisma (conflict — orn. TC baska kurumda kayitli, admin hesabi eslesti). details.runId ve details.action doner.',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationRowErrorResponse' } } },
+          },
+          429: { description: 'Rate limit asildi (IP 60/dk veya anahtar 120/dk)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+
+    '/integration/v1/staff/{externalId}': {
+      patch: {
+        summary: 'Personel kismi guncelleme',
+        description:
+          'Sicil numarasi (`externalId`) ile bulunan personelin YALNIZ gonderilen alanlarini gunceller; gonderilmeyen alanlar korunur. ' +
+          'Govde kanonik alan adlariyla gonderilmelidir (Alan Esleme burada uygulanmaz). ' +
+          'Pasif personele yapilan alan guncellemesi onu yeniden AKTIVE ETMEZ (`active: true` acikca gonderilmedikce).',
+        tags: ['Entegrasyon'],
+        security: [{ integrationApiKey: [] }],
+        parameters: [
+          { name: 'externalId', in: 'path', required: true, schema: { type: 'string', maxLength: 100 }, description: 'Kaynak sistemdeki personel/sicil no', example: 'EMP-1042' },
+          { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', minLength: 1, maxLength: 200 }, description: 'Opsiyonel idempotency anahtari (yazma uclari icin, 24 saat replay)' },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/IntegrationStaffPatchRequest' },
+              example: { title: 'Sorumlu Hemsire', departmentName: 'Yogun Bakim' },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Personel guncellendi',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationSingleRowResponse' }, example: { runId: '3f6b9a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b', action: 'update', userId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d' } } },
+          },
+          400: { description: 'Gecersiz istek govdesi veya gecersiz Idempotency-Key', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { description: 'Kimlik dogrulanamadi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          403: { description: 'Erisim engellendi (plan/kurum/IP/kanal)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          404: { description: 'Personel bulunamadi — bu kurumda verilen sicil no ile kayit yok', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          409: { description: 'Ayni Idempotency-Key ile islem halen suruyor veya es zamanli baska bir senkron calisiyor', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          422: { description: 'Kayit islenemedi (error/conflict)', content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationRowErrorResponse' } } } },
+          429: { description: 'Rate limit asildi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      delete: {
+        summary: 'Personel deaktivasyonu (soft delete)',
+        description:
+          'Sicil numarasi ile bulunan personeli pasif duruma getirir — veri SILINMEZ. ' +
+          'Zaten pasif personel icin `action: skip` ile 200 doner. Ayrilan personelin yeniden ise girisi icin ayni externalId ile `active: true` gonderilmesi yeterlidir (reactivate).',
+        tags: ['Entegrasyon'],
+        security: [{ integrationApiKey: [] }],
+        parameters: [
+          { name: 'externalId', in: 'path', required: true, schema: { type: 'string', maxLength: 100 }, description: 'Kaynak sistemdeki personel/sicil no', example: 'EMP-1042' },
+          { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', minLength: 1, maxLength: 200 }, description: 'Opsiyonel idempotency anahtari (yazma uclari icin, 24 saat replay)' },
+        ],
+        responses: {
+          200: {
+            description: 'Personel deaktive edildi (action: deactivate) veya zaten pasifti (action: skip)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationSingleRowResponse' }, example: { runId: '3f6b9a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b', action: 'deactivate', userId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d' } } },
+          },
+          401: { description: 'Kimlik dogrulanamadi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          403: { description: 'Erisim engellendi (plan/kurum/IP/kanal)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          404: { description: 'Personel bulunamadi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          409: { description: 'Ayni Idempotency-Key ile islem halen suruyor veya es zamanli baska bir senkron calisiyor', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          422: { description: 'Kayit islenemedi (error/conflict — orn. admin hesabi)', content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationRowErrorResponse' } } } },
+          429: { description: 'Rate limit asildi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+
+    '/integration/v1/sync': {
+      post: {
+        summary: 'Toplu personel senkronu (1-2000 kayit)',
+        description:
+          'IK/HBYS sisteminden toplu personel listesi gonderir. `mode: delta` yalniz gonderilen kayitlari isler; ' +
+          '`mode: snapshot` listeyi TAM personel listesi kabul eder — kurum yapilandirmasinda eksik-personeli-deaktive-et (deactivateMissing) ' +
+          'aciksa feed\'de olmayan entegrasyon-yonetimli (externalId\'li) personel deaktive edilir. Guvenlik esigi: max(5, aktif personelin %20\'si) — ' +
+          'asilirsa hicbir sey uygulanmadan kosu `aborted` biter. `dryRun: true` ile hicbir yazma yapilmadan plan raporlanir (canliya gecis oncesi ONERILIR). ' +
+          'Dakikalik anahtar limitine EK olarak kurum basina saatte 10 toplu senkron limiti uygulanir. ' +
+          'Ilk 100 hata satiri yanitta doner; tamami `/integration/v1/sync-runs/{id}` ucundan sayfalanir.',
+        tags: ['Entegrasyon'],
+        security: [{ integrationApiKey: [] }],
+        parameters: [
+          { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', minLength: 1, maxLength: 200 }, description: 'Opsiyonel idempotency anahtari — gecelik islerde `nightly-YYYY-MM-DD` deseni onerilir (24 saat replay)', example: 'nightly-2026-07-03' },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/IntegrationSyncRequest' },
+              example: {
+                mode: 'snapshot',
+                dryRun: true,
+                records: [
+                  { externalId: 'EMP-1', firstName: 'Ali', lastName: 'Yilmaz', departmentName: 'Acil Servis', title: 'Hemsire' },
+                  { externalId: 'EMP-2', firstName: 'Ayse', lastName: 'Demir', email: 'ayse.demir@hastane.com', active: true },
+                ],
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Senkron kosusu tamamlandi (dryRun dahil) — sayaclar ve ilk 100 hata satiri',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/IntegrationSyncResponse' },
+                example: {
+                  runId: '3f6b9a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+                  status: 'completed_with_errors',
+                  counts: { totalRows: 250, createdRows: 12, updatedRows: 230, deactivatedRows: 3, reactivatedRows: 1, skippedRows: 2, failedRows: 2 },
+                  errors: [
+                    { rowIndex: 41, action: 'error', externalId: null, userId: null, message: 'tcKimlik: Gecersiz TC Kimlik No (kontrol haneleri uyusmuyor)' },
+                    { rowIndex: 87, action: 'conflict', externalId: 'EMP-88', userId: null, message: 'Bu TC/e-posta baska bir kurumda kayitli — manuel cozum gerekir' },
+                  ],
+                },
+              },
+            },
+          },
+          400: { description: 'Gecersiz istek govdesi (mode/records eksik, 2000 kayit asildi) veya gecersiz Idempotency-Key', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { description: 'Kimlik dogrulanamadi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          403: { description: 'Erisim engellendi (plan/kurum/IP/kanal)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          409: { description: 'Ayni Idempotency-Key ile islem halen suruyor veya es zamanli baska bir senkron calisiyor', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          422: { description: 'Gonderilen kayitlarin HICBIRI dogrulanamadi — kosu baslatilmadi, details.errors ile satir hatalari doner', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          429: { description: 'Rate limit asildi (IP 60/dk, anahtar 120/dk veya kurum basina 10 senkron/saat)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+
+    '/integration/v1/files': {
+      post: {
+        summary: 'Personel dosyasi yukle (xlsx/csv)',
+        description:
+          'Gecelik IK export dosyasini (xlsx veya csv, en fazla 10MB / 2000 satir) yukler. ' +
+          'Turkce/Ingilizce baslik takma adlari otomatik taninir (Ad, Soyad, E-posta, Telefon, Departman, Unvan, TC Kimlik No...); ' +
+          'noktali virgul (`;`) ayiricili Turkce Excel CSV\'leri desteklenir. ' +
+          '`?mode=preview` ile hicbir yazma yapilmadan on izleme yapilir — gercek yukleme oncesi ONERILIR. ' +
+          '`?syncMode=` kurum yapilandirmasindaki senkron modunu gecersiz kilar. Kurum basina saatte 6 dosya limiti uygulanir.',
+        tags: ['Entegrasyon'],
+        security: [{ integrationApiKey: [] }],
+        parameters: [
+          { name: 'mode', in: 'query', required: false, schema: { type: 'string', enum: ['preview'] }, description: 'preview = dry-run; hicbir degisiklik uygulanmaz, plan raporlanir' },
+          { name: 'syncMode', in: 'query', required: false, schema: { type: 'string', enum: ['delta', 'snapshot'] }, description: 'Senkron modu — verilmezse kurum yapilandirmasi, o da yoksa delta' },
+          { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', minLength: 1, maxLength: 200 }, description: 'Opsiyonel idempotency anahtari (24 saat replay)' },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: { type: 'string', format: 'binary', description: 'Personel listesi dosyasi (.xlsx veya .csv, en fazla 10MB / 2000 veri satiri). Ilk satir baslik olmalidir.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Dosya islendi (preview dahil) — sayaclar ve ilk 100 hata satiri (row = dosyadaki 1-bazli satir numarasi, baslik satiri = 1)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/IntegrationFileSyncResponse' },
+                example: {
+                  runId: '3f6b9a52-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+                  status: 'completed',
+                  counts: { totalRows: 180, createdRows: 5, updatedRows: 173, deactivatedRows: 0, reactivatedRows: 0, skippedRows: 1, failedRows: 1 },
+                  errors: [{ row: 42, stage: 'validation', message: 'email: Gecersiz e-posta formati' }],
+                },
+              },
+            },
+          },
+          400: { description: 'Gecersiz dosya (bos, yanlis uzanti/icerik, 2000 satir asildi, islenebilir satir yok) veya gecersiz query parametresi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { description: 'Kimlik dogrulanamadi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          403: { description: 'Erisim engellendi — plan/kurum/IP veya dosya kanali kurum icin devre disi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          409: { description: 'Ayni Idempotency-Key ile islem halen suruyor veya es zamanli baska bir senkron calisiyor', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          413: { description: 'Dosya boyutu 10MB siniri asildi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          429: { description: 'Rate limit asildi (kurum basina 6 dosya/saat)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+
+    '/integration/v1/sync-runs/{id}': {
+      get: {
+        summary: 'Senkron kosusu durumu ve satir sonuclari',
+        description:
+          'POST /sync, /staff veya /files yanitindaki `runId` ile kosunun ozet sayaclarini ve satir-bazli sonuclarini sayfali dondurur. ' +
+          'Yalniz kendi kurumunuzun kosulari gorunur — baska kuruma ait ID 404 doner. ' +
+          'Satir sonuclarindaki `payloadMasked` alani KVKK geregi maskelidir (TC asla yer almaz) ve 90 gun sonra otomatik imha edilir.',
+        tags: ['Entegrasyon'],
+        security: [{ integrationApiKey: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' }, description: 'Senkron kosusu UUID (runId)' },
+          { name: 'page', in: 'query', required: false, schema: { type: 'integer', default: 1, minimum: 1 }, description: 'Satir sonuclari sayfa numarasi' },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 100, minimum: 1, maximum: 500 }, description: 'Sayfa basina satir sayisi (maks 500)' },
+          { name: 'action', in: 'query', required: false, schema: { type: 'string', enum: ['create', 'update', 'deactivate', 'reactivate', 'skip', 'conflict', 'error'] }, description: 'Satir sonuclarini islem tipine gore filtreler (orn. yalniz hatalar icin `error`)' },
+        ],
+        responses: {
+          200: {
+            description: 'Kosu ozeti + sayfali satir sonuclari',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/IntegrationSyncRunDetailResponse' } } },
+          },
+          400: { description: 'Gecersiz islem filtresi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { description: 'Kimlik dogrulanamadi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          403: { description: 'Erisim engellendi (plan/kurum/IP)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          404: { description: 'Senkron kosusu bulunamadi (veya baska kuruma ait)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          429: { description: 'Rate limit asildi', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
       },
     },
   },

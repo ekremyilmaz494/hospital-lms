@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download, KeyRound, FileText, CheckCircle2, Target, Award, ArrowUp } from 'lucide-react';
+import { ArrowLeft, GraduationCap, Briefcase, Edit, Mail, Phone, Building2, RotateCcw, Plus, Download, KeyRound, FileText, CheckCircle2, Target, Award, ArrowUp, ShieldCheck, ShieldOff } from 'lucide-react';
 import { AssignTrainingModal } from '../assign-training-modal';
 import { ResetPasswordModal } from '@/components/shared/reset-password-modal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useFetch } from '@/hooks/use-fetch';
+import { useAuth } from '@/hooks/use-auth';
+import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { isSyntheticEmail } from '@/lib/synthetic-email';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
@@ -21,6 +23,8 @@ interface StaffDetail {
   title: string;
   phone: string;
   initials: string;
+  role: string;
+  adminAccessGranted: boolean;
   stats: { assignedTrainings: number; completedTrainings: number; successRate: string; avgScore: string };
   trainingHistory: { trainingId: string; title: string; attempt: number; maxAttempts: number; preScore: number | null; postScore: number | null; status: string; date: string }[];
 }
@@ -53,6 +57,11 @@ export default function StaffDetailPage() {
   const id = typeof params?.id === 'string' ? params.id : null;
   const { toast } = useToast();
   const { data: staff, isLoading, error, refetch } = useFetch<StaffDetail>(id ? `/api/admin/staff/${id}` : null);
+  const { user } = useAuth();
+  const branding = useLayoutBranding();
+  // Yalnız Esas Yönetici (org owner) ek yönetici yetkisi verebilir/kaldırabilir.
+  const isOwner = !!(branding?.ownerUserId && user && branding.ownerUserId === user.id);
+  const [adminAccessBusy, setAdminAccessBusy] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [grantTarget, setGrantTarget] = useState<{ trainingId: string; title: string } | null>(null);
@@ -88,6 +97,30 @@ export default function StaffDetailPage() {
       toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
     } finally {
       setGranting(false);
+    }
+  };
+
+  // Esas Yönetici, personele ek yönetici (hastane-admin) yetkisi verir/kaldırır.
+  // Kişi personel olarak kalır (eğitim alır) ama /admin paneline de erişir.
+  const handleAdminAccessToggle = async () => {
+    if (!id || !staff) return;
+    const grant = !staff.adminAccessGranted;
+    setAdminAccessBusy(true);
+    try {
+      const res = await fetch(`/api/admin/staff/${id}/admin-access`, { method: grant ? 'POST' : 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(body.error || 'İşlem başarısız', 'error'); return; }
+      toast(
+        grant
+          ? 'Yönetici yetkisi verildi. Personel bir sonraki girişinde yönetim paneline erişebilecek.'
+          : 'Yönetici yetkisi kaldırıldı.',
+        'success',
+      );
+      refetch();
+    } catch {
+      toast('Bir hata oluştu', 'error');
+    } finally {
+      setAdminAccessBusy(false);
     }
   };
 
@@ -288,6 +321,27 @@ export default function StaffDetailPage() {
             <KeyRound className="h-4 w-4" />
             <span>Şifre Sıfırla</span>
           </button>
+          {isOwner && staff.role === 'staff' && (
+            <button
+              className="sd-btn"
+              onClick={handleAdminAccessToggle}
+              disabled={adminAccessBusy}
+              title={staff.adminAccessGranted
+                ? 'Bu personelin yönetim paneli (admin) yetkisini kaldır'
+                : 'Bu personele yönetim paneli (admin) erişimi ver — personel olarak kalır, eğitim almaya devam eder'}
+              style={{
+                background: staff.adminAccessGranted ? '#ffffff' : '#fef3c7',
+                color: '#92400e',
+                border: '1.5px solid #f59e0b',
+                fontFamily: K.FONT_DISPLAY,
+                opacity: adminAccessBusy ? 0.6 : 1,
+                cursor: adminAccessBusy ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {staff.adminAccessGranted ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+              <span>{staff.adminAccessGranted ? 'Yönetici Yetkisini Kaldır' : 'Yönetici Yetkisi Ver'}</span>
+            </button>
+          )}
           <button
             className="sd-btn"
             onClick={() => setAssignModalOpen(true)}
