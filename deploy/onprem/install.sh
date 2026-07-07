@@ -59,6 +59,30 @@ else
   read -rp "Lisans sunucusu URL'i [https://app.klinovax.com]: " LICENSE_SERVER_URL
   LICENSE_SERVER_URL="${LICENSE_SERVER_URL:-https://app.klinovax.com}"
 
+  # Yedek/alarm bildirimleri — yedek başarısız olursa bu adrese e-posta gider
+  # (aksi halde 44 gün fark edilmeyen yedek-arızası riski). Boş bırakılırsa alarm
+  # e-postası GİTMEZ (yalnız log/Sentry backstop kalır).
+  read -rp "Yedek/alarm bildirim e-postası [${ONPREM_ADMIN_EMAIL}]: " ADMIN_ALERT_EMAIL
+  ADMIN_ALERT_EMAIL="${ADMIN_ALERT_EMAIL:-$ONPREM_ADMIN_EMAIL}"
+
+  # SMTP relay — varsayılan 'mailpit' e-postaları YAKALAR ama GÖNDERMEZ (yalnız dev/demo).
+  # Gerçek e-posta (yedek-alarm, davet, şifre-sıfırlama) için kurum relay'i girilmeli.
+  log "SMTP relay yapılandırması (Enter=mailpit; bu modda e-postalar GERÇEKTEN gönderilmez):"
+  read -rp "  SMTP host [mailpit]: " SMTP_HOST
+  SMTP_HOST="${SMTP_HOST:-mailpit}"
+  if [ "$SMTP_HOST" = "mailpit" ]; then
+    SMTP_PORT=1025; SMTP_SECURE=false; SMTP_USER=""; SMTP_PASS=""
+    FROM_EMAIL="noreply@klinovax.local"
+    log "  → mailpit: alarm/davet/şifre-sıfırlama e-postaları GÖNDERİLMEZ (sadece yakalanır). Prod'da gerçek relay girin."
+  else
+    read -rp "  SMTP port [587]: " SMTP_PORT; SMTP_PORT="${SMTP_PORT:-587}"
+    read -rp "  SMTP TLS/secure (true/false) [false]: " SMTP_SECURE; SMTP_SECURE="${SMTP_SECURE:-false}"
+    read -rp "  SMTP kullanıcı adı: " SMTP_USER
+    read -rsp "  SMTP parola: " SMTP_PASS; echo
+    read -rp "  Gönderen (From) e-posta [${ADMIN_ALERT_EMAIL}]: " FROM_EMAIL
+    FROM_EMAIL="${FROM_EMAIL:-$ADMIN_ALERT_EMAIL}"
+  fi
+
   BASE_DOMAIN="$(printf '%s' "$PUBLIC_APP_URL" | sed -E 's#^https?://##')"
 
   cat > .env <<EOF
@@ -81,12 +105,13 @@ MINIO_ROOT_USER=klinovax
 MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 S3_BUCKET=klinovax-media
 SRH_TOKEN=${SRH_TOKEN}
-SMTP_HOST=mailpit
-SMTP_PORT=1025
-SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASS=
-FROM_EMAIL=noreply@klinovax.local
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
+SMTP_SECURE=${SMTP_SECURE}
+SMTP_USER=${SMTP_USER}
+SMTP_PASS=${SMTP_PASS}
+FROM_EMAIL=${FROM_EMAIL}
+ADMIN_ALERT_EMAIL=${ADMIN_ALERT_EMAIL}
 CRON_SECRET=${CRON_SECRET}
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY}

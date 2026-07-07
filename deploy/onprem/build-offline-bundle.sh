@@ -48,6 +48,7 @@ echo "[bundle] Compose + config kopyalanıyor…"
 cp deploy/onprem/docker-compose.yml "$OUT/"
 cp deploy/onprem/.env.example "$OUT/"
 cp deploy/onprem/install.sh "$OUT/"
+cp deploy/onprem/backup-volumes.sh "$OUT/"
 cp deploy/onprem/README.md "$OUT/" 2>/dev/null || true
 cp -r deploy/onprem/gateway "$OUT/"
 cp -r deploy/onprem/scheduler "$OUT/"

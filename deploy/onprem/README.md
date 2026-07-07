@@ -74,25 +74,131 @@ docker load < klinovax-onprem-images.tar.gz
 
 ## Güncelleme
 
+**Önce yedek al** (migration'lar ileri-yönlüdür; kötü sürümden dönüş için gerekir):
+
 ```bash
 cd deploy/onprem
+./backup-volumes.sh /mnt/nas/klinovax-backups   # DB + dosyalar (aşağıya bkz.)
 docker compose pull        # yeni imaj (offline'da: docker load < yeni-tarball)
 docker compose up -d       # migration'lar entrypoint'te otomatik uygulanır
 ```
 
 Migration'lar konteyner açılışında `prisma migrate deploy` ile idempotent çalışır.
 
+**Sürüm sabitleme (önerilir).** Varsayılan `:onprem` tag'i değişkendir (her `pull` en sonu
+getirir). Hangi sürümde olduğunuzu bilmek + geri dönebilmek için `.env`'de sabit sürüm pinleyin:
+
+```bash
+# .env
+APP_IMAGE=klinovax/hospital-lms:onprem-1.4.2   # sabit sürüm tag'i
+```
+
+**Geri alma (rollback).** Şema değiştiren bir güncelleme sonrası:
+
+1. Sorun yalnız uygulama kodundaysa (şema aynı): `.env`'de `APP_IMAGE`'i önceki sürüme
+   çevir → `docker compose up -d`.
+2. Migration da geldiyse: eski imaja dönmek TANIMSIZDIR (Prisma ileri-yönlü). Güncelleme
+   ÖNCESİ alınan yedeğe **Geri Yükleme** (aşağı) yap → sonra eski imajı başlat.
+   Bu yüzden her güncelleme öncesi yedek ŞARTTIR.
+
 ## Yedekleme
 
-- Uygulama içi otomatik yedek cron'u MinIO'ya şifreli yazar (`/api/cron/backup`).
-- Kalıcı diskler: `pgdata` (Postgres), `miniodata` (dosyalar), `redisdata`.
-  Docker volume yedeği alın:
-  ```bash
-  docker run --rm -v klinovax-onprem_pgdata:/data -v "$PWD":/backup alpine \
-    tar czf /backup/pgdata-$(date +%F).tar.gz -C /data .
-  ```
-- `.env` dosyasını da yedekleyin — `ENCRYPTION_KEY` kaybı **kalıcı veri kaybıdır**
-  (şifreli TC Kimlik alanları açılamaz).
+Uygulama-içi cron (`/api/cron/backup`) MinIO'ya **şifreli** yazar — ama AYNI sunucuda.
+Sunucu arızası/ransomware'de veri + yedek birlikte gider. Gerçek koruma için **off-site**:
+
+```bash
+cd deploy/onprem
+./backup-volumes.sh /mnt/nas/klinovax-backups   # DEST: harici disk / NFS / rsync hedefi
+```
+
+`backup-volumes.sh` pg_dump + MinIO nesne deposunu DEST'e alır. **HOST crontab'ına** ekleyin
+(konteyner-içi scheduler'a değil — Docker soketi gerekir), DEST'i sunucu-DIŞI bir mount yapın:
+
+```
+30 2 * * *  cd /opt/klinovax/deploy/onprem && ./backup-volumes.sh /mnt/nas/klinovax >> /var/log/klinovax-offsite.log 2>&1
+```
+
+**Alarm.** Yedek/yedek-doğrulama cron'u başarısız olursa `ADMIN_ALERT_EMAIL`'e e-posta atar
+(install.sh sorar). Gerçek SMTP relay tanımlı DEĞİLSE (mailpit) alarm gitmez — prod'da
+mutlaka kurum relay'i girin (aksi halde bozuk yedek fark edilmez).
+
+**`.env`'i AYRI yedekleyin** — `ENCRYPTION_KEY`/`BACKUP_ENCRYPTION_KEY` kaybı **kalıcı veri
+kaybıdır** (şifreli TC Kimlik alanları + şifreli yedekler açılamaz).
+
+## Geri Yükleme (Restore)
+
+**Senaryo A — uygulama-içi yedekten (aynı sunucu ayakta).** Süper-admin → `/super-admin/backups`
+→ yedeği seç → geri yükle. `BACKUP_ENCRYPTION_KEY` `.env`'de aynı olmalı.
+
+**Senaryo B — tam sunucu kaybı (off-site yedekten yeni sunucuya).**
+
+```bash
+# 1) Yeni sunucuda stack'i kur ama ESKİ .env'i geri koy (yeni üretME):
+cd deploy/onprem
+cp /güvenli/yer/.env .env        # ESKİ anahtarlarla — install.sh'ı .env varken çalıştırma
+docker compose up -d postgres minio    # önce veri servisleri
+sleep 20
+
+# 2) PostgreSQL dump'ını geri yükle:
+gunzip -c /mnt/nas/klinovax/db-YYYYMMDD-HHMMSS.sql.gz \
+  | docker compose exec -T postgres psql -U postgres -d postgres
+
+# 3) MinIO nesne deposunu geri yükle (dosyalar/videolar):
+docker run --rm -v klinovax-onprem_miniodata:/data \
+  -v /mnt/nas/klinovax:/backup alpine \
+  sh -c 'cd /data && tar xzf /backup/minio-YYYYMMDD-HHMMSS.tar.gz'
+
+# 4) Tüm stack'i başlat + doğrula:
+docker compose up -d
+docker compose ps                         # 10/10 healthy?
+curl -s http://localhost:3000/api/health  # license.state + servisler
+```
+
+> Restore'u satıştan sonra DEĞİL, ilk kurulumda bir kez **tatbik edin** — test edilmemiş
+> yedek = yedek yok. Örnek dosya adlarını (`YYYYMMDD-HHMMSS`) gerçek yedeğinizle değiştirin.
+
+## TLS ile kurulum (reverse proxy)
+
+Tarayıcı 3 endpoint'e erişir: **app** (3000), **gateway** (8000, auth+realtime/ws),
+**MinIO** (9000, presigned). Hepsini TLS sonlandıran bir reverse proxy arkasına alın ve
+`.env`'de PUBLIC URL'leri **https** yapın (`PUBLIC_APP_URL`, `PUBLIC_STORAGE_URL`).
+
+> **Mixed-content tuzağı:** app https, `PUBLIC_STORAGE_URL` http kalırsa video/dosya
+> sessizce yüklenmez. İkisini birlikte https yapın.
+
+Örnek nginx (tek domain, path-tabanlı — CSP on-prem'de şema-bazlı olduğundan çalışır):
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name lms.hastane.local;
+  ssl_certificate     /etc/ssl/hastane/fullchain.pem;   # kurum sertifikası
+  ssl_certificate_key /etc/ssl/hastane/privkey.pem;
+
+  location /auth/     { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host; }
+  location /realtime/ {                                   # WebSocket (realtime bildirimler)
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+  location /storage/  { proxy_pass http://127.0.0.1:9000; proxy_set_header Host $host; client_max_body_size 512m; }
+  location /          { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; client_max_body_size 512m; }
+}
+```
+
+Self-signed kurum CA kullanıyorsanız istemci makinelerin bu CA'ya güvenmesi gerekir.
+
+## Log rotasyonu
+
+Uzun süre çalışan sunucuda konteyner logları diski doldurabilir. `.env` yanında bir
+`daemon.json` (Docker) ile döndürün ya da compose'a servis-bazlı ekleyin:
+
+```yaml
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+```
 
 ## Güvenlik notları
 

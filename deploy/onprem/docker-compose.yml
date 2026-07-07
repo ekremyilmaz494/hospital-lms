@@ -90,6 +90,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SES_FROM_EMAIL: ${FROM_EMAIL:-noreply@klinovax.local}
+      # Yedek/yedek-doğrulama cron'u başarısızlıkta bu adrese alarm e-postası atar.
+      # BOŞSA alarm gitmez (yalnız log/Sentry backstop) — install.sh sorar.
+      ADMIN_ALERT_EMAIL: ${ADMIN_ALERT_EMAIL:-}
       # Güvenlik/altyapı sırları
       CRON_SECRET: ${CRON_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -156,6 +159,11 @@ services:
       GOTRUE_SMTP_HOST: ${SMTP_HOST:-mailpit}
       GOTRUE_SMTP_PORT: ${SMTP_PORT:-1025}
       GOTRUE_SMTP_ADMIN_EMAIL: ${FROM_EMAIL:-noreply@klinovax.local}
+      # Kimlik-doğrulamalı kurum relay'i için USER/PASS — yoksa authenticated SMTP'de
+      # şifre-sıfırlama/davet e-postaları sessizce başarısız olur (mailpit'te boş kalır).
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${FROM_EMAIL:-noreply@klinovax.local}
     expose:
       - "9999"
 
