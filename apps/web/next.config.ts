@@ -22,19 +22,10 @@ const isOnPremBuild =
   process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === 'onprem' ||
   process.env.DEPLOYMENT_MODE === 'onprem';
 
-// On-prem CSP/images için env'den türetilen origin'ler. NEXT_PUBLIC_STORAGE_HOST =
-// tarayıcının eriştiği nesne deposu origin'i (örn. MinIO: https://depo.hastane.local).
-const storageOrigin = (process.env.NEXT_PUBLIC_STORAGE_HOST ?? '').replace(/\/$/, '');
-const supabaseOrigin = (() => {
-  try {
-    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').origin;
-  } catch {
-    return '';
-  }
-})();
-// Realtime websocket aynı host'a ws(s) şemasıyla bağlanır.
-const supabaseWsOrigin = supabaseOrigin.replace(/^http/, 'ws');
-const cspList = (parts: Array<string | false>) => parts.filter(Boolean).join(' ');
+// On-prem CSP/images artık origin-pin ETMEZ (tek generic imaj → müşteri origin'i
+// build-time bilinmez): CSP şema-bazlı (http/https/ws/wss) açılır, next/image on-prem'de
+// unoptimized. Tarayıcı-yüzlü değerler RUNTIME'da enjekte edilir (bkz. onprem-config.ts
+// getBrowserRuntimeConfig → window.__ONPREM_CONFIG__).
 
 // ── Build-time guard: Yanlış Supabase URL ile production build'i engelle ──
 // CI (GitHub Actions) ortamında placeholder URL kullanıldığı için atla.
@@ -86,25 +77,20 @@ const nextConfig: NextConfig = {
     (process.env.NODE_ENV === 'development' && process.platform === 'darwin'
       ? '.next.nosync'
       : '.next'),
-  images: {
-    // On-prem: origin'ler müşteri env'inden türetilir (self-hosted Supabase + MinIO).
-    // Bulut: mevcut wildcard'lar aynen korunur.
-    remotePatterns: isOnPremBuild
-      ? ([supabaseOrigin, storageOrigin]
-          .filter(Boolean)
-          .map((origin) => {
-            const u = new URL(origin);
-            return {
-              protocol: u.protocol.replace(':', '') as 'http' | 'https',
-              hostname: u.hostname,
-              ...(u.port ? { port: u.port } : {}),
-            };
-          }))
-      : [
-          { protocol: 'https', hostname: '**.supabase.co' },
-          { protocol: 'https', hostname: '**.cloudfront.net' },
+  images: isOnPremBuild
+    ? {
+        // On-prem: müşteri storage domaini build-time'da bilinmez (tek generic imaj) +
+        // presigned URL'ler her istekte değişir → remotePatterns pinlenemez. Optimizasyon
+        // kapatılır (orijinal servis edilir) → herhangi müşteri domaini/portu çalışır.
+        unoptimized: true,
+      }
+    : {
+        // Bulut: mevcut wildcard'lar aynen korunur.
+        remotePatterns: [
+          { protocol: 'https' as const, hostname: '**.supabase.co' },
+          { protocol: 'https' as const, hostname: '**.cloudfront.net' },
         ],
-  },
+      },
   experimental: {
     proxyClientMaxBodySize: '512mb',
     optimizePackageImports: [
@@ -206,31 +192,28 @@ const nextConfig: NextConfig = {
             // unpkg.com: ffmpeg-core.js (client-side video compress). 'wasm-unsafe-eval': WebAssembly icin gerekli.
             `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://unpkg.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline'",
-            // On-prem'de LAN/http senaryosu için storage origin'i açıkça eklenir
-            // (https: genel izni http origin'i kapsamaz).
+            // On-prem: tek generic imaj HER müşteri domaininde çalışmalı; storage/gateway
+            // origin'leri build-time'da bilinmez (runtime enjekte edilir). Bu yüzden
+            // veri-yükleyen direktifler (img/connect/media/frame) ORIGIN-PİN yerine ŞEMA-bazlı
+            // (http:/https:/ws:/wss:) açılır. Güvenlik korunur: script-src hâlâ 'self' + unpkg
+            // ile kilitli (XSS ana koruması), default-src 'self'. Trust modeli: on-prem tek-tenant,
+            // müşteri-kontrollü ağ — bu gevşetme kabul edilebilir. Bulut yolu (origin-pin) DEĞİŞMEZ.
             isOnPremBuild
-              ? cspList(["img-src 'self' data: https: blob:", storageOrigin])
+              ? "img-src 'self' data: https: http: blob:"
               : "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
             // unpkg.com: ffmpeg-core.wasm fetch
             // blob:: three.js GLTFLoader gömülü GLB texture'larını blob URL'den fetch eder
             // Sentry: *.ingest.de.sentry.io = AB (Frankfurt) bölgesi ingest — KVKK yurt dışı
             // aktarımını en aza indirmek için AB-bölgesi DSN kullanılır (bkz. .env.production.reference).
-            // On-prem: origin'ler env'den (self-hosted Supabase + MinIO); Sentry/CloudFront yok.
             isOnPremBuild
-              ? cspList([
-                  "connect-src 'self' blob:",
-                  supabaseOrigin,
-                  supabaseWsOrigin,
-                  storageOrigin,
-                  'https://unpkg.com',
-                ])
+              ? "connect-src 'self' blob: https: http: wss: ws:"
               : "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://unpkg.com",
             isOnPremBuild
-              ? cspList(["media-src 'self' data:", storageOrigin, 'blob:'])
+              ? "media-src 'self' data: https: http: blob:"
               : "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             isOnPremBuild
-              ? cspList(["frame-src 'self'", storageOrigin, 'blob:'])
+              ? "frame-src 'self' https: http: blob:"
               : "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor
             "worker-src 'self' blob:",

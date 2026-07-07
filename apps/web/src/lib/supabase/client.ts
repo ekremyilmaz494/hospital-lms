@@ -1,11 +1,11 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { getCookieDomain } from './cookie-domain'
-import { getSupabaseCookieOptions } from './onprem-config'
+import { getSupabaseCookieOptions, readBrowserConfig } from './onprem-config'
 
-/** Supabase credentials mevcut mu? */
+/** Supabase credentials mevcut mu? On-prem'de runtime (window.__ONPREM_CONFIG__), aksi baked. */
 export const hasSupabaseCredentials =
-  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  (!!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+  (typeof window !== 'undefined' && !!readBrowserConfig())
 
 const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60
 
@@ -50,9 +50,12 @@ function parseCookies(): Array<{ name: string; value: string }> {
 }
 
 export function createClient() {
+  // On-prem: runtime config (window.__ONPREM_CONFIG__) baked localhost'u ezer; bulutta
+  // config null → baked NEXT_PUBLIC_* kullanılır (davranış bit-bit aynı).
+  const rt = readBrowserConfig()
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    rt?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    rt?.supabaseAnonKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookieOptions: getSupabaseCookieOptions(),
       cookies: {

@@ -36,3 +36,57 @@ export function getServerSupabaseUrl(): string {
 export function getSupabaseCookieOptions(): { name: string } | undefined {
   return isOnPrem() ? { name: 'sb-onprem-auth-token' } : undefined
 }
+
+/**
+ * Tarayıcı-yüzlü RUNTIME config — tek generic on-prem imajı için.
+ *
+ * NEDEN: `NEXT_PUBLIC_*` değerleri Next.js tarafından BUILD anında (server component'te
+ * bile) koda inline edilir → registry'den çekilen tek imaj 'localhost'a kilitlenir; hastane
+ * LAN/domaininde tarayıcı-taraflı Supabase auth/realtime KIRILIR. Çözüm: değerleri runtime'da
+ * enjekte et — root layout (server) `getBrowserRuntimeConfig()`'i okur, `window.__ONPREM_CONFIG__`'e
+ * basar; tarayıcı `readBrowserConfig()` ile oradan okur. Değerler NON-NEXT_PUBLIC env'den gelir
+ * (`ONPREM_PUBLIC_*`) — bunlar inline EDİLMEZ, runtime'da compose/.env'den okunur.
+ *
+ * Bulut: isOnPrem=false → getBrowserRuntimeConfig null → window global basılmaz →
+ * readBrowserConfig null → her yer baked `NEXT_PUBLIC_*`'e düşer (davranış bit-bit aynı).
+ * anon key zaten PUBLIC (NEXT_PUBLIC) — window'a basmak yeni ifşa DEĞİL.
+ */
+export interface OnpremBrowserConfig {
+  supabaseUrl: string
+  supabaseAnonKey: string
+  storageHost: string
+  appUrl: string
+  baseDomain: string
+}
+
+/** SUNUCU: runtime env'den tarayıcı config'i (yalnız on-prem + zorunlu alanlar dolu). Aksi null. */
+export function getBrowserRuntimeConfig(): OnpremBrowserConfig | null {
+  if (!isOnPrem()) return null
+  const supabaseUrl = process.env.ONPREM_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.ONPREM_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) return null
+  return {
+    supabaseUrl,
+    supabaseAnonKey,
+    storageHost: process.env.ONPREM_PUBLIC_STORAGE_HOST ?? '',
+    appUrl: process.env.ONPREM_PUBLIC_APP_URL ?? '',
+    baseDomain: process.env.ONPREM_PUBLIC_BASE_DOMAIN ?? '',
+  }
+}
+
+/** İZOMORFİK: tarayıcıdaki runtime config (window.__ONPREM_CONFIG__). Bulut/SSR'da null. */
+export function readBrowserConfig(): OnpremBrowserConfig | null {
+  if (typeof window === 'undefined') return null
+  return (window as unknown as { __ONPREM_CONFIG__?: OnpremBrowserConfig }).__ONPREM_CONFIG__ ?? null
+}
+
+/**
+ * `window.__ONPREM_CONFIG__` enjeksiyonu için güvenli inline script gövdesi.
+ * `<` kaçırılır (JSON içinde `</script>` ile script'ten çıkışı engeller). Değerler operatör
+ * .env'inden gelir (kullanıcı girdisi değil) ama defense-in-depth. Config null → boş string
+ * (script hiç basılmaz — çağıran koşullar).
+ */
+export function serializeBrowserConfigScript(config: OnpremBrowserConfig | null): string {
+  if (!config) return ''
+  return `window.__ONPREM_CONFIG__=${JSON.stringify(config).replace(/</g, '\\u003c')}`
+}

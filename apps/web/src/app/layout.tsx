@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/server";
+import { getBrowserRuntimeConfig, serializeBrowserConfigScript } from "@/lib/supabase/onprem-config";
 import type { User } from "@/types/database";
 import { extractAdminAccess } from "@/lib/auth/admin-authority";
 import { ToastProvider } from "@/components/shared/toast";
@@ -94,6 +95,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const initialUser = await getInitialUser();
+  // On-prem: tarayıcı-yüzlü config RUNTIME'da enjekte edilir (NEXT_PUBLIC_* build-time
+  // gömülü olduğundan tek generic imaj için gerekli). Bulutta null → hiç basılmaz.
+  const onpremConfig = getBrowserRuntimeConfig();
   return (
     <html
       lang="tr"
@@ -103,6 +107,13 @@ export default async function RootLayout({
     >
       <head>
         <meta name="theme-color" content="#0d9668" />
+        {/* On-prem runtime config — HER client script'inden ÖNCE (Supabase browser client
+            bunu okur). Bulutta onpremConfig null → hiç basılmaz, baked NEXT_PUBLIC kullanılır. */}
+        {onpremConfig && (
+          <script
+            dangerouslySetInnerHTML={{ __html: serializeBrowserConfigScript(onpremConfig) }}
+          />
+        )}
         {/* Pre-paint data-color set — FOUC önler. Next 16 App Router'da native script + dangerouslySetInnerHTML zorunlu (next/script beforeInteractive artık desteklenmiyor). */}
         <script
           dangerouslySetInnerHTML={{
