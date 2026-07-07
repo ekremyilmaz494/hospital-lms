@@ -48,6 +48,19 @@ export const s3Accelerate = S3_ENDPOINT
       useAccelerateEndpoint: true,
     })
 
+// Sunucu-taraf DOĞRUDAN işlemler (upload/download/complete/copy/verify) için iç
+// endpoint. On-prem'de presigned URL'ler tarayıcı-erişilebilir PUBLIC endpoint
+// (S3_ENDPOINT) kullanır AMA bu doğrudan işlemler container→MinIO İÇ adresine
+// (S3_INTERNAL_ENDPOINT=http://minio:9000) gitmeli: public endpoint 'localhost:9000'
+// ise container İÇİNDEN erişilemez (ECONNREFUSED — içerik yükleme, multipart complete,
+// yedek cron'u kırılır). İç endpoint TANIMSIZSA null → her call site mevcut client'ını
+// kullanır (bulut = AWS s3/s3Accelerate; tek-endpoint on-prem = S3_ENDPOINT). Böylece
+// bulut davranışı BİT-BİT korunur (yalnız S3_INTERNAL_ENDPOINT set edilince devreye girer).
+const S3_INTERNAL_ENDPOINT = process.env.S3_INTERNAL_ENDPOINT
+export const s3Internal = S3_INTERNAL_ENDPOINT
+  ? new S3Client({ ...s3BaseConfig, endpoint: S3_INTERNAL_ENDPOINT, forcePathStyle: true })
+  : null
+
 const BUCKET = process.env.AWS_S3_BUCKET!
 
 const ALLOWED_CONTENT_TYPES = [
@@ -124,10 +137,11 @@ export async function createMultipart(
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
     throw new Error(`İzin verilmeyen dosya türü: ${contentType}.`)
   }
-  // Create/Complete/Abort sunucu↔S3 arası çalışır, client'ın network'üne bağlı değil;
-  // yine de tutarlılık için aynı bucket addressing'i kullanılır. AcceleratedEndpoint
-  // ve standart endpoint aynı bucket'a yazar, sadece DNS farklı.
-  const client = opts?.accelerate === false ? s3 : s3Accelerate
+  // Create/Complete/Abort sunucu↔S3 arası çalışır (client'ın network'üne bağlı değil) →
+  // on-prem'de iç endpoint (s3Internal) kullanılır; parça PUT'ları AYRI presign'lanır ve
+  // tarayıcıdan public endpoint'e gider (aynı bucket, farklı DNS). İç endpoint yoksa
+  // mevcut client (bulut accelerate/standart) korunur.
+  const client = s3Internal ?? (opts?.accelerate === false ? s3 : s3Accelerate)
   const res = await client.send(
     new CreateMultipartUploadCommand({
       Bucket: BUCKET,
@@ -166,7 +180,7 @@ export async function completeMultipart(
   uploadId: string,
   parts: { partNumber: number; etag: string }[],
 ) {
-  await s3Accelerate.send(
+  await (s3Internal ?? s3Accelerate).send(
     new CompleteMultipartUploadCommand({
       Bucket: BUCKET,
       Key: key,
@@ -182,7 +196,7 @@ export async function completeMultipart(
 
 export async function abortMultipart(key: string, uploadId: string) {
   try {
-    await s3Accelerate.send(
+    await (s3Internal ?? s3Accelerate).send(
       new AbortMultipartUploadCommand({ Bucket: BUCKET, Key: key, UploadId: uploadId }),
     )
   } catch (err) {
@@ -245,7 +259,7 @@ export async function getStreamUrl(key: string) {
 /** Delete object from S3 — hata fırlatmaz, orphan key'i loglar */
 export async function deleteObject(key: string) {
   try {
-    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
+    await (s3Internal ?? s3).send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
   } catch (err) {
     logger.warn('s3-delete', `S3 silme basarisiz (orphan olabilir): ${key}`, err)
   }
@@ -253,7 +267,7 @@ export async function deleteObject(key: string) {
 
 /** Upload a buffer directly to S3 (for server-side operations like backups) */
 export async function uploadBuffer(key: string, body: Buffer, contentType: string) {
-  await s3.send(new PutObjectCommand({
+  await (s3Internal ?? s3).send(new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
     Body: body,
@@ -267,7 +281,7 @@ export async function uploadBuffer(key: string, body: Buffer, contentType: strin
 
 /** Download an S3 object as Buffer (for server-side operations like restore) */
 export async function downloadBuffer(key: string): Promise<Buffer> {
-  const response = await s3.send(new GetObjectCommand({
+  const response = await (s3Internal ?? s3).send(new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
   }))
@@ -286,7 +300,7 @@ export async function downloadBuffer(key: string): Promise<Buffer> {
 
 /** Copy an S3 object to a new key (same bucket) */
 export async function copyObject(sourceKey: string, destinationKey: string) {
-  await s3.send(new CopyObjectCommand({
+  await (s3Internal ?? s3).send(new CopyObjectCommand({
     Bucket: BUCKET,
     CopySource: `${BUCKET}/${sourceKey}`,
     Key: destinationKey,
@@ -296,7 +310,7 @@ export async function copyObject(sourceKey: string, destinationKey: string) {
 /** Verify an S3 object exists and has size > 0. Returns content length in bytes or null if invalid. */
 export async function verifyS3Object(key: string): Promise<number | null> {
   try {
-    const response = await s3.send(new HeadObjectCommand({
+    const response = await (s3Internal ?? s3).send(new HeadObjectCommand({
       Bucket: BUCKET,
       Key: key,
     }))
@@ -311,7 +325,7 @@ export async function verifyS3Object(key: string): Promise<number | null> {
  *  (verifyS3Object size>0 şartı koyar, örn. transkript `.queued` marker'ını göremez). */
 export async function s3ObjectExists(key: string): Promise<boolean> {
   try {
-    await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
+    await (s3Internal ?? s3).send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
     return true
   } catch {
     return false

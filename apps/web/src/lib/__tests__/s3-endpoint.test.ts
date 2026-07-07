@@ -46,3 +46,25 @@ describe('s3 endpoint override (on-prem MinIO)', () => {
     expect(await resolveFlag(mod.s3.config.useAccelerateEndpoint)).toBe(false)
   })
 })
+
+describe('s3 internal endpoint (on-prem sunucu-taraf doğrudan işlemler)', () => {
+  it('S3_INTERNAL_ENDPOINT verilince ayrı iç client (minio:9000, path-style) oluşur', async () => {
+    vi.stubEnv('S3_ENDPOINT', 'http://localhost:9000') // public (tarayıcı) — presign host'u
+    vi.stubEnv('S3_INTERNAL_ENDPOINT', 'http://minio:9000') // iç (container→MinIO)
+    const mod = await import('@/lib/s3')
+    expect(mod.s3Internal).not.toBeNull()
+    const endpoint = await mod.s3Internal!.config.endpoint?.()
+    expect(endpoint?.hostname).toBe('minio')
+    expect(endpoint?.port).toBe(9000)
+    expect(mod.s3Internal!.config.forcePathStyle).toBe(true)
+    // Public presign client'ı AYRI kalır (localhost host'u tarayıcıya verilir).
+    const pub = await mod.s3.config.endpoint?.()
+    expect(pub?.hostname).toBe('localhost')
+  })
+
+  it('S3_INTERNAL_ENDPOINT yokken s3Internal null — bulut/tek-endpoint davranışı korunur', async () => {
+    vi.stubEnv('S3_INTERNAL_ENDPOINT', '')
+    const mod = await import('@/lib/s3')
+    expect(mod.s3Internal).toBeNull()
+  })
+})

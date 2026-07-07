@@ -55,7 +55,14 @@ services:
       NEXT_PUBLIC_APP_URL: ${PUBLIC_APP_URL}
       NEXT_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN}
       # Nesne deposu (MinIO — S3 uyumlu, path-style)
+      # S3_ENDPOINT = PUBLIC (tarayıcı-erişilebilir) — presigned URL host'u budur.
       S3_ENDPOINT: ${PUBLIC_STORAGE_URL}
+      # S3_INTERNAL_ENDPOINT = sunucu-taraf DOĞRUDAN işlemler (upload/download/multipart
+      # complete/yedek cron'u) container içinden İÇ ağ üzerinden MinIO'ya gider. PUBLIC
+      # adres localhost/LAN ise container İÇİNDEN erişilemez (ECONNREFUSED) → bu iç adres
+      # olmadan içerik yükleme, multipart tamamlama ve yedek KIRILIR. Dış S3 kullanıyorsanız
+      # .env'de aynı dış URL'ye ayarlayın.
+      S3_INTERNAL_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_FORCE_PATH_STYLE: "true"
       NEXT_PUBLIC_STORAGE_HOST: ${PUBLIC_STORAGE_URL}
       AWS_REGION: us-east-1
