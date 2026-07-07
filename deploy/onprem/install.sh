@@ -29,7 +29,7 @@ else
   ENCRYPTION_KEY="$(randb64)"                    # secret-scanner-disable-line
   BACKUP_ENCRYPTION_KEY="$(randb64)"             # secret-scanner-disable-line
   HEALTH_CHECK_SECRET="$(rand)"                  # secret-scanner-disable-line
-  REALTIME_ENC_KEY="$(openssl rand -hex 16)"     # secret-scanner-disable-line (32 char)
+  REALTIME_ENC_KEY="$(openssl rand -hex 8)"      # secret-scanner-disable-line (16 char = Realtime DB_ENC_KEY AES-128 için 16 byte ZORUNLU)
   REALTIME_SECRET_KEY_BASE="$(openssl rand -hex 32)" # secret-scanner-disable-line
   ONPREM_ADMIN_PASSWORD="$(rand)"                # secret-scanner-disable-line
 

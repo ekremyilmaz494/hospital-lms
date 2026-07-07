@@ -1,9 +1,45 @@
 #!/usr/bin/env bash
 # KlinoVax on-prem konteyner giriş noktası.
-# Sıra: Postgres'i bekle → migrate deploy → (ilk boot) bootstrap → server başlat.
+# Sıra: sır sağlığı → Postgres bekle → migrate deploy → gateway bekle → bootstrap → server.
 set -euo pipefail
 
 log() { echo "[entrypoint] $*"; }
+err() { echo "[entrypoint] HATA: $*" >&2; }
+
+# ── 0) Sır sağlığı (FAIL-CLOSED) ──
+# .env.example verbatim kopyalanırsa CHANGE_ME placeholder'ları PUBLİK'tir (her bundle'da
+# aynı) → bilinen JWT_SECRET ile service_role forge + RLS bypass. Kritik sır placeholder/
+# boş/kısa ise başlatmayı DURDUR.
+check_secret() {
+  # $1=isim $2=değer $3=min-uzunluk(varsayılan 16)
+  local name="$1" val="${2:-}" min="${3:-16}"
+  if [ -z "$val" ]; then
+    err "Kritik sır boş: ${name}. .env'i install.sh ile üretin."
+    return 1
+  fi
+  case "$val" in
+    *CHANGE_ME*|*change_me*|*changeme*)
+      err "Kritik sır placeholder değerinde: ${name} (CHANGE_ME…). install.sh ile gerçek sır üretin."
+      return 1 ;;
+  esac
+  if [ "${#val}" -lt "$min" ]; then
+    err "Kritik sır çok kısa (<${min} karakter): ${name}."
+    return 1
+  fi
+  return 0
+}
+
+secrets_bad=0
+check_secret "SUPABASE_JWT_SECRET"    "${SUPABASE_JWT_SECRET:-}"    32 || secrets_bad=1
+check_secret "ENCRYPTION_KEY"         "${ENCRYPTION_KEY:-}"         16 || secrets_bad=1
+check_secret "BACKUP_ENCRYPTION_KEY"  "${BACKUP_ENCRYPTION_KEY:-}"  16 || secrets_bad=1
+check_secret "CRON_SECRET"            "${CRON_SECRET:-}"            16 || secrets_bad=1
+check_secret "HEALTH_CHECK_SECRET"    "${HEALTH_CHECK_SECRET:-}"    16 || secrets_bad=1
+if [ "$secrets_bad" -ne 0 ]; then
+  err "Güvensiz/eksik sır(lar) tespit edildi — başlatma durduruldu. (install.sh sırları üretir.)"
+  exit 1
+fi
+log "Sır sağlığı: geçti."
 
 # ── 1) Postgres'i bekle ──
 DB_HOST="${POSTGRES_HOST:-postgres}"
@@ -15,7 +51,7 @@ for i in $(seq 1 60); do
     break
   fi
   if [ "$i" -eq 60 ]; then
-    log "HATA: Postgres 60 sn içinde hazır olmadı."
+    err "Postgres 60 sn içinde hazır olmadı."
     exit 1
   fi
   sleep 1
@@ -26,17 +62,37 @@ done
 # DATABASE_URL env'inden).
 log "prisma migrate deploy çalıştırılıyor…"
 ( cd /app/migrate && ./node_modules/.bin/prisma migrate deploy ) || {
-  log "HATA: migrate deploy başarısız."
+  err "migrate deploy başarısız."
   exit 1
 }
 
 # ── 3) İlk boot bootstrap (idempotent — süper-admin yoksa oluşturur) ──
 # Kendi node_modules'ı olan /app/bootstrap dizininden çalışır (pg + supabase-js).
 if [ "${ONPREM_BOOTSTRAP:-true}" = "true" ]; then
+  # Gateway (GoTrue) hazır olsun — bootstrap auth admin API'sini çağırır. Best-effort
+  # bekleme (health yolu değişirse boot'u kilitleme; asıl fail-closed bootstrap adımında).
+  GW_URL="${SUPABASE_URL:-http://gateway:8000}"
+  log "Auth gateway bekleniyor: ${GW_URL}/auth/v1/health"
+  for i in $(seq 1 60); do
+    if curl -fsS "${GW_URL}/auth/v1/health" >/dev/null 2>&1; then
+      log "Auth gateway hazır."
+      break
+    fi
+    if [ "$i" -eq 60 ]; then
+      log "UYARI: gateway health 60 sn'de yanıt vermedi — bootstrap yine de denenecek."
+    fi
+    sleep 1
+  done
+
   log "İlk-boot bootstrap kontrolü…"
-  ( cd /app/bootstrap && node onprem-bootstrap.mjs ) || {
-    log "UYARI: bootstrap adımı hata verdi (süper-admin zaten var olabilir) — devam."
-  }
+  # onprem-bootstrap.mjs sözleşmesi: süper-admin zaten varsa exit 0 (idempotent-atlama);
+  # GERÇEK hata (eksik sır/DB izni/GoTrue erişilemez) exit≠0. Bu yüzden non-zero =
+  # gerçek hata → FAIL-CLOSED (restart policy yeniden dener; sessizce admin'siz açma).
+  if ! ( cd /app/bootstrap && node onprem-bootstrap.mjs ); then
+    err "Bootstrap GERÇEK hata verdi (idempotent-atlama değil) — süper-admin oluşturulamadı."
+    err "Başlatma durduruldu; konteyner yeniden denenecek (logları kontrol edin)."
+    exit 1
+  fi
 fi
 
 # ── 4) Standalone server ──

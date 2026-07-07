@@ -1,5 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { getCookieDomain } from './cookie-domain'
+import { getSupabaseCookieOptions } from './onprem-config'
 
 /** Supabase credentials mevcut mu? */
 export const hasSupabaseCredentials =
@@ -53,6 +54,7 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: getSupabaseCookieOptions(),
       cookies: {
         getAll() {
           return parseCookies()

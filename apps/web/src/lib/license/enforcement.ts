@@ -34,9 +34,12 @@ const ALWAYS_OPEN_API = [
  * READONLY durumunda yazmaya İZİN verilen yollar — süresi dolmadan başlamış
  * sınav denemesinin ilerlemesi kaybolmasın (personel mağdur olmaz) + oturum/şifre.
  */
+// Grup sonu segment sınırına sabitlenir ((?:$|[/?])) → ileride eklenecek bir rota
+// (ör. /api/exam/{id}/submit-review) `submit` prefix'iyle YANLIŞLIKLA muaf olmasın;
+// alt-yollar (ör. /scorm/tracking/commit) `/` ile eşleşmeyi sürdürür.
 const READONLY_WRITE_EXEMPT = [
-  /^\/api\/exam\/[^/]+\/(save-answer|timer|videos\/progress|submit|state|sign|scorm\/tracking)/,
-  /^\/api\/auth\/(logout|change-password)/,
+  /^\/api\/exam\/[^/]+\/(save-answer|timer|videos\/progress|submit|state|sign|scorm\/tracking)(?:$|[/?])/,
+  /^\/api\/auth\/(logout|change-password)(?:$|[/?])/,
 ]
 
 export function isReadonlyWriteExempt(pathname: string): boolean {

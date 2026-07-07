@@ -1,13 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getAuthUserStrict, createAuditLog } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { isOnPrem } from '@/lib/deployment'
 import { activateLicense, storeReceipt, getInstanceId } from '@/lib/license/store'
-import { invalidateLicenseCache } from '@/lib/license/cache'
+import { invalidateLicenseCache, getLicenseState } from '@/lib/license/cache'
 import { callActivate } from '@/lib/license/client'
 import { LicenseVerifyError } from '@/lib/license/verify'
+import { LICENSE_STATE_COOKIE } from '@/lib/license/enforcement'
+
+/**
+ * Aktivasyon/makbuz sonrası middleware sayfa-yönlendirme sentinel'ini (hlms-license-state)
+ * tazeler. Aksi halde login-anında set edilen bayat 'locked' değeri kalır ve kullanıcı
+ * lisansı etkinleştirse bile panele ulaşamayıp /license'a geri sekerdi (re-login gerekirdi).
+ */
+async function refreshLicenseSentinel(): Promise<void> {
+  const state = (await getLicenseState()).state
+  const locked = state === 'LOCKED' || state === 'NO_LICENSE'
+  const cookieStore = await cookies()
+  cookieStore.set(LICENSE_STATE_COOKIE, locked ? 'locked' : 'ok', {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60,
+  })
+}
 
 /**
  * POST /api/license/activate — on-prem kurulumda lisans/makbuz yükleme.
@@ -55,6 +75,7 @@ export async function POST(request: NextRequest) {
     if ('receiptJwt' in parsed.data) {
       await storeReceipt(parsed.data.receiptJwt)
       invalidateLicenseCache()
+      await refreshLicenseSentinel()
       await createAuditLog({
         userId: auth.dbUser.id,
         action: 'license.receipt_uploaded',
@@ -82,6 +103,8 @@ export async function POST(request: NextRequest) {
         invalidateLicenseCache()
       }
     }
+
+    await refreshLicenseSentinel()
 
     await createAuditLog({
       userId: auth.dbUser.id,

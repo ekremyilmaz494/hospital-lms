@@ -1,8 +1,10 @@
 import { compactVerify, importJWK } from 'jose'
 import type { JWK } from 'jose'
+import { isOnPrem } from '@/lib/deployment'
 import {
   LICENSE_ISSUER_PUBLIC_JWK,
   RECEIPT_PUBLIC_JWK,
+  usingDevLicenseKeys,
 } from '@/lib/license/keys'
 import {
   licenseClaimsSchema,
@@ -26,6 +28,7 @@ export type LicenseVerifyReason =
   | 'signature_invalid'
   | 'claims_invalid'
   | 'schema_unsupported'
+  | 'dev_keys_in_production'
 
 export class LicenseVerifyError extends Error {
   constructor(
@@ -58,6 +61,22 @@ async function verifySignedPayload(jwt: string, publicJwk: JWK): Promise<unknown
  * @throws LicenseVerifyError — imza/biçim hatası veya desteklenmeyen şema sürümü.
  */
 export async function verifyLicenseJwt(jwt: string): Promise<LicenseClaims> {
+  // FORGEABLE ÇIPA GUARD'I (fail-closed): üretim on-prem paketi anahtar töreni
+  // yapılmadan (keys.ts DEV placeholder) çıkarsa dev private anahtarını bilen taraf
+  // lisans forge edebilir. Bu durumda doğrulamayı reddet → durum makinesi kilitlenir.
+  // CI/dev için kaçış: ALLOW_DEV_LICENSE_KEYS=true. Bulut modda no-op (isOnPrem false).
+  if (
+    isOnPrem() &&
+    process.env.NODE_ENV === 'production' &&
+    usingDevLicenseKeys() &&
+    process.env.ALLOW_DEV_LICENSE_KEYS !== 'true'
+  ) {
+    throw new LicenseVerifyError(
+      'Sistem lisans anahtarları üretim için yapılandırılmamış. Lütfen tedarikçiyle iletişime geçin.',
+      'dev_keys_in_production',
+    )
+  }
+
   const payload = await verifySignedPayload(jwt, LICENSE_ISSUER_PUBLIC_JWK as JWK)
 
   // Şema sürümü önce kontrol edilir ki gelecekteki lisanslar için kullanıcıya

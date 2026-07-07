@@ -4,8 +4,15 @@
 **/.next.nosync
 **/.next-*
 .git
+# Sır sızıntısı önleme: HİÇBİR .env varyantı (example/reference/production dahil) ve
+# anahtar/lisans dosyası build context'e girmesin — runtime env'i compose sağlar.
 **/.env
-**/.env.local
+**/.env.*
+**/*.klv
+**/*.klr
+**/*.pem
+**/*.jwk
+**/*.key
 **/*.log
 deploy/onprem/dist
 apps/web/.vercel

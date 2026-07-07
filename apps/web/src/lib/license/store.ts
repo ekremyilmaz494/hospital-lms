@@ -8,10 +8,18 @@ import type { LicenseSnapshot } from '@/lib/license/state'
 /**
  * PlatformLicense singleton satırının (id=1) okuma/yazma katmanı.
  *
- * Güvenlik modeli: DB'de saklanan lisans/makbuz JWT'leri HER OKUYUŞTA imza
- * doğrulamasından geçer — satır elle değiştirilirse (DB tamper) imza düşer ve
- * durum makinesi NO_LICENSE'a düşer. Saat watermark'ı yalnız İLERİ sarar
- * (aktivasyon, makbuz, boot/heartbeat ratchet) — geri sarma tespiti state.ts'te.
+ * Güvenlik modeli: DB'de saklanan lisans/makbuz JWT'leri (licenseJwt/receiptJwt
+ * KOLONLARI) HER OKUYUŞTA imza doğrulamasından geçer — bu kolonlar elle değiştirilirse
+ * (DB tamper) imza düşer ve durum makinesi NO_LICENSE'a düşer.
+ *
+ * SINIR (imza kapsamı DIŞINDA): `clockWatermark` ve `activatedAt` İMZASIZ düz
+ * kolonlardır. DB/volume sahibi (on-prem müşteri) bunları SQL ile değiştirerek —
+ * ya da volume'u silip/eski backup'ı restore ederek — saat-geri ve offline-grace
+ * backstop'larını sıfırlayabilir. Bu KAÇINILMAZDIR (kutu sahibi tüm sırları tutar;
+ * DRM değil, caydırıcılık). Asıl kontrol: online phone-home + SaaS tarafında
+ * lisans-başına instance/seat izlemesi. Watermark yalnız İLERİ sarar (aktivasyon,
+ * makbuz, boot/heartbeat ratchet) — geri sarma tespiti state.ts'te (imzasız çapa
+ * aynı sahte saatle yazıldığında bu tespitin sınırlı olduğu unutulmamalı).
  */
 
 const SINGLETON_ID = 1

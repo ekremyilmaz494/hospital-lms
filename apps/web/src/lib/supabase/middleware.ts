@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { extractSubdomain } from '@/lib/organization-utils';
 import { getCookieDomain } from './cookie-domain';
 import { verifyAccessToken } from './verify-jwt';
+import { getServerSupabaseUrl, getSupabaseCookieOptions } from './onprem-config';
 import { KVKK_NOTICE_VERSION } from '@/lib/kvkk/notice-version';
 
 const PUBLIC_ROUTES = [
@@ -138,9 +139,10 @@ export async function updateSession(request: NextRequest) {
   const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60;
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getServerSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: getSupabaseCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { getRateLimitCount, incrementRateLimit, deleteRateLimit } from '@/lib/redis'
-import { createLoginClient } from '@/lib/supabase/server'
+import { createLoginClient, createServiceClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { maskEmail, maskIp } from '@/lib/pii-mask'
@@ -16,6 +16,7 @@ import { hashTcKimlik } from '@/lib/tc-crypto'
 import { isOnPrem } from '@/lib/deployment'
 import { getLicenseState } from '@/lib/license/cache'
 import { LICENSE_STATE_COOKIE } from '@/lib/license/enforcement'
+import { verifyAccessToken } from '@/lib/supabase/verify-jwt'
 
 /**
  * "SMS MFA pending" sentinel cookie.
@@ -179,10 +180,12 @@ export async function POST(request: NextRequest) {
     const authTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('auth_timeout')), 12000)
     )
-    const { data, error: authError } = await Promise.race([
+    const authResult = await Promise.race([
       supabase.auth.signInWithPassword({ email: normalizedEmail, password }),
       authTimeout,
     ])
+    let data = authResult.data
+    const authError = authResult.error
 
     if (authError) {
       logger.info('auth:login', 'Başarısız giriş denemesi', { email: maskEmail(normalizedEmail), ip: maskIp(ip), reason: authError.message, code: authError.status })
@@ -215,10 +218,19 @@ export async function POST(request: NextRequest) {
         401,
       )
     }
+    if (!data.user) {
+      return errorResponse(
+        looksLikeTc ? 'TC Kimlik No veya şifre hatalı.' : 'E-posta veya şifre hatalı.',
+        401,
+      )
+    }
+
+    let signedInUser = data.user
+    let signedInSession = data.session
 
     // ── Orphan user detection + active check ──
     const dbUser = await prisma.user.findUnique({
-      where: { id: data.user.id },
+      where: { id: signedInUser.id },
       select: {
         id: true,
         mustChangePassword: true,
@@ -282,18 +294,78 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const role = (data.user?.app_metadata?.role ?? data.user?.user_metadata?.role) as string | undefined
+    const authAppMetadata = (signedInUser.app_metadata ?? {}) as Record<string, unknown>
+    const authRole = typeof authAppMetadata.role === 'string' ? authAppMetadata.role : undefined
+    const authOrgId = typeof authAppMetadata.organization_id === 'string' ? authAppMetadata.organization_id : undefined
+    const expectedRole = dbUser.role
+    const expectedOrgId = dbUser.organizationId ?? undefined
+
+    if (authRole !== expectedRole || (expectedRole !== 'super_admin' && authOrgId !== expectedOrgId)) {
+      try {
+        const adminClient = await createServiceClient()
+        const nextAppMetadata: Record<string, unknown> = {
+          ...authAppMetadata,
+          role: expectedRole,
+        }
+        if (expectedOrgId) {
+          nextAppMetadata.organization_id = expectedOrgId
+        } else {
+          delete nextAppMetadata.organization_id
+        }
+
+        const { error: metadataError } = await adminClient.auth.admin.updateUserById(signedInUser.id, {
+          app_metadata: nextAppMetadata,
+        })
+        if (metadataError) throw metadataError
+
+        // Metadata değiştiyse yeni access token mint et; middleware role kararını JWT'den verir.
+        const refreshed = await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
+        if (refreshed.error || !refreshed.data.user || !refreshed.data.session) {
+          throw refreshed.error ?? new Error('metadata_refreshed_session_missing')
+        }
+        data = refreshed.data
+        signedInUser = refreshed.data.user
+        signedInSession = refreshed.data.session
+      } catch (err) {
+        logger.warn('auth:login', 'Auth metadata kanonik DB rolüyle eşitlenemedi', {
+          userId: dbUser.id,
+          role: expectedRole,
+          organizationId: expectedOrgId ?? null,
+          error: err instanceof Error ? err.message : String(err),
+        })
+        await supabase.auth.signOut().catch(() => {})
+        return errorResponse('Oturum bilgileriniz güncellenemedi. Lütfen tekrar deneyin.', 500)
+      }
+    }
+
+    const role = dbUser.role
+    const verifiedSession = signedInSession?.access_token
+      ? await verifyAccessToken(signedInSession.access_token)
+      : null
+    const verifiedOrgId = (verifiedSession?.payload.app_metadata as Record<string, unknown> | undefined)?.organization_id
+    const jwtOrgOk = role === 'super_admin' || verifiedOrgId === expectedOrgId
+    if (!verifiedSession || verifiedSession.role !== role || !jwtOrgOk) {
+      logger.warn('auth:login', 'JWT metadata DB rolüyle eşleşmiyor', {
+        userId: dbUser.id,
+        role,
+        jwtRole: verifiedSession?.role ?? null,
+        organizationId: expectedOrgId ?? null,
+        jwtOrganizationId: typeof verifiedOrgId === 'string' ? verifiedOrgId : null,
+      })
+      await supabase.auth.signOut().catch(() => {})
+      return errorResponse('Oturum bilgileriniz güncellenemedi. Lütfen tekrar deneyin.', 500)
+    }
 
     // MFA check — session'daki factors bilgisinden kontrol et (HTTP call YOK).
     // signInWithPassword() response'unda user.factors her zaman döner.
     // Fallback API call'ı kaldırıldı — gereksiz ~400-800ms HTTP round-trip.
-    const sessionFactors = data.session?.user?.factors
+    const sessionFactors = signedInSession?.user?.factors
     const activeFactor = sessionFactors?.find(
       (f: { factor_type: string; status: string }) => f.factor_type === 'totp' && f.status === 'verified'
     ) as { id: string } | undefined
 
     if (activeFactor) {
-      logger.info('auth:login', 'MFA gerekli', { userId: data.user?.id, role })
+      logger.info('auth:login', 'MFA gerekli', { userId: signedInUser.id, role })
       return jsonResponse({
         mfaRequired: true,
         factorId: activeFactor.id,
@@ -306,7 +378,7 @@ export async function POST(request: NextRequest) {
     // Super admin platform operatörü, hastane policy'sinden muaf.
     const smsMfaEnabled = dbUser.organization?.smsMfaEnabled ?? false
     if (smsMfaEnabled && role !== 'super_admin') {
-      const deviceTrusted = await isDeviceTrusted(data.user.id).catch(() => false)
+      const deviceTrusted = await isDeviceTrusted(signedInUser.id).catch(() => false)
       if (!deviceTrusted) {
         const cookieStore = await cookies()
         cookieStore.set(SMS_PENDING_COOKIE, '1', {
@@ -317,7 +389,7 @@ export async function POST(request: NextRequest) {
           maxAge: SMS_PENDING_TTL,
         })
 
-        logger.info('auth:login', 'SMS MFA gerekli', { userId: data.user.id, hasPhone: !!dbUser.phone })
+        logger.info('auth:login', 'SMS MFA gerekli', { userId: signedInUser.id, hasPhone: !!dbUser.phone })
         return jsonResponse({
           smsMfaRequired: true,
           phoneMissing: !dbUser.phone,
@@ -388,10 +460,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    logger.info('auth:login', 'Basarili giris', { userId: data.user?.id, role })
+    logger.info('auth:login', 'Basarili giris', { userId: signedInUser.id, role })
 
     void logActivity({
-      userId: data.user.id,
+      userId: signedInUser.id,
       organizationId: dbUser.organizationId ?? '',
       action: 'login',
       ipAddress: ip,
@@ -420,8 +492,8 @@ export async function POST(request: NextRequest) {
 
     return jsonResponse({
       user: {
-        id: data.user?.id,
-        email: data.user?.email,
+        id: signedInUser.id,
+        email: signedInUser.email,
         role: role ?? 'staff',
       },
       mustChangePassword: dbUser.mustChangePassword,
@@ -436,11 +508,11 @@ export async function POST(request: NextRequest) {
       organizationId: dbUser.organizationId ?? null,
       // Mobile app için JWT bilgileri. Web tarafı cookie'yi kullandığı için bu alanları ignore eder.
       // Mobile, response'tan alıp expo-secure-store'a yazar; sonraki istekleri Authorization: Bearer ile yapar.
-      session: data.session ? {
-        accessToken: data.session.access_token,
-        refreshToken: data.session.refresh_token,
-        expiresAt: data.session.expires_at ?? null,
-        tokenType: data.session.token_type,
+      session: signedInSession ? {
+        accessToken: signedInSession.access_token,
+        refreshToken: signedInSession.refresh_token,
+        expiresAt: signedInSession.expires_at ?? null,
+        tokenType: signedInSession.token_type,
       } : null,
     })
   } catch (err) {

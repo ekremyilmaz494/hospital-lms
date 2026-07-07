@@ -5,6 +5,12 @@
 #
 # Bileşenler: app · postgres · gotrue(auth) · realtime · gateway(kong) ·
 #             redis · srh(Upstash-REST proxy) · minio(+init) · scheduler · mailpit
+#
+# Güvenlik notu: veri/kimlik servisleri (postgres/redis/minio/gotrue/realtime/srh)
+# yalnız iç ağdadır (`expose`, `ports` DEĞİL). Host'a açık olanlar: app (3000),
+# gateway (8000, tarayıcı auth/ws), minio S3 API (9000, presigned URL). Yönetim
+# yüzeyleri (minio konsol 9001, mailpit UI 8025) yalnız 127.0.0.1'e bağlıdır —
+# uzaktan erişim için SSH tüneli kullanın; LAN'a AÇMAYIN.
 # ─────────────────────────────────────────────────────────────────────────────
 name: klinovax-onprem
 
@@ -12,9 +18,17 @@ x-common-env: &common-env
   DEPLOYMENT_MODE: onprem
   NEXT_PUBLIC_DEPLOYMENT_MODE: onprem
 
+# Tüm servislere uygulanan minimum sertleştirme: ayrıcalık-yükseltme (setuid/setgid)
+# engeli. Daha derin sertleştirme (read_only rootfs + cap_drop) servis-özel doğrulama
+# gerektirir → sonraki tur.
+x-hardening: &hardening
+  security_opt:
+    - "no-new-privileges:true"
+
 services:
   # ── Uygulama (Next.js standalone) ──
   app:
+    <<: *hardening
     image: ${APP_IMAGE:-klinovax/hospital-lms:onprem}
     restart: unless-stopped
     depends_on:
@@ -66,6 +80,10 @@ services:
       HEALTH_CHECK_SECRET: ${HEALTH_CHECK_SECRET}
       # Lisans (dışarı TEK bağlantı)
       LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-https://app.klinovax.com}
+      # LOKAL/CI TEST — üretim/müşteri kurulumunda BOŞ bırakılır (gömülü anahtar korunur).
+      # ALLOW_DEV_LICENSE_KEYS=true iken keys.ts issuer public'i env'den okur (test-imzalı lisans).
+      ALLOW_DEV_LICENSE_KEYS: ${ALLOW_DEV_LICENSE_KEYS:-}
+      LICENSE_ISSUER_PUBLIC_JWK_X: ${LICENSE_ISSUER_PUBLIC_JWK_X:-}
       # İlk-boot bootstrap
       ONPREM_BOOTSTRAP: "true"
       ONPREM_ADMIN_EMAIL: ${ONPREM_ADMIN_EMAIL}
@@ -76,6 +94,7 @@ services:
 
   # ── PostgreSQL (uygulama + auth şeması) ──
   postgres:
+    <<: *hardening
     image: supabase/postgres:15.8.1.060
     restart: unless-stopped
     environment:
@@ -84,6 +103,9 @@ services:
       JWT_EXP: 3600
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # İlk-init (fresh volume): alt-rol parolalarını POSTGRES_PASSWORD'e eşitle +
+      # Prisma baseline. supabase/postgres migrate.sh'ından SONRA çalışır (zz- öneki).
+      - ./db-init/zz-onprem-db-init.sh:/docker-entrypoint-initdb.d/zz-onprem-db-init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -95,6 +117,7 @@ services:
 
   # ── GoTrue (Supabase Auth) ──
   auth:
+    <<: *hardening
     image: supabase/gotrue:v2.177.0
     restart: unless-stopped
     depends_on:
@@ -121,6 +144,7 @@ services:
 
   # ── Realtime (bildirim/presence/sınav kanalları) ──
   realtime:
+    <<: *hardening
     image: supabase/realtime:v2.34.47
     restart: unless-stopped
     depends_on:
@@ -146,6 +170,7 @@ services:
 
   # ── Gateway (Kong) — /auth/v1/* → GoTrue, /realtime/v1/* → Realtime ──
   gateway:
+    <<: *hardening
     image: kong:2.8.1
     restart: unless-stopped
     depends_on:
@@ -165,6 +190,7 @@ services:
 
   # ── Redis + SRH (Upstash REST uyumlu proxy — @upstash/redis istemcisi değişmez) ──
   redis:
+    <<: *hardening
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -174,7 +200,8 @@ services:
       - "6379"
 
   srh:
-    image: hiett/serverless-redis-http:latest
+    <<: *hardening
+    image: hiett/serverless-redis-http:0.0.10
     restart: unless-stopped
     depends_on:
       - redis
@@ -187,7 +214,8 @@ services:
 
   # ── MinIO (S3 uyumlu nesne deposu) ──
   minio:
-    image: minio/minio:latest
+    <<: *hardening
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -196,9 +224,10 @@ services:
     volumes:
       - miniodata:/data
     ports:
-      # 9000 = S3 API (presigned URL host'u; tarayıcı erişir). 9001 = konsol.
+      # 9000 = S3 API (presigned URL host'u; tarayıcı erişir → reverse-proxy arkası önerilir).
       - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      # 9001 = yönetim konsolu — YALNIZ 127.0.0.1 (LAN'a açma; erişim için SSH tüneli).
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -206,7 +235,8 @@ services:
       retries: 10
 
   minio-init:
-    image: minio/mc:latest
+    <<: *hardening
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio: { condition: service_healthy }
     entrypoint: ["/bin/sh", "/init/minio-init.sh"]
@@ -220,11 +250,16 @@ services:
 
   # ── Scheduler (supercronic — Vercel Cron yerine; binary imajda gömülü) ──
   scheduler:
+    <<: *hardening
     image: ${APP_IMAGE:-klinovax/hospital-lms:onprem}
     restart: unless-stopped
     depends_on:
       app: { condition: service_started }
     entrypoint: ["/usr/local/bin/supercronic", "/crontab"]
+    # App imajından miras kalan HTTP healthcheck burada geçersiz (supercronic çalışır,
+    # 3000'de sunucu yok) → sürekli "unhealthy" gürültüsü. Bu serviste devre dışı.
+    healthcheck:
+      disable: true
     environment:
       CRON_SECRET: ${CRON_SECRET}
       APP_URL: http://app:3000
@@ -232,11 +267,14 @@ services:
       - ./scheduler/crontab:/crontab:ro
 
   # ── Mailpit (yerel SMTP yakalama — geliştirme/test; prod'da müşteri relay'i) ──
+  # UI (8025) YALNIZ 127.0.0.1'e bağlı — yakalanan postalar (parola-sıfırlama linkleri,
+  # personel PII) LAN'a açılmaz. Prod'da gerçek SMTP relay'i kullanın (mailpit'i kaldırın).
   mailpit:
-    image: axllent/mailpit:latest
+    <<: *hardening
+    image: axllent/mailpit:v1.30.3
     restart: unless-stopped
     ports:
-      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
     expose:
       - "1025"
 

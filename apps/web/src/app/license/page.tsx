@@ -149,7 +149,8 @@ export default function LicensePage() {
               type="button"
               disabled={busy || licenseText.trim().length < 20}
               onClick={() => void submit({ licenseJwt: licenseText.trim() })}
-              className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              style={{ backgroundColor: '#0d9668', color: '#ffffff' }}
+              className="mt-3 rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {busy ? 'Etkinleştiriliyor…' : 'Lisansı Etkinleştir'}
             </button>
