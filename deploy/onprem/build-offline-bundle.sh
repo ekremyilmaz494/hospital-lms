@@ -6,11 +6,26 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo kökü
 
 TAG="${1:-klinovax/hospital-lms:onprem}"
+# Hedef mimari: hastane sunucuları çoğunlukla x86_64. Bu makinede (ör. Apple Silicon arm64)
+# --platform'suz build/pull YEREL mimariyi üretir → müşterinin x86 sunucusunda TÜM konteynerler
+# "exec format error" ile sonsuz restart-loop (lokal Docker smoke arm64'te 10/10 geçse bile).
+# ARM sunucu için: TARGET_PLATFORM=linux/arm64 ile çalıştırın.
+PLATFORM="${TARGET_PLATFORM:-linux/amd64}"
 OUT="deploy/onprem/dist"
 mkdir -p "$OUT"
 
-echo "[bundle] İmaj build ediliyor: $TAG"
-docker build -f deploy/onprem/Dockerfile -t "$TAG" .
+echo "[bundle] İmaj build ediliyor: $TAG (platform: $PLATFORM)"
+docker build --platform "$PLATFORM" -f deploy/onprem/Dockerfile -t "$TAG" .
+
+# Arch assert: imaj GERÇEKTEN hedef mimaride mi? (yanlış mimari = müşteride exec format error)
+EXPECT_ARCH="${PLATFORM##*/}"
+GOT_ARCH="$(docker image inspect --format '{{.Architecture}}' "$TAG")"
+if [ "$GOT_ARCH" != "$EXPECT_ARCH" ]; then
+  echo "[bundle] HATA: imaj mimarisi '$GOT_ARCH' ≠ hedef '$EXPECT_ARCH' — müşteri sunucusunda çalışmaz." >&2
+  echo "         (Docker buildx/QEMU emülasyonu gerekebilir; 'docker buildx' kurulu mu?)" >&2
+  exit 1
+fi
+echo "[bundle] Mimari doğrulandı: $GOT_ARCH"
 
 echo "[bundle] Yardımcı imajlar çekiliyor (compose bağımlılıkları)…"
 # Compose'daki dış imajlar — offline makinede lazım olacak.
@@ -39,7 +54,9 @@ for img in "${DEP_IMAGES[@]}"; do
   fi
 done
 
-for img in "${DEP_IMAGES[@]}"; do docker pull "$img"; done
+# --platform: yardımcı imajlar da hedef mimaride çekilmeli (app imajıyla aynı; aksi halde
+# müşteride yalnız bazıları çalışır). Multi-arch olmayan bir imaj bu platformda yoksa pull hata verir.
+for img in "${DEP_IMAGES[@]}"; do docker pull --platform "$PLATFORM" "$img"; done
 
 echo "[bundle] docker save → tarball (bu birkaç dakika sürebilir)…"
 docker save "$TAG" "${DEP_IMAGES[@]}" | gzip > "$OUT/klinovax-onprem-images.tar.gz"

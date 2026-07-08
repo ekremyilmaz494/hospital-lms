@@ -20,6 +20,8 @@
  * kullanılıyor mu" tespiti için referanstır (usingDevLicenseKeys) — DEĞİŞTİRME.
  */
 
+import { isOnPrem } from '@/lib/deployment'
+
 export const LICENSE_ISSUER = 'klinovax-license'
 export const RECEIPT_ISSUER = 'klinovax-receipt'
 
@@ -34,7 +36,13 @@ const EMBEDDED_ISSUER_X = 'Eu5bU2TkAdEtaqWPhd1qdBuz7JCrA8n4yylmPoN_hQA'
  * set EDİLMEZ → gömülü sabit korunur, hiçbir müşteri env ile anahtar değiştiremez.
  */
 function resolveIssuerPublicX(): string {
+  // GÜVENLİK: env-override YALNIZ üretim-DIŞI (lokal/CI) içindir. On-prem ÜRETİM'de YOK SAYILIR —
+  // aksi halde kutu sahibi .env'e ALLOW_DEV_LICENSE_KEYS=true + kendi LICENSE_ISSUER_PUBLIC_JWK_X'ini
+  // yazıp gömülü issuer'ı ezerek KENDİ private'ıyla süresiz/sınırsız sahte lisans imzalayabilirdi
+  // (tek-satır lisans-bypass). Bu kapı yalnız NODE_ENV!=production VEYA bulut modunda açıktır.
+  const prodOnprem = isOnPrem() && process.env.NODE_ENV === 'production'
   if (
+    !prodOnprem &&
     process.env.ALLOW_DEV_LICENSE_KEYS === 'true' &&
     process.env.LICENSE_ISSUER_PUBLIC_JWK_X
   ) {

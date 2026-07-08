@@ -44,6 +44,15 @@ async function main() {
       process.exitCode = 1
       return
     }
+    // Placeholder/zayıf parola reddi (savunma derinliği): .env.example verbatim kopyalanıp
+    // ONPREM_ADMIN_PASSWORD=CHANGE_ME bırakılırsa admin@…/CHANGE_ME ile süper-admin ele geçirme
+    // olurdu. install.sh güçlü (48-hex) parola üretir; bu kontrol yalnız İLK admin oluşturulurken
+    // çalışır (üstteki idempotent-atlama geçilmişse), sonradan .env'den parola silinmesini engellemez.
+    if (/change_?me/i.test(ONPREM_ADMIN_PASSWORD) || ONPREM_ADMIN_PASSWORD.length < 12) {
+      console.error('[bootstrap] ONPREM_ADMIN_PASSWORD placeholder/çok kısa (min 12, CHANGE_ME yasak) — süper-admin oluşturulamadı.')
+      process.exitCode = 1
+      return
+    }
     if (!supabaseUrl || !SUPABASE_SERVICE_ROLE_KEY) {
       console.error('[bootstrap] SUPABASE_URL / SERVICE_ROLE_KEY yok — süper-admin oluşturulamadı.')
       process.exitCode = 1
@@ -75,22 +84,49 @@ async function main() {
       },
       app_metadata: { role: 'super_admin' },
     })
-    if (error || !data?.user) {
-      throw new Error(`Auth kullanıcısı oluşturulamadı: ${error?.message ?? 'bilinmeyen hata'}`)
+    // createUser başarısız olabilir çünkü önceki boot auth kullanıcısını oluşturup DB INSERT'ten
+    // ÖNCE öldü (orphan). Üstteki idempotency kontrolü yalnız public.users'a bakar → orphan'ı
+    // GÖRMEZ → createUser "already registered" ile patlar → sonsuz crash-loop. Kurtar: mevcut auth
+    // kullanıcısını bul, rol/parolayı garanti et. Her adım tek başına idempotent → rollback GEREKMEZ.
+    let authUser = data?.user
+    if (error || !authUser) {
+      const already = /already|registered|exist/i.test(error?.message ?? '')
+      if (!already) {
+        throw new Error(`Auth kullanıcısı oluşturulamadı: ${error?.message ?? 'bilinmeyen hata'}`)
+      }
+      const { data: list, error: listErr } = await supabase.auth.admin.listUsers()
+      if (listErr) throw new Error(`Auth kullanıcı listesi alınamadı: ${listErr.message}`)
+      authUser = list?.users?.find(
+        (u) => (u.email ?? '').toLowerCase() === ONPREM_ADMIN_EMAIL.toLowerCase(),
+      )
+      if (!authUser) {
+        throw new Error('Auth "already registered" dedi ama kullanıcı listede yok — elle inceleyin.')
+      }
+      // Yarıda kalmış olabilir → rol/parola/KVKK'yı garanti et (idempotent).
+      const { error: updErr } = await supabase.auth.admin.updateUserById(authUser.id, {
+        password: ONPREM_ADMIN_PASSWORD,
+        app_metadata: { role: 'super_admin' },
+        user_metadata: {
+          ...(authUser.user_metadata ?? {}),
+          first_name: 'Sistem',
+          last_name: 'Yöneticisi',
+          kvkk_notice_acknowledged_at:
+            authUser.user_metadata?.kvkk_notice_acknowledged_at ?? new Date().toISOString(),
+          kvkk_notice_version: KVKK_NOTICE_VERSION,
+        },
+      })
+      if (updErr) throw new Error(`Orphan auth kullanıcısı güncellenemedi: ${updErr.message}`)
+      console.log('[bootstrap] Mevcut (orphan) auth kullanıcısı bulundu — rol/parola senkronlandı.')
     }
 
-    // 2) DB users satırı (organization_id NULL — platform süper-admin'i)
-    try {
-      await pool.query(
-        `INSERT INTO users (id, email, first_name, last_name, role, is_active, created_at, updated_at)
-         VALUES ($1, $2, 'Sistem', 'Yöneticisi', 'super_admin', true, now(), now())`,
-        [data.user.id, ONPREM_ADMIN_EMAIL],
-      )
-    } catch (dbErr) {
-      // Rollback: auth kullanıcısını sil (orphan bırakma)
-      await supabase.auth.admin.deleteUser(data.user.id).catch(() => {})
-      throw dbErr
-    }
+    // 2) DB users satırı (organization_id NULL — platform süper-admin'i). ON CONFLICT DO NOTHING
+    //    → orphan-kurtarma / kısmi-boot tekrarında güvenli (rollback yerine idempotency).
+    await pool.query(
+      `INSERT INTO users (id, email, first_name, last_name, role, is_active, created_at, updated_at)
+       VALUES ($1, $2, 'Sistem', 'Yöneticisi', 'super_admin', true, now(), now())
+       ON CONFLICT DO NOTHING`,
+      [authUser.id, ONPREM_ADMIN_EMAIL],
+    )
 
     console.log(`[bootstrap] Süper-admin oluşturuldu: ${ONPREM_ADMIN_EMAIL}`)
   } finally {

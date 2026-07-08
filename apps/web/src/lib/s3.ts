@@ -9,6 +9,7 @@ import {
   UploadPartCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
+  type ServerSideEncryption,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getSignedUrl as getCloudfrontSignedUrl } from '@aws-sdk/cloudfront-signer'
@@ -22,6 +23,14 @@ import { prisma } from '@/lib/prisma'
 // (public) adres verilmelidir. Endpoint yokken davranış AWS default'u (mevcut).
 const S3_ENDPOINT = process.env.S3_ENDPOINT
 const S3_FORCE_PATH_STYLE = process.env.S3_FORCE_PATH_STYLE === 'true'
+
+// Sunucu-taraf yüklemelerde istenen SSE. Bulut (AWS S3): env yok → varsayılan 'AES256'
+// (mevcut davranış, bit-bit korunur). On-prem MinIO KMS'siz kurulur → SSE-S3 header'ı
+// 'KMS is not configured' ile REDDEDİLİR (branding/belge upload + yedek KIRILIR). Bu yüzden
+// on-prem compose S3_SSE'yi BOŞ verir (SSE header'ı hiç gönderilmez → düz PUT çalışır;
+// hasta PII'si zaten yedeklerde app-katmanı AES-256-GCM ile şifreli, disk şifrelemesi README'de
+// önerilir). MinIO KMS yapılandıran ileri operatör S3_SSE=AES256 set ederek geri açabilir.
+const S3_SSE = process.env.S3_SSE ?? 'AES256'
 
 const s3BaseConfig = {
   region: process.env.AWS_REGION!,
@@ -272,10 +281,10 @@ export async function uploadBuffer(key: string, body: Buffer, contentType: strin
     Key: key,
     Body: body,
     ContentType: contentType,
-    // At-rest şifrelemeyi istek düzeyinde açıkça zorla (defense-in-depth). Bucket
-    // default-encryption kapalı/değiştirilse bile bu nesneler SSE-S3 (AES-256) ile
-    // yazılır. Yedekler ayrıca uygulama katmanında AES-256-GCM ile şifreli.
-    ServerSideEncryption: 'AES256',
+    // At-rest şifreleme (defense-in-depth): bulutta 'AES256' (SSE-S3). On-prem KMS'siz MinIO'da
+    // S3_SSE boş → header GÖNDERİLMEZ (aksi halde MinIO 'KMS not configured' ile REDDEDER →
+    // upload/yedek kırılır). Yedekler ayrıca app-katmanı AES-256-GCM ile şifreli.
+    ...(S3_SSE ? { ServerSideEncryption: S3_SSE as ServerSideEncryption } : {}),
   }))
 }
 

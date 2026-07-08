@@ -30,11 +30,32 @@ check_secret() {
 }
 
 secrets_bad=0
-check_secret "SUPABASE_JWT_SECRET"    "${SUPABASE_JWT_SECRET:-}"    32 || secrets_bad=1
-check_secret "ENCRYPTION_KEY"         "${ENCRYPTION_KEY:-}"         16 || secrets_bad=1
-check_secret "BACKUP_ENCRYPTION_KEY"  "${BACKUP_ENCRYPTION_KEY:-}"  16 || secrets_bad=1
-check_secret "CRON_SECRET"            "${CRON_SECRET:-}"            16 || secrets_bad=1
-check_secret "HEALTH_CHECK_SECRET"    "${HEALTH_CHECK_SECRET:-}"    16 || secrets_bad=1
+check_secret "SUPABASE_JWT_SECRET"          "${SUPABASE_JWT_SECRET:-}"          32 || secrets_bad=1
+check_secret "ENCRYPTION_KEY"               "${ENCRYPTION_KEY:-}"               16 || secrets_bad=1
+check_secret "BACKUP_ENCRYPTION_KEY"        "${BACKUP_ENCRYPTION_KEY:-}"        16 || secrets_bad=1
+check_secret "CRON_SECRET"                  "${CRON_SECRET:-}"                  16 || secrets_bad=1
+check_secret "HEALTH_CHECK_SECRET"          "${HEALTH_CHECK_SECRET:-}"          16 || secrets_bad=1
+# App container'ının ZATEN aldığı diğer kritik sırlar (compose app env) — placeholder/boş bırakılırsa
+# stack "sağlıklı ama ele geçirilebilir" boot eder (örn. MINIO 0.0.0.0:9000'de klinovax/CHANGE_ME,
+# ya da CHANGE_ME ile süper-admin girişi). Guard'ın amacı (verbatim .env.example = publik sır) bunları da kapsar.
+check_secret "DATABASE_URL"                 "${DATABASE_URL:-}"                 24 || secrets_bad=1
+check_secret "SUPABASE_SERVICE_ROLE_KEY"    "${SUPABASE_SERVICE_ROLE_KEY:-}"    40 || secrets_bad=1
+check_secret "NEXT_PUBLIC_SUPABASE_ANON_KEY" "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" 40 || secrets_bad=1
+check_secret "AWS_SECRET_ACCESS_KEY"        "${AWS_SECRET_ACCESS_KEY:-}"        16 || secrets_bad=1
+check_secret "REDIS_TOKEN"                  "${REDIS_TOKEN:-}"                  16 || secrets_bad=1
+
+# ── Format kilitleri (yanlış format = SESSİZ arıza; tüketicinin beklediği KESİN biçim) ──
+# BACKUP_ENCRYPTION_KEY: backup-crypto.ts TAM 64 hex ister → yanlışsa yedek HER seferinde throw = 0 yedek.
+if ! [[ "${BACKUP_ENCRYPTION_KEY:-}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  err "BACKUP_ENCRYPTION_KEY 64 karakter hex olmalı (openssl rand -hex 32) — yoksa hiçbir yedek oluşmaz."
+  secrets_bad=1
+fi
+# ENCRYPTION_KEY: crypto.ts base64→32 byte ister → yanlışsa ilk TC/şifreleme kullanımında 500 (İK/HBYS senkron sessiz yarım kalır).
+if ! node -e 'process.exit(Buffer.from(process.env.ENCRYPTION_KEY||"","base64").length===32?0:1)' 2>/dev/null; then
+  err "ENCRYPTION_KEY base64 çözümü tam 32 byte olmalı (node -e \"crypto.randomBytes(32).toString('base64')\")."
+  secrets_bad=1
+fi
+
 if [ "$secrets_bad" -ne 0 ]; then
   err "Güvensiz/eksik sır(lar) tespit edildi — başlatma durduruldu. (install.sh sırları üretir.)"
   exit 1
@@ -57,14 +78,31 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
-# ── 2) Şema migrasyonu (idempotent — her boot'ta güvenli) ──
+# ── 2) Şema migrasyonu (idempotent — YALNIZ tamamlanmış migration'lar için her boot güvenli) ──
 # İzole /app/migrate dizininden (lokal prisma + config; datasource url DIRECT_URL/
 # DATABASE_URL env'inden).
 log "prisma migrate deploy çalıştırılıyor…"
-( cd /app/migrate && ./node_modules/.bin/prisma migrate deploy ) || {
-  err "migrate deploy başarısız."
+set +e
+migrate_out="$( cd /app/migrate && ./node_modules/.bin/prisma migrate deploy 2>&1 )"
+migrate_rc=$?
+set -e
+printf '%s\n' "$migrate_out"
+if [ "$migrate_rc" -ne 0 ]; then
+  err "migrate deploy başarısız (rc=${migrate_rc})."
+  # Yarıda kesilen migration (elektrik/OOM) _prisma_migrations'ta 'failed' kayıt bırakır → sonraki
+  # HER deploy P3009/P3018 ile durur → restart:unless-stopped sonsuz crash-loop. Restart ÇÖZMEZ;
+  # operatöre somut kurtarma yolu göster (aksi halde 'site açılmıyor' + prisma bilmeyen BT = uzun kesinti).
+  case "$migrate_out" in
+    *P3009*|*P3018*)
+      err "→ Yarıda kalmış/başarısız migration (P3009/P3018). RESTART TEK BAŞINA ÇÖZMEZ."
+      err "  1) Durumu gör:  docker compose exec app sh -c 'cd /app/migrate && ./node_modules/.bin/prisma migrate status'"
+      err "  2) İlgili migration'ı çöz:  ... prisma migrate resolve --rolled-back <migration_adı>   sonra konteyneri restart et."
+      err "  UYARI: otomatik çözülmez (yanlış resolve veri bozar). Emin değilseniz yedekten geri yükleyin (README > Geri Yükleme)."
+      ;;
+  esac
   exit 1
-}
+fi
+log "Şema migrasyonu tamam."
 
 # ── 3) İlk boot bootstrap (idempotent — süper-admin yoksa oluşturur) ──
 # Kendi node_modules'ı olan /app/bootstrap dizininden çalışır (pg + supabase-js).

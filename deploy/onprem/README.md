@@ -219,3 +219,41 @@ curl -s http://localhost:3000/api/health     # sağlık (public özet)
 
 Lisans durumu `/api/health` yanıtında (yetkili istekte) `license.state` alanında
 görünür. Sorun için Klinovax destek ekibiyle iletişime geçin.
+
+**Sağlık izleme:** ayrıntılı servis durumu için yetkili istek kullanın
+(`curl -s -H "x-health-secret: <HEALTH_CHECK_SECRET>" http://localhost:3000/api/health`).
+Secret'sız public uç artık **DB erişilebilirliğini** kontrol eder (Docker healthcheck bunu
+kullanır; DB düşerse 503 → konteyner restart) ama servis ayrıntısı sızdırmaz.
+
+## Operasyon notları (ZORUNLU — atlanırsa sessiz arıza)
+
+- **Alarm zinciri:** Yedek/verify-backup arızası e-postası **yalnızca** `ADMIN_ALERT_EMAIL`
+  dolu **ve** GERÇEK bir SMTP relay girildiğinde çıkar. Varsayılan `mailpit` postaları YAKALAR
+  ama GÖNDERMEZ → arıza sessiz kalır (44-günlük sessiz-yedek olayı). Prod'da mutlaka kurum
+  relay'i + alarm e-postası girin. Ek güvence: host cron'unda ölü-adam kontrolü —
+  `find <offsite> -name 'db-*.sql.gz' -mtime -1 | grep -q . || <uyar>`.
+- **NTP / saat:** Lisans saat-oynatma tespiti sistem saatine dayanır. Sunucu saatinin >24 saat
+  geriye/ileriye sıçraması lisansı yanlışlıkla LOCKED yapabilir → **NTP senkron açık** olsun
+  (kapalı ağda yerel NTP sunucusu).
+- **Parola rotasyonu:** `POSTGRES_PASSWORD` ilk boot'ta alt-rollere (GoTrue/Realtime) yazılır
+  (db-init tek-seferlik). Sonradan `.env`'de değiştirmek TEK BAŞINA yetmez → GoTrue/Realtime
+  28P01 verir. Rotasyon: `.env`'i güncelle, sonra çalışan postgres'te alt-rolleri de senkronla:
+  `docker compose exec postgres psql -U supabase_admin -c "ALTER USER supabase_auth_admin PASSWORD '<yeni>'; ALTER USER supabase_admin PASSWORD '<yeni>'; ALTER USER authenticator PASSWORD '<yeni>'; ..."`
+  ardından `docker compose up -d --force-recreate`.
+- **Disk şifreleme (at-rest):** Nesne deposu (video/belge) `miniodata` volume'ünde **şifresiz**
+  durur (MinIO KMS'siz). Hasta verisi için **disk-seviyesi şifreleme** (LUKS/dm-crypt) önerilir.
+  Yedekler zaten uygulama katmanında AES-256-GCM ile şifreli. (MinIO KMS kurup `S3_SSE=AES256`
+  ile object-SSE de açılabilir — ama KMS anahtarı kaybı = nesne kaybı, ayrı DR yükü.)
+- **Realtime (bildirim/canlı-sınav) + reverse proxy:** Tarayıcı realtime/token-yenileme, `/auth/v1`
+  ve `/realtime/v1` yollarının **aynı origin'den gateway:8000'e proxy'lenmesini** gerektirir
+  (README'deki nginx örneği). Proxy'siz düz `localhost:3000` kurulumunda bu kanallar sessizce
+  çalışmaz; üretimde reverse proxy ŞARTTIR.
+
+## Geri yükleme (restore) uyarıları
+
+- **MinIO tar'ını DURDURULMUŞ minio'ya aç:** `docker compose stop minio` → tar'ı `miniodata`
+  volume'üne aç → `docker compose start minio`. Çalışan minio'ya açmak veri bozar.
+- **redisdata yedek DIŞIDIR:** tam-restore'da açık sınav timer'ları ve streak sayaçları sıfırlanır
+  (DB'deki attempt'ler korunur). Personel "sınavım uçtu" derse restore'a bağlı olabilir.
+- **Anahtar custody:** `ENCRYPTION_KEY`/`BACKUP_ENCRYPTION_KEY` kaybı = kalıcı veri/yedek kaybı —
+  `.env`'i sırlardan AYRI, güvenli yerde saklayın.

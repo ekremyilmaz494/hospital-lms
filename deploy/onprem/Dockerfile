@@ -67,26 +67,39 @@ ENV NODE_ENV=production \
     DEPLOYMENT_MODE=onprem \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    CHECKPOINT_DISABLE=1 \
+    PRISMA_HIDE_UPDATE_MESSAGE=1
+# CHECKPOINT_DISABLE: Prisma CLI'nin her migrate deploy'da checkpoint.prisma.io'ya update-check
+# denemesini kapatır → air-gap'te "dışarıya TEK bağlantı = LICENSE_SERVER_URL" taahhüdünü korur.
 # Sağlık kontrolü + entrypoint bekleme için minimal araçlar
 RUN apt-get update && apt-get install -y --no-install-recommends curl netcat-openbsd ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+# NOT: runner'da pnpm/corepack YOK — migrate/bootstrap `npm` (node ile gelir) kullanır, server
+# standalone `node`; runtime pnpm tüketicisi olmadığından ölü katman + gereksiz CVE yüzeyi kaldırıldı.
 
 # supercronic — Vercel Cron yerine scheduler (binary imaja gömülür → airgap güvenli).
 # Build sırasında (Klinovax'ta internet var) indirilir; teslim imajı offline çalışır.
 ARG SUPERCRONIC_VERSION=v0.2.33
+# İndirilen binary bütünlüğü SABİTLENMİŞ SHA256 ile doğrulanır: upstream release ele geçirilse
+# bile (aynı etiket, değişmiş asset) build FAIL olur → trojan'lı scheduler binary'si (CRON_SECRET'a
+# erişir, tüm cron uçlarını çağırabilir) hastane teslimat imajına GÖMÜLMEZ.
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
-    case "$arch" in amd64) sc="supercronic-linux-amd64";; arm64) sc="supercronic-linux-arm64";; *) echo "desteklenmeyen mimari $arch"; exit 1;; esac; \
+    case "$arch" in \
+      amd64) sc="supercronic-linux-amd64"; sha="feefa310da569c81b99e1027b86b27b51e6ee9ab647747b49099645120cfc671";; \
+      arm64) sc="supercronic-linux-arm64"; sha="f1f8585c66de020fef494dd636058f99949d108f569fef00016a1c8b9eb145b3";; \
+      *) echo "desteklenmeyen mimari $arch"; exit 1;; \
+    esac; \
     curl -fsSLo /usr/local/bin/supercronic "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/${sc}"; \
+    echo "${sha}  /usr/local/bin/supercronic" | sha256sum -c -; \
     chmod +x /usr/local/bin/supercronic
 
 # standalone server + static + public (fontlar/logolar runtime disk okunur!)
 # Standalone monorepo layout: server.js apps/web/ altında, node_modules /app/ kökünde.
-COPY --from=build /repo/apps/web/.next/standalone ./
-COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build /repo/apps/web/public ./apps/web/public
+COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
+COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=node:node /repo/apps/web/public ./apps/web/public
 # ── Migration çalıştırıcı (izole /app/migrate) ──
 # Prisma 7 datasource url'i prisma.config.ts'ten okur ve config `prisma/config`'i
 # import eder → prisma LOKAL kurulmalı (global npm node-resolution yolunda değil).
@@ -107,8 +120,19 @@ RUN cd /app/bootstrap && npm init -y >/dev/null 2>&1 \
 COPY deploy/onprem/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# Non-root çalıştırma (defense-in-depth): base imajın 'node' (uid 1000) kullanıcısı. Bir RCE'nin
+# blast radius'unu küçültür (sırları/entrypoint'i root olarak ele geçirme + konteyner-kaçış zorlaşır).
+# Standalone/static/public zaten COPY --chown=node ile node'a ait; yalnız Next'in çalışma-zamanında
+# YAZDIĞI .next/cache dizinini node-yazılabilir yap (migrate/bootstrap node_modules root-owned kalır,
+# world-read ile okunur). Port 3000 unprivileged; supercronic/prisma migrate root gerektirmez.
+RUN mkdir -p /app/apps/web/.next/cache && chown node:node /app/apps/web/.next/cache
+USER node
+
 EXPOSE 3000
 # server.js standalone'da apps/web/ altında (monorepo tracing).
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+# start-period=300s: ilk boot'ta postgres-bekle + ~85 migration deploy + gateway-bekle + bootstrap
+# mütevazı donanımda 40s'yi kolayca aşar → start-period içi başarısızlık 'starting' sayılır,
+# 'unhealthy' DAMGALAMAZ (operatörün kurulumu bozuk sanıp gereksiz down -v yapmasını önler).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
   CMD curl -fsS http://localhost:3000/api/health || exit 1
 ENTRYPOINT ["/app/entrypoint.sh"]

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getRedis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-import { s3 } from '@/lib/s3'
+import { s3, s3Internal } from '@/lib/s3'
 import { HeadBucketCommand } from '@aws-sdk/client-s3'
 import { isOnPrem } from '@/lib/deployment'
+import { getServerSupabaseUrl } from '@/lib/supabase/onprem-config'
 import { getLicenseState } from '@/lib/license/cache'
 
 const APP_VERSION = process.env.npm_package_version ?? '0.1.0'
@@ -16,6 +17,22 @@ export async function GET(request: Request) {
     request.headers.get('x-health-secret') === healthSecret
 
   if (!isAuthenticated) {
+    // On-prem: Docker HEALTHCHECK bu (secret'sız) yolu çağırır. ESKİDEN KOŞULSUZ 200 dönerdi →
+    // DB/servisler çökse bile konteyner 'healthy' görünür, restart:unless-stopped HİÇ tetiklenmezdi
+    // (içi boş healthcheck). Artık hafif bir DB erişilebilirlik kontrolü yapar: app DB'ye ulaşamıyorsa
+    // hiçbir şey servis edemez → 503 → healthcheck 'unhealthy' → restart. Topoloji sızdırmaz (yalnız
+    // 200/503, ayrıntı yok). BULUT yolu DEĞİŞMEZ (minimal 200 — Vercel/monitör davranışı korunur).
+    if (isOnPrem()) {
+      try {
+        await prisma.$queryRaw`SELECT 1`
+      } catch (err) {
+        logger.error('health', 'Public readiness DB kontrolu basarisiz', err)
+        return NextResponse.json(
+          { status: 'down', timestamp: new Date().toISOString() },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } },
+        )
+      }
+    }
     // Public response: minimal — avoids leaking service topology
     return NextResponse.json(
       { status: 'ok', timestamp: new Date().toISOString() },
@@ -52,7 +69,10 @@ export async function GET(request: Request) {
 
   // ── Supabase Auth check ──
   try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    // İÇ gateway URL'i (SUPABASE_URL=http://gateway:8000) — konteyner içinden. NEXT_PUBLIC_SUPABASE_URL
+    // tarayıcı-yüzlü PUBLIC adrestir (on-prem'de PUBLIC_APP_URL); container içinden ona istek app'in
+    // KENDİSİNE gider (/auth/v1 route'u yok → 404 → yanlış 'auth down'). getServerSupabaseUrl iç adresi verir.
+    const url = getServerSupabaseUrl()
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     if (url && key) {
       const res = await fetch(`${url}/auth/v1/health`, {
@@ -68,7 +88,9 @@ export async function GET(request: Request) {
     const bucket = process.env.AWS_S3_BUCKET
     const region = process.env.AWS_REGION
     if (bucket && region && process.env.AWS_ACCESS_KEY_ID) {
-      await s3.send(new HeadBucketCommand({ Bucket: bucket }))
+      // s3Internal (container→minio:9000) — public s3 client PUBLIC_STORAGE_URL'e (ör. localhost:9000)
+      // bakar, container İÇİNDEN erişilemez → yanlış 's3 down'. Bulutta s3Internal null → s3'e düşer.
+      await (s3Internal ?? s3).send(new HeadBucketCommand({ Bucket: bucket }))
       services.s3 = true
     }
   } catch { /* S3 check failed */ }

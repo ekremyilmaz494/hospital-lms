@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import { BRAND } from '@/lib/brand'
+import { isOnPrem } from '@/lib/deployment'
 
 export const metadata: Metadata = {
   title: `API Dokumantasyonu — ${BRAND.fullName}`,
@@ -14,6 +16,10 @@ export const metadata: Metadata = {
  * kullanilmaktadir — kullanici girdisi yoktur, XSS riski bulunmamaktadir.
  */
 export default function ApiDocsPage() {
+  // On-prem (kapalı ağ): Swagger UI + spec CDN'den (jsdelivr) yüklenir → air-gap'te erişilemez
+  // ve "dışarıya TEK bağlantı = lisans" ilkesini ihlal eder. Offline'da anlamsız → 404.
+  if (isOnPrem()) notFound()
+
   // Tum icerik statik string literal — kullanici girdisi iceremez
   const staticCss = `
     body {

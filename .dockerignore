@@ -19,3 +19,11 @@ apps/web/.vercel
 apps/web/coverage
 apps/web/playwright-report
 apps/web/test-results
+# public/uploads: imaj içeriği repo'ya değil dev-makinesinin O ANKİ working tree'sine bağlı
+# (paylaşılan dev makinesi). Buraya düşen gerçek video/logo/deneme dosyası aksi halde teslimat
+# imajına gömülüp http://hastane:3000/uploads/<dosya>'dan KİMLİK-DOĞRULAMASIZ servis edilir
+# (başka müşteri/iç-test içeriği sızıntısı). Yalnız commit'li 2 demo webm istisna (.gitignore:70-73 ile aynı).
+apps/web/public/uploads/*
+!apps/web/public/uploads/egitim-el-hijyeni.webm
+!apps/web/public/uploads/egitim-yangin-guvenligi.webm
+**/.DS_Store

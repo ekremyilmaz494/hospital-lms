@@ -26,14 +26,19 @@ APP_DB_ROLE="postgres"   # DATABASE_URL bu rolle bağlanır → baseline tablosu
 
 # supabase_admin = superuser; ilk-init sırasında local socket pg_hba `trust` → parolasız
 # superuser bağlantısı (reserved rolleri değiştirebilen tek yol).
-psql -v ON_ERROR_STOP=1 --username supabase_admin --dbname "${POSTGRES_DB:-postgres}" <<SQL
+# GÜVENLİK: parola/rol ADI heredoc'a SHELL ile interpolate edilmez (elle düzenlenmiş .env'de
+# ' içeren parola SQL'i kırar/enjekte ederdi). Quoted delimiter <<'SQL' → shell expand YOK;
+# değerler psql değişkeni olarak geçer: :'pw' string-literal olarak, :"approle" identifier
+# olarak psql tarafından GÜVENLE quote'lanır (kaçış otomatik).
+psql -v ON_ERROR_STOP=1 -v pw="$POSTGRES_PASSWORD" -v approle="$APP_DB_ROLE" \
+     --username supabase_admin --dbname "${POSTGRES_DB:-postgres}" <<'SQL'
 -- (1) Alt-rol parolalarını POSTGRES_PASSWORD'e eşitle (GoTrue/Realtime ağ bağlantısı için)
-ALTER USER supabase_auth_admin        WITH PASSWORD '${POSTGRES_PASSWORD}';
-ALTER USER supabase_storage_admin     WITH PASSWORD '${POSTGRES_PASSWORD}';
-ALTER USER supabase_admin             WITH PASSWORD '${POSTGRES_PASSWORD}';
-ALTER USER supabase_replication_admin WITH PASSWORD '${POSTGRES_PASSWORD}';
-ALTER USER authenticator              WITH PASSWORD '${POSTGRES_PASSWORD}';
-ALTER USER pgbouncer                  WITH PASSWORD '${POSTGRES_PASSWORD}';
+ALTER USER supabase_auth_admin        WITH PASSWORD :'pw';
+ALTER USER supabase_storage_admin     WITH PASSWORD :'pw';
+ALTER USER supabase_admin             WITH PASSWORD :'pw';
+ALTER USER supabase_replication_admin WITH PASSWORD :'pw';
+ALTER USER authenticator              WITH PASSWORD :'pw';
+ALTER USER pgbouncer                  WITH PASSWORD :'pw';
 
 -- (2) Prisma baseline: boş _prisma_migrations (P3005 yarışını kapatır; owner = app rolü)
 CREATE TABLE IF NOT EXISTS public."_prisma_migrations" (
@@ -47,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public."_prisma_migrations" (
     "applied_steps_count" INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "_prisma_migrations_pkey" PRIMARY KEY ("id")
 );
-ALTER TABLE public."_prisma_migrations" OWNER TO ${APP_DB_ROLE};
+ALTER TABLE public."_prisma_migrations" OWNER TO :"approle";
 SQL
 
 echo "[onprem-db-init] Alt-rol parolaları POSTGRES_PASSWORD ile senkronlandı + Prisma baseline hazır."
