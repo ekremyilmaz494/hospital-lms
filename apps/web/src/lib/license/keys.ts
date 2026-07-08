@@ -13,16 +13,18 @@
  *   SaaS tamamen ele geçse bile saldırgan en fazla ~35 günlük makbuz basabilir,
  *   asla yeni lisans üretemez.
  *
- * ⚠️ AŞAĞIDAKİLER DEV/TEST ANAHTARLARIDIR (Faz 5 anahtar töreninde üretim
- * public anahtarlarıyla DEĞİŞTİRİLECEK). Test private key'leri yalnız
- * __tests__/ fixture'larında ve lokal CLI denemelerinde kullanılır.
+ * ✅ ÜRETİM anahtar töreni YAPILDI (2026-07-08): gömülü issuer/receipt public
+ * anahtarları üretim değerleridir. Private'ler bu repo'da/sunucuda DEĞİL — issuer
+ * private soğuk saklamada (offline), receipt private SaaS env'inde
+ * (LICENSE_RECEIPT_PRIVATE_KEY). Aşağıdaki DEV_* sabitleri yalnızca "dev-anahtar
+ * kullanılıyor mu" tespiti için referanstır (usingDevLicenseKeys) — DEĞİŞTİRME.
  */
 
 export const LICENSE_ISSUER = 'klinovax-license'
 export const RECEIPT_ISSUER = 'klinovax-receipt'
 
-/** Gömülü (kaynak koda sabit) DEV/TEST issuer public `x`. */
-const EMBEDDED_ISSUER_X = 'ozAdQbOx4PHWDV_QxBrLU41SbHbuquKJQTgbiFoibTo'
+/** Gömülü (kaynak koda sabit) ÜRETİM issuer public `x` (anahtar töreni 2026-07-08). */
+const EMBEDDED_ISSUER_X = 'Eu5bU2TkAdEtaqWPhd1qdBuz7JCrA8n4yylmPoN_hQA'
 
 /**
  * Issuer public `x` çözümü. NORMALDE gömülü sabit döner (env'den OKUNMAZ — güvenlik
@@ -52,7 +54,7 @@ export const LICENSE_ISSUER_PUBLIC_JWK = {
 export const RECEIPT_PUBLIC_JWK = {
   kty: 'OKP',
   crv: 'Ed25519',
-  x: 'asru1wTYfAN7zs_Rd0uAFrIm0rxTmWJKBjZXEWBgh48',
+  x: 'PHg1ezeis1eSSWF23EgH2VGbRghzszHhfV_dG22oOBU',
 } as const
 
 /**
@@ -70,8 +72,11 @@ const DEV_RECEIPT_X = 'asru1wTYfAN7zs_Rd0uAFrIm0rxTmWJKBjZXEWBgh48'
  * verify.ts üretim+on-prem'de bu durumda doğrulamayı reddeder (fail-closed).
  */
 export function usingDevLicenseKeys(): boolean {
+  // Cast: tören sonrası gömülü x'ler (as const literal) DEV_* ile örtüşmez → tsc
+  // karşılaştırmayı "her zaman false" sayıp TS2367 verir. Runtime kontrolü korunur
+  // (dev-anahtar bir gün geri gömülürse true döner — defense-in-depth).
   return (
-    LICENSE_ISSUER_PUBLIC_JWK.x === DEV_ISSUER_X ||
-    RECEIPT_PUBLIC_JWK.x === DEV_RECEIPT_X
+    (LICENSE_ISSUER_PUBLIC_JWK.x as string) === DEV_ISSUER_X ||
+    (RECEIPT_PUBLIC_JWK.x as string) === DEV_RECEIPT_X
   )
 }

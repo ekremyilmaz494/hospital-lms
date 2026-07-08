@@ -14,17 +14,19 @@ describe('J — forgeable dev-anahtar üretim guard', () => {
     vi.unstubAllEnvs()
   })
 
-  it('gömülü anahtarlar şu an DEV/TEST placeholder (tören yapılmadı)', () => {
-    expect(usingDevLicenseKeys()).toBe(true)
+  it('gömülü anahtarlar ÜRETİM (anahtar töreni 2026-07-08 yapıldı — dev placeholder DEĞİL)', () => {
+    expect(usingDevLicenseKeys()).toBe(false)
   })
 
-  it('üretim + on-prem + dev anahtar → doğrulama reddedilir (NO_LICENSE)', async () => {
+  it('üretim anahtarı + on-prem + production → dev-guard TETİKLENMEZ, imza kontrolüne geçer', async () => {
+    // Tören sonrası usingDevLicenseKeys()=false → dev_keys_in_production guard'ı devreye
+    // girmez; doğrulama gerçek imza kontrolüne ilerler (bogus JWT → signature_invalid).
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('DEPLOYMENT_MODE', 'onprem')
     vi.stubEnv('NEXT_PUBLIC_DEPLOYMENT_MODE', 'onprem')
     vi.stubEnv('ALLOW_DEV_LICENSE_KEYS', '')
     await expect(verifyLicenseJwt('a.b.c')).rejects.toMatchObject({
-      reason: 'dev_keys_in_production',
+      reason: 'signature_invalid',
     })
   })
 
