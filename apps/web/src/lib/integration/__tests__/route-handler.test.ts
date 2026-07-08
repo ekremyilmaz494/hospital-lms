@@ -21,6 +21,7 @@ const {
   checkFeatureMock,
   checkWritePermissionMock,
   createAuditLogMock,
+  licenseApiGateMock,
 } = vi.hoisted(() => ({
   prismaMock: {
     integrationApiKey: { findUnique: vi.fn(), update: vi.fn() },
@@ -30,9 +31,11 @@ const {
   checkFeatureMock: vi.fn(),
   checkWritePermissionMock: vi.fn(),
   createAuditLogMock: vi.fn(),
+  licenseApiGateMock: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
+vi.mock('@/lib/license/enforcement', () => ({ licenseApiGate: licenseApiGateMock }))
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: checkRateLimitMock,
   // getRedis null → idempotency modülü in-memory fallback kullanır (dev deseni).
@@ -109,6 +112,7 @@ beforeEach(() => {
   checkFeatureMock.mockResolvedValue(true)
   checkWritePermissionMock.mockResolvedValue(null)
   createAuditLogMock.mockResolvedValue(undefined)
+  licenseApiGateMock.mockResolvedValue({ blocked: false }) // bulut/lisanslı varsayılan
 })
 
 describe('withIntegrationRoute — auth', () => {
@@ -178,6 +182,20 @@ describe('withIntegrationRoute — org/plan/lisans kapıları', () => {
       error: 'Personel entegrasyonu planınızda etkin değil. Lütfen Klinovax ile iletişime geçin.',
     })
     expect(checkFeatureMock).toHaveBeenCalledWith('org-1', 'staffIntegration')
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('on-prem lisans kilidi (licenseApiGate blocked) → 403, handler çağrılmaz', async () => {
+    licenseApiGateMock.mockResolvedValue({
+      blocked: true,
+      code: 'license_locked',
+      message: 'Lisans kilitli.',
+    })
+    const handler = vi.fn(async () => Response.json({ ok: true }))
+    const route = withIntegrationRoute(handler)
+    const res = await route(makeRequest())
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'Lisans kilitli.' })
     expect(handler).not.toHaveBeenCalled()
   })
 

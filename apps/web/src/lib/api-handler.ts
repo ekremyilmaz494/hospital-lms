@@ -26,6 +26,16 @@ import {
 } from '@/lib/api-helpers'
 import type { UserRole } from '@/types/database'
 import { logger } from '@/lib/logger'
+import { licenseApiGate, isReadonlyWriteExempt } from '@/lib/license/enforcement'
+
+/** İstek URL'inden pathname çıkarır (parse hatasında boş string). */
+function pathOf(request: Request): string {
+  try {
+    return new URL(request.url).pathname
+  } catch {
+    return ''
+  }
+}
 
 type DbUser = NonNullable<Awaited<ReturnType<typeof getAuthUser>>['dbUser']>
 
@@ -168,6 +178,14 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
       const { user, dbUser } = auth
       if (!user || !dbUser) return errorResponse('Unauthorized', 401)
 
+      // ── On-prem lisans kapısı ── LOCKED/NO_LICENSE → herkese 403 (super_admin
+      // DAHİL). Bulut modunda no-op. READONLY yazma bloğu aşağıda write-guard'da.
+      const pathname = pathOf(request)
+      const licenseDecision = await licenseApiGate(pathname)
+      if (licenseDecision.blocked) {
+        return errorResponse(licenseDecision.message ?? 'Sistem lisansı geçerli değil.', 403)
+      }
+
       // ── O1: First-login (şifre değiştirme) zorunluluğunu API katmanında da zorla ──
       // Middleware /api/*'ı tamamen atlar; mustChangePassword yalnız sayfa middleware'inde +
       // client cookie'sinde (hlms-must-change-pw) enforce ediliyordu → kullanıcı doğrudan API
@@ -209,9 +227,11 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
         return errorResponse('Bu işlem için bir kurum bağlamı gerekir', 400)
       }
 
-      // Write guard — super_admin exempt, GET serbest
+      // Write guard — super_admin exempt, GET serbest. On-prem READONLY'de bu
+      // yol lisans-güdümlüdür (subscription-guard on-prem dalı); aktif sınav
+      // ilerlemesi pathname ile muaf tutulur.
       if (writeGuard && WRITE_METHODS.has(request.method.toUpperCase()) && dbUser.role !== 'super_admin' && dbUser.organizationId) {
-        const block = await checkWritePermission(dbUser.organizationId, request.method)
+        const block = await checkWritePermission(dbUser.organizationId, request.method, { pathname })
         if (block) return block
       }
 

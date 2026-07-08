@@ -1688,6 +1688,92 @@ model UserBadge {
   @@map("user_badges")
 }
 
+// ═══════════════ Lisans (On-Premise) ═══════════════
+
+// Platform lisansı — ON-PREM kurulumun tek (singleton, id=1) lisans kaydı.
+// licenseJwt/receiptJwt her okunuşta İMZA DOĞRULAMASINDAN geçer (store.ts):
+// satır elle değiştirilirse imza düşer → NO_LICENSE. Bulut deploy'unda tablo
+// boş durur, zararsızdır. clockWatermark = görülen en ileri zaman (saat
+// geri alma tespiti; makbuz iat'i ile ileri sarar).
+model PlatformLicense {
+  id                  Int       @id @default(1)
+  licenseJwt          String    @map("license_jwt") @db.Text
+  licenseId           String    @map("license_id") @db.VarChar(64)
+  instanceId          String    @map("instance_id") @db.Uuid
+  receiptJwt          String?   @map("receipt_jwt") @db.Text
+  lastHeartbeatAt     DateTime? @map("last_heartbeat_at") @db.Timestamptz
+  lastHeartbeatStatus String?   @map("last_heartbeat_status") @db.VarChar(20)
+  clockWatermark      DateTime  @map("clock_watermark") @db.Timestamptz
+  activatedAt         DateTime  @default(now()) @map("activated_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("platform_license")
+}
+
+// Klinovax lisans sunucusu (SaaS tarafı) — on-prem kurulumlara kesilen
+// lisansların kaydı, iptali ve heartbeat telemetrisi. On-prem kurulumda bu üç
+// tablo boş durur (zararsız). License.id == lisans JWT'sinin jti claim'i.
+model License {
+  id               String    @id @db.Uuid
+  customerName     String    @map("customer_name") @db.VarChar(200)
+  contactEmail     String?   @map("contact_email") @db.VarChar(200)
+  // Kayıtlı ham lisans JWT'si — yeniden indirme + heartbeat'te renewedLicense
+  // olarak sunma (elle dosya değişmeden yenileme) için saklanır.
+  licenseJwt       String    @map("license_jwt") @db.Text
+  schemaVersion    Int       @default(1) @map("schema_version")
+  licenseType      String    @default("standard") @map("license_type") @db.VarChar(20)
+  maxOrganizations Int?      @map("max_organizations")
+  maxStaff         Int?      @map("max_staff")
+  graceDays        Int       @default(14) @map("grace_days")
+  validUntil       DateTime? @map("valid_until") @db.Timestamptz
+  status           String    @default("active") @db.VarChar(20) // active | revoked
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  revokeReason     String?   @map("revoke_reason") @db.Text
+  notes            String?   @db.Text
+  createdBy        String?   @map("created_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  activations LicenseActivation[]
+  heartbeats  LicenseHeartbeat[]
+
+  @@map("licenses")
+}
+
+// Bir lisansın aktive edildiği kurulumlar. Aynı lisansın >1 instance'tan
+// düzenli heartbeat'i = paylaşım/kopyalama anomalisi (super-admin bildirimi).
+model LicenseActivation {
+  id          String   @id @default(uuid()) @db.Uuid
+  licenseId   String   @map("license_id") @db.Uuid
+  instanceId  String   @map("instance_id") @db.Uuid
+  appVersion  String?  @map("app_version") @db.VarChar(40)
+  hostname    String?  @db.VarChar(200)
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, instanceId])
+  @@map("license_activations")
+}
+
+// Heartbeat telemetrisi — kullanım anlık görüntüsü (org/personel sayısı, sürüm).
+// Lisans limit aşımı ve sağlık takibi super-admin panelinde buradan okunur.
+model LicenseHeartbeat {
+  id         String   @id @default(uuid()) @db.Uuid
+  licenseId  String   @map("license_id") @db.Uuid
+  instanceId String   @map("instance_id") @db.Uuid
+  orgCount   Int      @map("org_count")
+  staffCount Int      @map("staff_count")
+  appVersion String?  @map("app_version") @db.VarChar(40)
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId, receivedAt], map: "idx_license_heartbeat_license_time")
+  @@map("license_heartbeats")
+}
+
 // ═══════════════ İK/HBYS Personel Senkron Entegrasyonu ═══════════════
 // Hastanenin kendi İK/HBYS sisteminden otomatik personel ekleme/güncelleme/
 // deaktivasyon. Kanal-bağımsız: tek ingestion çekirdeği (src/lib/integration/)

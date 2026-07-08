@@ -1,0 +1,29 @@
+# On-prem Docker build (deploy/onprem/Dockerfile, context = repo kökü) için.
+**/node_modules
+**/.next
+**/.next.nosync
+**/.next-*
+.git
+# Sır sızıntısı önleme: HİÇBİR .env varyantı (example/reference/production dahil) ve
+# anahtar/lisans dosyası build context'e girmesin — runtime env'i compose sağlar.
+**/.env
+**/.env.*
+**/*.klv
+**/*.klr
+**/*.pem
+**/*.jwk
+**/*.key
+**/*.log
+deploy/onprem/dist
+apps/web/.vercel
+apps/web/coverage
+apps/web/playwright-report
+apps/web/test-results
+# public/uploads: imaj içeriği repo'ya değil dev-makinesinin O ANKİ working tree'sine bağlı
+# (paylaşılan dev makinesi). Buraya düşen gerçek video/logo/deneme dosyası aksi halde teslimat
+# imajına gömülüp http://hastane:3000/uploads/<dosya>'dan KİMLİK-DOĞRULAMASIZ servis edilir
+# (başka müşteri/iç-test içeriği sızıntısı). Yalnız commit'li 2 demo webm istisna (.gitignore:70-73 ile aynı).
+apps/web/public/uploads/*
+!apps/web/public/uploads/egitim-el-hijyeni.webm
+!apps/web/public/uploads/egitim-yangin-guvenligi.webm
+**/.DS_Store

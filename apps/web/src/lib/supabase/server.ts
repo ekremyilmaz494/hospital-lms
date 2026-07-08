@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getCookieDomain } from './cookie-domain'
+import { getServerSupabaseUrl, getSupabaseCookieOptions } from './onprem-config'
 
 /**
  * getSession() vs getUser():
@@ -25,9 +26,10 @@ export async function createClient() {
   const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getServerSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: getSupabaseCookieOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -64,9 +66,10 @@ export async function createLoginClient(rememberMe: boolean) {
   const SEVEN_DAYS = 7 * 24 * 60 * 60
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getServerSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: getSupabaseCookieOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -93,7 +96,7 @@ export async function createLoginClient(rememberMe: boolean) {
 export async function createServiceClient() {
   const { createClient } = await import('@supabase/supabase-js')
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getServerSupabaseUrl(),
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
@@ -109,7 +112,7 @@ export async function createServiceClient() {
 export async function createBearerClient(token: string) {
   const { createClient } = await import('@supabase/supabase-js')
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getServerSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },

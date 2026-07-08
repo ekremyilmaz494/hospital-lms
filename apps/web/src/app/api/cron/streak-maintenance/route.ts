@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { istanbulDateString, addDaysToDateString, dateStringToUTCDate } from '@/lib/gamification/timezone'
 import { assertCronAuth } from '@/lib/cron-auth'
+import { isBusinessCronAllowed } from '@/lib/license/enforcement'
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
@@ -19,6 +20,11 @@ const NO_STORE = { 'Cache-Control': 'no-store' }
 export async function GET(request: Request) {
   const authErr = assertCronAuth(request)
   if (authErr) return authErr
+
+  // On-prem: READONLY/LOCKED'ta iş cron'ları atlanır (yalnız altyapı cron'ları çalışır). Bulutta no-op.
+  if (!(await isBusinessCronAllowed())) {
+    return NextResponse.json({ ok: true, skipped: 'license' }, { headers: { 'Cache-Control': 'no-store' } })
+  }
 
   const now = new Date()
   const yesterday = dateStringToUTCDate(addDaysToDateString(istanbulDateString(now), -1))

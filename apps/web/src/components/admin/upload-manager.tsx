@@ -161,7 +161,10 @@ export function UploadManagerProvider({ children }: { children: ReactNode }) {
       if (kind === 'pdf') {
         try {
           const pdfjs = await import('pdfjs-dist');
-          pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs`;
+          // Yerel worker (public/pdf.worker.min.mjs — exam/pdf-viewer.tsx ile aynı). unpkg CDN'i
+          // (1) kapalı-ağ on-prem'de erişilemez → air-gap kırığı, (2) sabitlenmiş @4.9.155 kurulu
+          // pdfjs-dist v5 ile uyuşmaz (pdfjs api==worker sürüm ister) → CDN'le bile bozuktu.
+          pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
           const buf = await file.arrayBuffer();
           const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
           pageCount = pdf.numPages;

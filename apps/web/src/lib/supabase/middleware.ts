@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { extractSubdomain } from '@/lib/organization-utils';
 import { getCookieDomain } from './cookie-domain';
 import { verifyAccessToken } from './verify-jwt';
+import { getServerSupabaseUrl, getSupabaseCookieOptions } from './onprem-config';
 import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
 import { hasAdminAuthority } from '@/lib/auth/admin-authority';
 
@@ -34,6 +35,8 @@ const PUBLIC_ROUTES = [
   '/api/public/',
   '/dev-reset',
   '/clear-cache',
+  '/license', // on-prem lisans aktivasyon/yenileme ekranı (kilitliyken erişilebilir)
+  '/api/license/', // durum + aktivasyon uçları (kilitliyken erişilebilir)
 ];
 
 function isPublicRoute(pathname: string): boolean {
@@ -137,9 +140,10 @@ export async function updateSession(request: NextRequest) {
   const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60;
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getServerSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: getSupabaseCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -254,6 +258,20 @@ export async function updateSession(request: NextRequest) {
         url.searchParams.set('redirectTo', pathname);
       }
       return NextResponse.redirect(url);
+    }
+
+    // ── On-prem lisans sentinel guard ──
+    // Login endpoint'i lisans kilitli/lisanssızsa 'hlms-license-state=locked' set eder.
+    // Bu çerez varsa kullanıcı /license (aktivasyon) dışında hiçbir protected route'a
+    // giremez — advisory hızlı-yol (asıl zorlama API kapısı + layout guard'ıdır).
+    // Cookie-only kontrol → middleware'de DB/lisans okuması YOK (performans).
+    const licenseLocked = request.cookies.get('hlms-license-state')?.value === 'locked';
+    if (
+      licenseLocked &&
+      !pathname.startsWith('/license') &&
+      !pathname.startsWith('/auth/logout')
+    ) {
+      return NextResponse.redirect(new URL('/license', request.url));
     }
 
     // ── Şifre değiştirme zorunluluğu guard ──

@@ -9,6 +9,7 @@ import {
 import { logger } from '@/lib/logger'
 import type { SubscriptionStatus } from '@/types/database'
 import { assertCronAuth } from '@/lib/cron-auth'
+import { isBusinessCronAllowed } from '@/lib/license/enforcement'
 
 const REMINDER_DAYS = [7, 3, 1] as const
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -21,6 +22,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export async function POST(request: Request) {
   const authErr = assertCronAuth(request)
   if (authErr) return authErr
+
+  // On-prem: READONLY/LOCKED'ta iş cron'ları atlanır (yalnız altyapı cron'ları çalışır). Bulutta no-op.
+  if (!(await isBusinessCronAllowed())) {
+    return NextResponse.json({ ok: true, skipped: 'license' }, { headers: { 'Cache-Control': 'no-store' } })
+  }
 
   const now = Date.now()
   let sentCount = 0

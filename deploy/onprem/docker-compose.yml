@@ -1,0 +1,406 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# KlinoVax Hospital LMS — On-Premise (tek sunucu) compose.
+# Tüm bileşenler müşteri sunucusunda; dışarıya TEK bağlantı lisans doğrulama
+# (LICENSE_SERVER_URL). Sırları docker-compose değil `.env` sağlar (install.sh üretir).
+#
+# Bileşenler: app · postgres · gotrue(auth) · realtime · gateway(kong) ·
+#             redis · srh(Upstash-REST proxy) · minio(+init) · scheduler · mailpit
+#
+# Güvenlik notu: veri/kimlik servisleri (postgres/redis/minio/gotrue/realtime/srh)
+# yalnız iç ağdadır (`expose`, `ports` DEĞİL). Host'a açık olanlar: app (3000),
+# gateway (8000, tarayıcı auth/ws), minio S3 API (9000, presigned URL). Yönetim
+# yüzeyleri (minio konsol 9001, mailpit UI 8025) yalnız 127.0.0.1'e bağlıdır —
+# uzaktan erişim için SSH tüneli kullanın; LAN'a AÇMAYIN.
+# ─────────────────────────────────────────────────────────────────────────────
+name: klinovax-onprem
+
+x-common-env: &common-env
+  DEPLOYMENT_MODE: onprem
+  NEXT_PUBLIC_DEPLOYMENT_MODE: onprem
+
+# Tüm servislere uygulanan minimum sertleştirme: ayrıcalık-yükseltme (setuid/setgid)
+# engeli. Daha derin sertleştirme (read_only rootfs + cap_drop) servis-özel doğrulama
+# gerektirir → sonraki tur.
+x-hardening: &hardening
+  security_opt:
+    - "no-new-privileges:true"
+
+# Log rotasyonu — teslim paketinde GARANTİ (docker json-file default'u SINIRSIZ; aylarca
+# çalışan sunucuda /var/lib/docker disk'ini doldurup postgres WAL fsync'ini kırar → topyekûn
+# kesinti). Her servise <<: [*hardening, *logging] ile uygulanır. ~5×20m = servis başına ≤100MB.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+services:
+  # ── Uygulama (Next.js standalone) ──
+  app:
+    <<: [*hardening, *logging]
+    image: ${APP_IMAGE:-klinovax/hospital-lms:onprem}
+    restart: unless-stopped
+    # Kaynak tavanı (cgroup): tek servis bellek sızıntısı/yük artışı TÜM sunucuyu (hasta
+    # sistemi) çökertmesin — limitli halde yalnız bu konteyner OOM-kill olup restart eder.
+    mem_limit: 2g
+    pids_limit: 512
+    depends_on:
+      postgres: { condition: service_healthy }
+      gateway: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      srh: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      <<: *common-env
+      NODE_ENV: production
+      PORT: 3000
+      # Runtime Node heap tavanı (V8 GC'yi cgroup OOM-kill'den ÖNCE tetikler). mem_limit'in altında.
+      NODE_OPTIONS: --max-old-space-size=1536
+      # DB — app pooler yok, doğrudan postgres. DIRECT_URL migrate için (aynı).
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres # secret-scanner-disable-line (değişken referansı, gerçek sır değil)
+      DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres # secret-scanner-disable-line (değişken referansı)
+      # Auth (self-hosted GoTrue, gateway üzerinden). HS256 shared secret —
+      # verify-jwt.ts SUPABASE_JWT_SECRET fallback'iyle doğrular (kod değişikliği yok).
+      # NEXT_PUBLIC_SUPABASE_URL = tarayıcının Supabase (auth/realtime) için gördüğü URL.
+      # Üretim (reverse-proxy) topolojisinde bu PUBLIC_APP_URL'dir; proxy /auth/v1 + /realtime/v1
+      # yollarını gateway:8000'e yönlendirir (aynı-origin, CORS yok). Proxy'siz localhost'ta
+      # tarayıcı realtime/token-refresh KIRIK kalır — bunun tam çözümü (config köprüsü + proxy)
+      # ayrı ele alınıyor (bkz. docs/onprem-lisans.md manuel-doğrulama riskleri: Realtime paritesi).
+      NEXT_PUBLIC_SUPABASE_URL: ${PUBLIC_APP_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_JWT_SECRET: ${JWT_SECRET}
+      # App
+      NEXT_PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+      NEXT_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN}
+      # ── Tarayıcı-yüzlü RUNTIME config (tek generic imaj için) ──
+      # NEXT_PUBLIC_* build-time koda gömülür → imaj 'localhost'a kilitlenir. Bu
+      # ONPREM_PUBLIC_* değerleri RUNTIME'da okunur (inline EDİLMEZ): root layout
+      # window.__ONPREM_CONFIG__'e basar, tarayıcı Supabase client'ı buradan okur.
+      # Değerler müşteri .env'inden gelir — imaj müşteri-nötr kalır (vendor sır tutmaz).
+      ONPREM_PUBLIC_SUPABASE_URL: ${PUBLIC_APP_URL}
+      ONPREM_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
+      ONPREM_PUBLIC_STORAGE_HOST: ${PUBLIC_STORAGE_URL}
+      ONPREM_PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+      ONPREM_PUBLIC_BASE_DOMAIN: ${BASE_DOMAIN}
+      # Nesne deposu (MinIO — S3 uyumlu, path-style)
+      # S3_ENDPOINT = PUBLIC (tarayıcı-erişilebilir) — presigned URL host'u budur.
+      S3_ENDPOINT: ${PUBLIC_STORAGE_URL}
+      # S3_INTERNAL_ENDPOINT = sunucu-taraf DOĞRUDAN işlemler (upload/download/multipart
+      # complete/yedek cron'u) container içinden İÇ ağ üzerinden MinIO'ya gider. PUBLIC
+      # adres localhost/LAN ise container İÇİNDEN erişilemez (ECONNREFUSED) → bu iç adres
+      # olmadan içerik yükleme, multipart tamamlama ve yedek KIRILIR. Dış S3 kullanıyorsanız
+      # .env'de aynı dış URL'ye ayarlayın.
+      S3_INTERNAL_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
+      S3_FORCE_PATH_STYLE: "true"
+      # SSE: on-prem MinIO KMS'siz kurulur → SSE-S3 header'ı 'KMS not configured' ile REDDEDER
+      # (branding/belge upload + yedek KIRILIR). Bu yüzden BOŞ (header gönderilmez, düz PUT çalışır).
+      # MinIO KMS yapılandıran operatör .env'e S3_SSE=AES256 yazarak geri açabilir.
+      S3_SSE: ${S3_SSE:-}
+      NEXT_PUBLIC_STORAGE_HOST: ${PUBLIC_STORAGE_URL}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_S3_BUCKET: ${S3_BUCKET:-klinovax-media}
+      # Redis (SRH — Upstash REST uyumlu proxy)
+      REDIS_URL: http://srh:80
+      REDIS_TOKEN: ${SRH_TOKEN}
+      # E-posta (SMTP — mailpit varsayılan; prod'da müşteri relay'i)
+      EMAIL_DRIVER: smtp
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SES_FROM_EMAIL: ${FROM_EMAIL:-noreply@klinovax.local}
+      # Yedek/yedek-doğrulama cron'u başarısızlıkta bu adrese alarm e-postası atar.
+      # BOŞSA alarm gitmez (yalnız log/Sentry backstop) — install.sh sorar.
+      ADMIN_ALERT_EMAIL: ${ADMIN_ALERT_EMAIL:-}
+      # Güvenlik/altyapı sırları
+      CRON_SECRET: ${CRON_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY}
+      HEALTH_CHECK_SECRET: ${HEALTH_CHECK_SECRET}
+      # Lisans (dışarı TEK bağlantı)
+      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-https://app.klinovax.com}
+      # NOT: ALLOW_DEV_LICENSE_KEYS / LICENSE_ISSUER_PUBLIC_JWK_X (lokal/CI test knob'ları)
+      # ÜRETİM compose'undan bilinçle ÇIKARILDI — bu env'ler gömülü issuer public'i
+      # override edip lisansı devre-dışı bırakabilir (kutu sahibi kendi anahtarıyla sahte
+      # lisans imzalar). Kod tarafı ayrıca on-prem+production'da bu override'ı yok sayar.
+      # İlk-boot bootstrap
+      ONPREM_BOOTSTRAP: "true"
+      ONPREM_ADMIN_EMAIL: ${ONPREM_ADMIN_EMAIL}
+      ONPREM_ADMIN_PASSWORD: ${ONPREM_ADMIN_PASSWORD}
+      SUPABASE_URL: http://gateway:8000
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+  # ── PostgreSQL (uygulama + auth şeması) ──
+  postgres:
+    <<: [*hardening, *logging]
+    image: supabase/postgres:15.8.1.060
+    restart: unless-stopped
+    mem_limit: 2g
+    pids_limit: 512
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # İlk-init (fresh volume): alt-rol parolalarını POSTGRES_PASSWORD'e eşitle +
+      # Prisma baseline. supabase/postgres migrate.sh'ından SONRA çalışır (zz- öneki).
+      - ./db-init/zz-onprem-db-init.sh:/docker-entrypoint-initdb.d/zz-onprem-db-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      # Kirli kapanış sonrası büyümüş pgdata'da WAL replay 100s'yi aşabilir → geçici
+      # 'unhealthy' damgasını önle (app healthcheck'iyle aynı desen).
+      start_period: 300s
+    # Sadece iç ağ — dışarı port AÇMA (hasta verisi).
+    expose:
+      - "5432"
+
+  # ── GoTrue (Supabase Auth) ──
+  auth:
+    <<: [*hardening, *logging]
+    image: supabase/gotrue:v2.177.0
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 256
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${PUBLIC_APP_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@postgres:5432/postgres # secret-scanner-disable-line (değişken referansı)
+      GOTRUE_SITE_URL: ${PUBLIC_APP_URL}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-mailpit}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-1025}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${FROM_EMAIL:-noreply@klinovax.local}
+      # Kimlik-doğrulamalı kurum relay'i için USER/PASS — yoksa authenticated SMTP'de
+      # şifre-sıfırlama/davet e-postaları sessizce başarısız olur (mailpit'te boş kalır).
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${FROM_EMAIL:-noreply@klinovax.local}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9999/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    expose:
+      - "9999"
+
+  # ── Realtime (bildirim/presence/sınav kanalları) ──
+  realtime:
+    <<: [*hardening, *logging]
+    image: supabase/realtime:v2.34.47
+    restart: unless-stopped
+    mem_limit: 1g
+    pids_limit: 512
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_ENC_KEY: ${REALTIME_ENC_KEY}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+    # Liveness (port yanıt veriyor mu) — realtime imajında curl var (nc yok). Tenant-özel
+    # health yolu kırılgan olduğundan bağlanabilirlik kontrolü kullanılır.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null --max-time 4 http://localhost:4000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    expose:
+      - "4000"
+
+  # ── Gateway (Kong) — /auth/v1/* → GoTrue, /realtime/v1/* → Realtime ──
+  gateway:
+    <<: [*hardening, *logging]
+    image: kong:2.8.1
+    restart: unless-stopped
+    mem_limit: 768m
+    pids_limit: 512
+    depends_on:
+      auth: { condition: service_healthy }
+      realtime: { condition: service_started }
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Worker sayısını host çekirdek sayısından BAĞIMSIZ sabitle. Varsayılan 'auto' = ncpu
+      # (18-çekirdek makinede 18 worker → her biri Lua VM preallocate → mem_limit'i aşıp OOM).
+      # On-prem düşük-trafik için 2 worker fazlasıyla yeter (~150MB).
+      KONG_NGINX_WORKER_PROCESSES: "2"
+    volumes:
+      - ./gateway/kong.yml:/home/kong/kong.yml:ro
+    # 'kong health' yalnız master süreç canlı mı bakar (OOM-thrashing worker'ları HEALTHY sanır).
+    # Bunun yerine GERÇEK proxy-hazırlık: Kong üzerinden /auth/v1/health'e ulaşabiliyor muyuz?
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8000/auth/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+
+  # ── Redis + SRH (Upstash REST uyumlu proxy — @upstash/redis istemcisi değişmez) ──
+  redis:
+    <<: [*hardening, *logging]
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 512m
+    pids_limit: 256
+    # maxmemory container limitinin ALTINDA; noeviction = doldu ise SESSİZCE sınav timer'ı
+    # düşürmek yerine yazmayı reddeder (redis.ts fail-open ile zarif düşer). appendonly = kalıcılık.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "384mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    expose:
+      - "6379"
+
+  srh:
+    <<: [*hardening, *logging]
+    image: hiett/serverless-redis-http:0.0.10
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 256
+    depends_on:
+      redis: { condition: service_healthy }
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: ${SRH_TOKEN}
+      SRH_CONNECTION_STRING: redis://redis:6379
+    # NOT: 'localhost' değil '127.0.0.1' — busybox nc 'localhost'u önce IPv6 (::1) çözer,
+    # srh yalnız IPv4 0.0.0.0:80 dinler → localhost ile yanlış 'unhealthy' (app'i bloke eder).
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 80 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    expose:
+      - "80"
+
+  # ── MinIO (S3 uyumlu nesne deposu) ──
+  minio:
+    <<: [*hardening, *logging]
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    mem_limit: 1g
+    pids_limit: 512
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    ports:
+      # 9000 = S3 API (presigned URL host'u; tarayıcı erişir → reverse-proxy arkası önerilir).
+      - "${MINIO_PORT:-9000}:9000"
+      # 9001 = yönetim konsolu — YALNIZ 127.0.0.1 (LAN'a açma; erişim için SSH tüneli).
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    <<: [*hardening, *logging]
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    mem_limit: 256m
+    pids_limit: 256
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "/init/minio-init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-klinovax-media}
+    volumes:
+      - ./scheduler/minio-init.sh:/init/minio-init.sh:ro
+    restart: "no"
+
+  # ── Scheduler (supercronic — Vercel Cron yerine; binary imajda gömülü) ──
+  scheduler:
+    <<: [*hardening, *logging]
+    image: ${APP_IMAGE:-klinovax/hospital-lms:onprem}
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 256
+    depends_on:
+      app: { condition: service_started }
+    entrypoint: ["/usr/local/bin/supercronic", "/crontab"]
+    # App imajından miras kalan HTTP healthcheck burada geçersiz (supercronic çalışır,
+    # 3000'de sunucu yok) → sürekli "unhealthy" gürültüsü. Bu serviste devre dışı.
+    healthcheck:
+      disable: true
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+      APP_URL: http://app:3000
+    volumes:
+      - ./scheduler/crontab:/crontab:ro
+
+  # ── Mailpit (yerel SMTP yakalama — geliştirme/test; prod'da müşteri relay'i) ──
+  # UI (8025) YALNIZ 127.0.0.1'e bağlı — yakalanan postalar (parola-sıfırlama linkleri,
+  # personel PII) LAN'a açılmaz. Prod'da gerçek SMTP relay'i kullanın (mailpit'i kaldırın).
+  mailpit:
+    <<: [*hardening, *logging]
+    image: axllent/mailpit:v1.30.3
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 1025 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    expose:
+      - "1025"
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

@@ -31,6 +31,7 @@ import { logger } from '@/lib/logger'
 import { maskIp } from '@/lib/pii-mask'
 import { isIpAllowed } from '@/lib/auth/ip-allowlist'
 import { checkFeature } from '@/lib/feature-gate'
+import { licenseApiGate } from '@/lib/license/enforcement'
 import { verifyApiKey } from './api-key'
 import { idempotencyBegin, idempotencyComplete, idempotencyRelease } from './idempotency'
 
@@ -193,14 +194,22 @@ export function withIntegrationRoute<P extends DefaultParams = DefaultParams>(
       }
 
       // ── 6) Feature gate ── staffIntegration plana bağlı.
-      // (On-prem lisans kapısı on-prem branch'inde eklenir — bkz. licenseApiGate;
-      //  bulut/main'de lisans katmanı yok, gate zaten no-op olurdu.)
       const featureEnabled = await checkFeature(organizationId, 'staffIntegration')
       if (!featureEnabled) {
         return errorResponse(
           'Personel entegrasyonu planınızda etkin değil. Lütfen Klinovax ile iletişime geçin.',
           403,
         )
+      }
+
+      // ── 7) On-prem lisans kapısı ── LOCKED/NO_LICENSE'ta tüm entegrasyon uçları
+      // (okuma dahil) 403. Bu route-handler withApiHandler DIŞI olduğundan (API-key
+      // auth) merkezi licenseApiGate'i kendisi çağırmalı; aksi halde lisanssız/kilitli
+      // kurulumda HBYS senkron API'leri çalışmaya devam eder (kademeli-kilit deliği).
+      // Bulutta isOnPrem=false → no-op (main davranışı bit-bit korunur).
+      const licenseDecision = await licenseApiGate(pathOf(request))
+      if (licenseDecision.blocked) {
+        return errorResponse(licenseDecision.message ?? 'Lisans geçersiz.', 403)
       }
 
       // ── 8) Subscription write-guard ── yalnız write metodlarında.

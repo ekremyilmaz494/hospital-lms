@@ -1,5 +1,6 @@
 import * as Brevo from '@getbrevo/brevo'
 import { htmlToText } from 'html-to-text'
+import { sendViaSmtp, isRetryableSmtpError } from '@/lib/email-smtp'
 import { checkRateLimit } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -31,6 +32,15 @@ function getBrevoClient(): Brevo.BrevoClient {
   if (!apiKey) throw new Error('BREVO_API_KEY env var eksik')
   brevoClientInstance = new Brevo.BrevoClient({ apiKey })
   return brevoClientInstance
+}
+
+/**
+ * E-posta sürücüsü seçimi — on-prem dağıtımlar Brevo yerine müşterinin kendi
+ * SMTP sunucusunu kullanır (`EMAIL_DRIVER=smtp`). Varsayılan: brevo (bulut).
+ * Her çağrıda okunur ki testlerde env ile değiştirilebilsin.
+ */
+function emailDriver(): 'smtp' | 'brevo' {
+  return process.env.EMAIL_DRIVER === 'smtp' ? 'smtp' : 'brevo'
 }
 
 interface OrgEmailContext {
@@ -147,21 +157,35 @@ export async function sendEmail({
   }
 
   // Retry: rate limit / sunucu hatalarında exponential backoff (300ms × 2^attempt)
+  const driver = emailDriver()
   let lastErr: unknown = null
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      await getBrevoClient().transactionalEmails.sendTransacEmail(emailPayload)
+      if (driver === 'smtp') {
+        await sendViaSmtp({
+          fromName: displayName,
+          fromAddress: BRAND.fromAddress,
+          to: recipientList,
+          subject,
+          html,
+          text: plainText,
+          ...(effectiveReplyTo ? { replyTo: effectiveReplyTo } : {}),
+        })
+      } else {
+        await getBrevoClient().transactionalEmails.sendTransacEmail(emailPayload)
+      }
       return true
     } catch (err) {
       lastErr = err
       const status = (err as { statusCode?: number })?.statusCode ?? 0
-      const retryable = status === 429 || status >= 500
+      const retryable =
+        driver === 'smtp' ? isRetryableSmtpError(err) : status === 429 || status >= 500
       if (!retryable || attempt === MAX_ATTEMPTS - 1) break
       await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(2, attempt)))
     }
   }
-  logger.error('email', `Brevo gönderim başarısız (${recipientList.length} alıcı, subject="${subject}")`, lastErr)
-  throw lastErr instanceof Error ? lastErr : new Error('Brevo gönderim başarısız')
+  logger.error('email', `E-posta gönderim başarısız (driver=${driver}, ${recipientList.length} alıcı, subject="${subject}")`, lastErr)
+  throw lastErr instanceof Error ? lastErr : new Error('E-posta gönderim başarısız')
 }
 
 // ── Email Templates ──
@@ -665,18 +689,29 @@ export async function sendInvoiceEmail(params: {
   `
 
   try {
-    await getBrevoClient().transactionalEmails.sendTransacEmail({
-      subject: `Fatura - ${invoiceNumber}`,
-      htmlContent: html,
-      sender: { name: BRAND.fullName, email: BRAND.fromAddress },
-      to: recipientList.map(e => ({ email: e })),
-      attachment: [{
-        name: `fatura-${invoiceNumber}.pdf`,
-        content: Buffer.from(pdfBuffer).toString('base64'),
-      }],
-    })
+    if (emailDriver() === 'smtp') {
+      await sendViaSmtp({
+        fromName: BRAND.fullName,
+        fromAddress: BRAND.fromAddress,
+        to: recipientList,
+        subject: `Fatura - ${invoiceNumber}`,
+        html,
+        attachments: [{ filename: `fatura-${invoiceNumber}.pdf`, content: Buffer.from(pdfBuffer) }],
+      })
+    } else {
+      await getBrevoClient().transactionalEmails.sendTransacEmail({
+        subject: `Fatura - ${invoiceNumber}`,
+        htmlContent: html,
+        sender: { name: BRAND.fullName, email: BRAND.fromAddress },
+        to: recipientList.map(e => ({ email: e })),
+        attachment: [{
+          name: `fatura-${invoiceNumber}.pdf`,
+          content: Buffer.from(pdfBuffer).toString('base64'),
+        }],
+      })
+    }
   } catch (err) {
-    logger.error('Email', 'Invoice Brevo send failed', err instanceof Error ? err.message : String(err))
+    logger.error('Email', 'Invoice send failed', err instanceof Error ? err.message : String(err))
     throw err
   }
 }

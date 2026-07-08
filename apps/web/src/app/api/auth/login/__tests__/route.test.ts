@@ -16,6 +16,25 @@ vi.mock('@/lib/redis', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createLoginClient: vi.fn(),
+  createServiceClient: vi.fn(async () => ({
+    auth: {
+      admin: {
+        updateUserById: vi.fn().mockResolvedValue({ error: null }),
+      },
+    },
+  })),
+}))
+
+vi.mock('@/lib/supabase/verify-jwt', () => ({
+  verifyAccessToken: vi.fn(async (token?: string) => {
+    if (token === 'super_admin-token') {
+      return { sub: 'user-1', role: 'super_admin', payload: { app_metadata: {} } }
+    }
+    if (token === 'admin-token') {
+      return { sub: 'user-1', role: 'admin', payload: { app_metadata: { organization_id: 'org-1' } } }
+    }
+    return null
+  }),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -63,7 +82,7 @@ function mockSuccessfulAuth(role: string) {
         data: {
           user: { id: 'user-1', email: 'admin@deneme-organizasyonu.com', app_metadata: { role } },
           session: {
-            access_token: 'at',
+            access_token: `${role}-token`,
             refresh_token: 'rt',
             expires_at: 0,
             user: { factors: [] },
@@ -71,6 +90,7 @@ function mockSuccessfulAuth(role: string) {
         },
         error: null,
       }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
     },
   }
   mockCreateLoginClient.mockResolvedValue(supabase as never)

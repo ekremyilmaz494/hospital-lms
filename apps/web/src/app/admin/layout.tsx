@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { useMobile } from '@/hooks/use-mobile';
 import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
+import { LicenseBanner } from '@/components/shared/license-banner';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { performLogout } from '@/lib/auth/logout';
 import { hasAdminAuthority } from '@/lib/auth/admin-authority';
@@ -138,7 +139,10 @@ export default function AdminLayout({
             userRole={displayRole}
             userInitials={initials}
           />
-          <div className="p-4 pb-20 md:p-8 md:pb-8 flex-1">{children}</div>
+          <div className="p-4 pb-20 md:p-8 md:pb-8 flex-1">
+            <LicenseBanner />
+            {children}
+          </div>
         </main>
         <MobileBottomNav
           items={adminBottomNavItems}

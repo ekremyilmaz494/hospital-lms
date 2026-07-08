@@ -24,6 +24,7 @@ import {
   UserCog,
   Database,
   FlaskConical,
+  KeyRound,
   Cable,
   type LucideIcon,
 } from 'lucide-react';
@@ -87,6 +88,7 @@ export const superAdminNav: NavGroup[] = [
       },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
       { title: 'İletişim Mesajları', href: '/super-admin/messages', icon: Inbox },
+      { title: 'Lisanslar', href: '/super-admin/licenses', icon: KeyRound },
     ],
   },
   {

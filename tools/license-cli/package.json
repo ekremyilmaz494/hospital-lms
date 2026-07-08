@@ -1,0 +1,21 @@
+{
+  "name": "@klinovax/license-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Klinovax lisans ihraç CLI'ı — offline anahtar üretimi, lisans imzalama, inceleme, offline makbuz",
+  "type": "module",
+  "scripts": {
+    "keygen": "tsx src/keygen.ts",
+    "issue": "tsx src/issue.ts",
+    "inspect": "tsx src/inspect.ts",
+    "offline-receipt": "tsx src/offline-receipt.ts"
+  },
+  "dependencies": {
+    "jose": "^6.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.37",
+    "tsx": "^4.19.0",
+    "typescript": "^5"
+  }
+}

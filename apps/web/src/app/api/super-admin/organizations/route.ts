@@ -8,6 +8,7 @@ import { sendInvitationEmail, sendStaffWelcomeEmail } from '@/lib/email'
 import { TRAINING_CATEGORIES } from '@/lib/training-categories'
 import { slugify } from '@/lib/organization'
 import { logger } from '@/lib/logger'
+import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import {
   generateInvitationToken,
   computeInvitationExpiry,
@@ -98,6 +99,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
   //   'invite' (default) → davet linki, esas yönetici email'den şifresini kurar
   //   'direct'           → otomatik şifre, super admin elden teslim eder
   const { mode, adminFirstName, adminLastName, adminEmail, adminTcKimlik, adminPassword, planId, trialDays, ...orgData } = parsed.data
+
+  // On-prem: lisans organizasyon limiti (global). Bulut'ta no-op.
+  const orgLimitBlock = await checkSubscriptionLimit('', 'organization')
+  if (orgLimitBlock) return orgLimitBlock
 
   // Hastane kodu benzersiz mi?
   const existing = await prisma.organization.findUnique({ where: { code: orgData.code } })

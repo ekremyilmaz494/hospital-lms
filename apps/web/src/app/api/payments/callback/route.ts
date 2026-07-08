@@ -2,12 +2,17 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyIyzicoCallback, retrieveCheckoutForm, generateInvoiceNumber } from '@/lib/iyzico'
 import { logger } from '@/lib/logger'
+import { isOnPrem } from '@/lib/deployment'
 
 /**
  * POST /api/payments/callback
  * Iyzico'dan dönen ödeme sonucu — 3D Secure callback
  */
 export async function POST(request: Request) {
+  // On-prem dağıtımda ödeme/abonelik SaaS kavramıdır — lisans kullanılır.
+  if (isOnPrem()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
   const formData = await request.formData()
   const token = formData.get('token') as string
 

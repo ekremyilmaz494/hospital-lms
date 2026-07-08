@@ -1,5 +1,6 @@
 import * as jose from 'jose'
 import { logger } from '@/lib/logger'
+import { isOnPrem } from '@/lib/deployment'
 import { extractAdminAccess } from '@/lib/auth/admin-authority'
 
 /**
@@ -67,9 +68,14 @@ export async function verifyAccessToken(token: string): Promise<VerifiedToken | 
   try {
     const header = jose.decodeProtectedHeader(token)
     const alg = header.alg
+    // On-prem self-hosted GoTrue (HS256) token'a `iss` claim'i KOYMAZ; issuer opsiyonu
+    // tanımlıyken jose iss'siz token'ı koşulsuz reddeder → her istek 401. Güvenlik korunur:
+    // HS256 imzası SUPABASE_JWT_SECRET ile, aud='authenticated' ve algorithms allowlist ile
+    // doğrulanır (iss kriptografik değil, yalnız claim-eşleşme). Bulutta (isOnPrem=false)
+    // issuer kontrolü aynen korunur — verifyOpts bulut yolunda bit-bit aynı.
     const verifyOpts: jose.JWTVerifyOptions = {
-      issuer: expectedIssuer(),
       audience: 'authenticated',
+      ...(isOnPrem() ? {} : { issuer: expectedIssuer() }),
     }
 
     let payload: jose.JWTPayload

@@ -31,7 +31,18 @@ vi.mock('@/lib/api-helpers', () => ({
   }),
 }))
 
+// Mock deployment + lisans cache — varsayılan BULUT (isOnPrem=false); on-prem
+// testleri kendi blokunda override eder. Böylece mevcut testler bulut yolundan geçer.
+vi.mock('@/lib/deployment', () => ({
+  isOnPrem: vi.fn(() => false),
+}))
+vi.mock('@/lib/license/cache', () => ({
+  getLicenseState: vi.fn(async () => ({ state: 'VALID', limits: null })),
+}))
+
 import { prisma } from '@/lib/prisma'
+import { isOnPrem } from '@/lib/deployment'
+import { getLicenseState } from '@/lib/license/cache'
 import { checkSubscriptionLimit, checkStaffLimit, resolveStaffLimit, countStaffSeats } from '../subscription-guard'
 
 const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>
@@ -39,6 +50,8 @@ const mockFindUnique = prisma.organizationSubscription.findUnique as ReturnType<
 const mockUserCount = prisma.user.count as ReturnType<typeof vi.fn>
 const mockInviteCount = prisma.invitation.count as ReturnType<typeof vi.fn>
 const mockTrainingCount = prisma.training.count as ReturnType<typeof vi.fn>
+const mockIsOnPrem = isOnPrem as ReturnType<typeof vi.fn>
+const mockGetLicenseState = getLicenseState as ReturnType<typeof vi.fn>
 
 const ORG_ID = 'org-test-uuid-1234'
 
@@ -47,6 +60,8 @@ beforeEach(() => {
   // Sensible defaults — testler kendi ihtiyacına göre ezer.
   mockOrgFindUnique.mockResolvedValue({ maxStaff: null })
   mockInviteCount.mockResolvedValue(0)
+  mockIsOnPrem.mockReturnValue(false) // varsayılan bulut; on-prem bloğu ezer
+  mockGetLicenseState.mockResolvedValue({ state: 'VALID', limits: null })
 })
 
 describe('checkSubscriptionLimit', () => {
@@ -331,5 +346,68 @@ describe('checkStaffLimit — seat guard', () => {
 
     const result = await checkStaffLimit(ORG_ID, 5)
     expect(result).toBeNull()
+  })
+})
+
+describe('checkStaffLimit — on-prem GLOBAL lisans personel limiti', () => {
+  beforeEach(() => {
+    mockIsOnPrem.mockReturnValue(true)
+  })
+
+  it('global lisans limiti aşılırsa 403 (org limitinden ÖNCE bloklar)', async () => {
+    mockGetLicenseState.mockResolvedValue({ state: 'VALID', limits: { maxStaff: 10 } })
+    mockUserCount.mockResolvedValue(10) // kurulum genelinde 10 aktif personel
+    mockInviteCount.mockResolvedValue(0)
+
+    const result = await checkStaffLimit(ORG_ID, 1)
+    expect(result).not.toBeNull()
+    expect(result!.status).toBe(403)
+    const body = await result!.json()
+    expect(body.code).toBe('STAFF_LIMIT_REACHED')
+    expect(body.error).toContain('10/10')
+    // Org-bazlı çözüme (resolveStaffLimit) HİÇ gitmemeli — lisans katmanı önce bloklar.
+    expect(mockOrgFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('global lisans limiti içindeyse ve org limiti yoksa serbest', async () => {
+    mockGetLicenseState.mockResolvedValue({ state: 'VALID', limits: { maxStaff: 10 } })
+    mockUserCount.mockResolvedValue(5)
+    mockInviteCount.mockResolvedValue(0)
+    mockOrgFindUnique.mockResolvedValue({ maxStaff: null })
+    mockFindUnique.mockResolvedValue(null)
+
+    const result = await checkStaffLimit(ORG_ID, 1)
+    expect(result).toBeNull()
+  })
+
+  it('lisansta staff limiti yoksa (limits.maxStaff yok) org limitine düşer', async () => {
+    mockGetLicenseState.mockResolvedValue({ state: 'VALID', limits: { maxStaff: null } })
+    mockOrgFindUnique.mockResolvedValue({ maxStaff: null })
+    mockFindUnique.mockResolvedValue(null)
+
+    const result = await checkStaffLimit(ORG_ID, 1)
+    expect(result).toBeNull()
+  })
+
+  it('bekleyen davetler global sayıma dahil (9 personel + 1 davet = limit)', async () => {
+    mockGetLicenseState.mockResolvedValue({ state: 'VALID', limits: { maxStaff: 10 } })
+    mockUserCount.mockResolvedValue(9)
+    mockInviteCount.mockResolvedValue(1) // 9 + 1 = 10, +1 daha = 11 > 10
+
+    const result = await checkStaffLimit(ORG_ID, 1)
+    expect(result).not.toBeNull()
+    expect(result!.status).toBe(403)
+  })
+
+  it('BULUT modunda (isOnPrem=false) lisans state HİÇ sorgulanmaz — main davranışı korunur', async () => {
+    mockIsOnPrem.mockReturnValue(false)
+    mockOrgFindUnique.mockResolvedValue({ maxStaff: 10 })
+    mockFindUnique.mockResolvedValue({ plan: { maxStaff: null } })
+    mockUserCount.mockResolvedValue(10)
+    mockInviteCount.mockResolvedValue(0)
+
+    const result = await checkStaffLimit(ORG_ID, 1) // org limiti dolu → 403 (bulut yolu)
+    expect(result!.status).toBe(403)
+    expect(mockGetLicenseState).not.toHaveBeenCalled()
   })
 })

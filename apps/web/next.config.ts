@@ -14,9 +14,23 @@ const projectRoot = path.resolve('..', '..');
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+// ── Dağıtım modu ──
+// On-prem imaj build'i NEXT_PUBLIC_DEPLOYMENT_MODE=onprem ile yapılır (bundle'a
+// gömülür — runtime'da değiştirilemez; bkz. src/lib/deployment.ts). Bayrak yokken
+// tüm davranış bulut (mevcut) davranışıyla birebir aynıdır.
+const isOnPremBuild =
+  process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === 'onprem' ||
+  process.env.DEPLOYMENT_MODE === 'onprem';
+
+// On-prem CSP/images artık origin-pin ETMEZ (tek generic imaj → müşteri origin'i
+// build-time bilinmez): CSP şema-bazlı (http/https/ws/wss) açılır, next/image on-prem'de
+// unoptimized. Tarayıcı-yüzlü değerler RUNTIME'da enjekte edilir (bkz. onprem-config.ts
+// getBrowserRuntimeConfig → window.__ONPREM_CONFIG__).
+
 // ── Build-time guard: Yanlış Supabase URL ile production build'i engelle ──
 // CI (GitHub Actions) ortamında placeholder URL kullanıldığı için atla.
-if (process.env.NODE_ENV === 'production' && !process.env.CI) {
+// On-prem build'ler müşteriye özel (self-hosted) Supabase kullanır — guard anlamsız.
+if (process.env.NODE_ENV === 'production' && !process.env.CI && !isOnPremBuild) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
   const expectedRef = 'pkkkyyajfmusurcoovwt';
   if (!supabaseUrl.includes(expectedRef)) {
@@ -45,6 +59,10 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  // On-prem Docker imajı self-contained çalışmalı: standalone output,
+  // .next/standalone altına yalnız gereken dosyaları (traced) kopyalar.
+  // Bulut (Vercel) build'inde output ayarlanmaz — Vercel kendi çıktısını yönetir.
+  ...(isOnPremBuild ? { output: 'standalone' as const } : {}),
   serverExternalPackages: ['remotion', '@remotion/cli'],
   turbopack: {
     root: projectRoot,
@@ -59,12 +77,20 @@ const nextConfig: NextConfig = {
     (process.env.NODE_ENV === 'development' && process.platform === 'darwin'
       ? '.next.nosync'
       : '.next'),
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: '**.supabase.co' },
-      { protocol: 'https', hostname: '**.cloudfront.net' },
-    ],
-  },
+  images: isOnPremBuild
+    ? {
+        // On-prem: müşteri storage domaini build-time'da bilinmez (tek generic imaj) +
+        // presigned URL'ler her istekte değişir → remotePatterns pinlenemez. Optimizasyon
+        // kapatılır (orijinal servis edilir) → herhangi müşteri domaini/portu çalışır.
+        unoptimized: true,
+      }
+    : {
+        // Bulut: mevcut wildcard'lar aynen korunur.
+        remotePatterns: [
+          { protocol: 'https' as const, hostname: '**.supabase.co' },
+          { protocol: 'https' as const, hostname: '**.cloudfront.net' },
+        ],
+      },
   experimental: {
     proxyClientMaxBodySize: '512mb',
     optimizePackageImports: [
@@ -163,18 +189,34 @@ const nextConfig: NextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            // unpkg.com: ffmpeg-core.js (client-side video compress). 'wasm-unsafe-eval': WebAssembly icin gerekli.
-            `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://unpkg.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+            // 'wasm-unsafe-eval': WebAssembly (three.js vb.) icin gerekli. unpkg KALDIRILDI —
+            // ffmpeg client-compress ozelligi kodda yok; pdf.js worker artik self-hosted
+            // (/pdf.worker.min.mjs). Boylece runtime'da dis script kaynagi kalmadi (air-gap).
+            `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: https: blob:",
+            // On-prem: tek generic imaj HER müşteri domaininde çalışmalı; storage/gateway
+            // origin'leri build-time'da bilinmez (runtime enjekte edilir). Bu yüzden
+            // veri-yükleyen direktifler (img/connect/media/frame) ORIGIN-PİN yerine ŞEMA-bazlı
+            // (http:/https:/ws:/wss:) açılır. Güvenlik korunur: script-src hâlâ 'self'
+            // ile kilitli (XSS ana koruması), default-src 'self'. Trust modeli: on-prem tek-tenant,
+            // müşteri-kontrollü ağ — bu gevşetme kabul edilebilir. Bulut yolu (origin-pin) DEĞİŞMEZ.
+            isOnPremBuild
+              ? "img-src 'self' data: https: http: blob:"
+              : "img-src 'self' data: https: blob:",
             "font-src 'self' data:",
-            // unpkg.com: ffmpeg-core.wasm fetch
             // blob:: three.js GLTFLoader gömülü GLB texture'larını blob URL'den fetch eder
             // Sentry: *.ingest.de.sentry.io = AB (Frankfurt) bölgesi ingest — KVKK yurt dışı
             // aktarımını en aza indirmek için AB-bölgesi DSN kullanılır (bkz. .env.production.reference).
-            "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://unpkg.com",
-            "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
-            "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
+            // (unpkg KALDIRILDI — ffmpeg-core fetch'i yok.)
+            isOnPremBuild
+              ? "connect-src 'self' blob: https: http: wss: ws:"
+              : "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com https://*.s3-accelerate.amazonaws.com https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io",
+            isOnPremBuild
+              ? "media-src 'self' data: https: http: blob:"
+              : "media-src 'self' data: https://*.cloudfront.net https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
+            isOnPremBuild
+              ? "frame-src 'self' https: http: blob:"
+              : "frame-src 'self' https://*.s3.amazonaws.com https://*.s3.eu-central-1.amazonaws.com blob:",
             // blob:: ffmpeg.wasm internal worker'i blob URL'den olusturuyor
             "worker-src 'self' blob:",
             "manifest-src 'self'",
@@ -220,7 +262,9 @@ const finalConfig = withPWA(nextConfig);
 // SENTRY_REACT_ANNOTATION=1 ile sadece staging'de acik tutulabilir.
 const sentryAnnotationEnabled = process.env.SENTRY_REACT_ANNOTATION === '1';
 
-export default process.env.NODE_ENV === 'development'
+// On-prem build'de Sentry wrapper'ı atlanır: müşteri sunucusunda Sentry hesabı/
+// token'ı yoktur; wrapper source-map upload denemesi yapar ve DSN'siz gereksizdir.
+export default process.env.NODE_ENV === 'development' || isOnPremBuild
   ? finalConfig
   : withSentryConfig(finalConfig, {
       org: process.env.SENTRY_ORG,

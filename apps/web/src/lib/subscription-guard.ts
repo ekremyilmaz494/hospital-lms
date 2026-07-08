@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { errorResponse } from '@/lib/api-helpers'
 import { getCached, setCached } from '@/lib/redis'
+import { isOnPrem } from '@/lib/deployment'
+import { getLicenseState } from '@/lib/license/cache'
 
 const SUBSCRIPTION_CACHE_TTL = 120 // 2 dakika
 const GRACE_PERIOD_DAYS = 7
@@ -21,6 +23,25 @@ export interface SubscriptionCheckResult {
 export async function checkSubscriptionStatus(
   organizationId: string
 ): Promise<SubscriptionCheckResult> {
+  // On-prem: abonelik yerine lisans durumu geçerlidir. READONLY → isExpired
+  // (mevcut write-guard yazmayı bloklar); VALID/WARN → active; LOCKED/NO_LICENSE
+  // zaten API kapısında (licenseApiGate) 403'lenmiş olur, buraya nadiren düşer.
+  if (isOnPrem()) {
+    const license = await getLicenseState()
+    if (license.state === 'READONLY') {
+      return { status: 'expired', daysLeft: 0, isExpired: true, isGracePeriod: false }
+    }
+    if (license.state === 'LOCKED' || license.state === 'NO_LICENSE') {
+      return { status: 'suspended', daysLeft: 0, isExpired: true, isGracePeriod: false }
+    }
+    return {
+      status: 'active',
+      daysLeft: license.daysToExpiry ?? 9999,
+      isExpired: false,
+      isGracePeriod: false,
+    }
+  }
+
   const cacheKey = `sub:status:${organizationId}`
 
   // Cache'den kontrol
@@ -97,8 +118,32 @@ function computeExpiryStatus(endDate: Date, now: Date): SubscriptionCheckResult 
  */
 export async function checkSubscriptionLimit(
   organizationId: string,
-  type: 'staff' | 'training'
+  type: 'staff' | 'training' | 'organization'
 ): Promise<Response | null> {
+  // On-prem: limitler lisans claim'lerinden gelir (abonelik planı değil) ve
+  // GLOBAL sayılır (tek kurulum = tüm organizasyonlar). training limiti
+  // lisansta yoktur — serbest.
+  if (isOnPrem()) {
+    const license = await getLicenseState()
+    const limits = license.limits
+    if (!limits) return null // NO_LICENSE zaten API kapısında bloklanır
+    if (type === 'staff') {
+      // TEK kaynak: checkStaffLimit on-prem'de global lisans tavanını da uygular
+      // (org-bazlı limitle birlikte). Burada ayrı bir sayım tutma — drift olur.
+      return checkStaffLimit(organizationId, 1)
+    }
+    if (type === 'organization' && limits.maxOrganizations) {
+      const currentOrgs = await prisma.organization.count()
+      if (currentOrgs >= limits.maxOrganizations) {
+        return errorResponse(
+          `Lisans organizasyon limitine ulaşıldı (${currentOrgs}/${limits.maxOrganizations}). Klinovax ile iletişime geçin.`,
+          403
+        )
+      }
+    }
+    return null
+  }
+
   const subscription = await prisma.organizationSubscription.findUnique({
     where: { organizationId },
     include: { plan: true },
@@ -190,6 +235,44 @@ export async function countStaffSeats(organizationId: string): Promise<number> {
 }
 
 /**
+ * On-prem GLOBAL lisans personel limiti — kurulumdaki TÜM organizasyonların aktif
+ * personeli + bekleyen personel davetleri, lisans claim'indeki `maxStaff`'a karşı.
+ * Org-bazlı `resolveStaffLimit`'in ÜSTÜNDE ek katman: on-prem tek kurulum = tüm org'lar,
+ * lisans limiti global tavandır. Lisansta staff limiti yoksa serbest (NO_LICENSE zaten
+ * API kapısında bloklanır). Yalnız `isOnPrem()` yolundan çağrılır.
+ */
+async function checkOnPremStaffLicenseLimit(adding: number): Promise<Response | null> {
+  const { limits } = await getLicenseState()
+  const max = limits?.maxStaff
+  if (!max) return null
+
+  // Deaktif personel koltuk tüketmez; bekleyen davetler sayılır (countStaffSeats ile
+  // aynı semantik ama GLOBAL kapsam — org filtresi yok).
+  const now = new Date()
+  const [staff, pendingInvites] = await Promise.all([
+    prisma.user.count({ where: { role: 'staff', isActive: true } }),
+    prisma.invitation.count({
+      where: { role: 'staff', acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
+    }),
+  ])
+  const used = staff + pendingInvites
+  if (used + adding <= max) return null
+
+  const remaining = Math.max(0, max - used)
+  return new Response(
+    JSON.stringify({
+      error: `Lisans personel limitine ulaşıldı (${used}/${max}). Yeni personel için Klinovax ile iletişime geçin.`,
+      code: 'STAFF_LIMIT_REACHED',
+      limit: max,
+      used,
+      remaining,
+      requested: adding,
+    }),
+    { status: 403, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
+/**
  * Personel oluşturma/davet AKIŞLARININ ÖNÜNDE çağrılan seat-limit guard'ı.
  *
  * @param organizationId Hedef organizasyon.
@@ -201,6 +284,13 @@ export async function checkStaffLimit(
   organizationId: string,
   adding = 1
 ): Promise<Response | null> {
+  // On-prem: org-bazlı limitin ÖNÜNDE global lisans tavanı — hangisi önce dolarsa o
+  // bloklar. Bulutta (isOnPrem=false) atlanır → main davranışı bit-bit korunur.
+  if (isOnPrem()) {
+    const licenseBlock = await checkOnPremStaffLicenseLimit(adding)
+    if (licenseBlock) return licenseBlock
+  }
+
   const limit = await resolveStaffLimit(organizationId)
   if (limit == null) return null // sınırsız
 

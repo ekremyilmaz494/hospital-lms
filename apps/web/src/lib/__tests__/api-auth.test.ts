@@ -4,11 +4,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockSignInWithPassword = vi.fn()
 const mockGetSession = vi.fn()
+const mockSignOut = vi.fn()
+const mockUpdateUserById = vi.fn()
 
 vi.mock('@/lib/supabase/server', () => ({
   createLoginClient: vi.fn(async () => ({
     auth: {
       signInWithPassword: mockSignInWithPassword,
+      signOut: mockSignOut,
+    },
+  })),
+  createServiceClient: vi.fn(async () => ({
+    auth: {
+      admin: {
+        updateUserById: mockUpdateUserById,
+      },
     },
   })),
   createClient: vi.fn(async () => ({
@@ -22,9 +32,15 @@ vi.mock('@/lib/supabase/server', () => ({
 // olmadığından verifyAccessToken'ı mock'la: token'ı sub olarak yansıtır. Testler session'a
 // access_token = user.id koyduğunda verified.sub === session.user.id eşleşir.
 vi.mock('@/lib/supabase/verify-jwt', () => ({
-  verifyAccessToken: vi.fn(async (token?: string) =>
-    token ? { sub: token, role: 'staff', payload: {} } : null,
-  ),
+  verifyAccessToken: vi.fn(async (token?: string) => {
+    if (token === 'login-admin-token') {
+      return { sub: 'user-1', role: 'admin', payload: { app_metadata: { organization_id: 'org-1' } } }
+    }
+    if (token === 'stale-login-token') {
+      return { sub: 'user-1', role: 'staff', payload: {} }
+    }
+    return token ? { sub: token, role: 'staff', payload: {} } : null
+  }),
 }))
 
 const mockCookiesGetAll = vi.fn(() => [] as { name: string; value: string }[])
@@ -113,6 +129,8 @@ beforeEach(() => {
   mockGetRateLimitCount.mockResolvedValue(0)
   mockUserFindUnique.mockResolvedValue(activeDbUser)
   mockCookiesGetAll.mockReturnValue([])
+  mockSignOut.mockResolvedValue({ error: null })
+  mockUpdateUserById.mockResolvedValue({ error: null })
 })
 
 // ── Tests ──
@@ -123,7 +141,7 @@ describe('POST /api/auth/login', () => {
       mockSignInWithPassword.mockResolvedValue({
         data: {
           user: { id: 'user-1', email: 'admin@test.com', user_metadata: { role: 'admin' } },
-          session: { user: { factors: [] } },
+          session: { access_token: 'login-admin-token', user: { factors: [] } },
         },
         error: null,
       })
@@ -140,7 +158,7 @@ describe('POST /api/auth/login', () => {
       mockSignInWithPassword.mockResolvedValue({
         data: {
           user: { id: 'user-1', email: 'staff@test.com', user_metadata: { role: 'staff' } },
-          session: { user: { factors: [] } },
+          session: { access_token: 'login-admin-token', user: { factors: [] } },
         },
         error: null,
       })
@@ -158,6 +176,7 @@ describe('POST /api/auth/login', () => {
         data: {
           user: { id: 'user-1', email: 'mfa@test.com', user_metadata: { role: 'admin' } },
           session: {
+            access_token: 'login-admin-token',
             user: {
               factors: [{ id: 'factor-1', factor_type: 'totp', status: 'verified' }],
             },
@@ -226,11 +245,44 @@ describe('POST /api/auth/login', () => {
   })
 
   describe('Rol kontrolu', () => {
-    it('role metadata yoksa varsayilan staff rolu doner', async () => {
+    it('role metadata yoksa DB rolunu kanonik kabul eder ve yeni token mint eder', async () => {
+      mockSignInWithPassword
+        .mockResolvedValueOnce({
+          data: {
+            user: { id: 'user-1', email: 'norole@test.com', user_metadata: {} },
+            session: { access_token: 'stale-login-token', user: { factors: [] } },
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            user: {
+              id: 'user-1',
+              email: 'norole@test.com',
+              app_metadata: { role: 'admin', organization_id: 'org-1' },
+              user_metadata: {},
+            },
+            session: { access_token: 'login-admin-token', user: { factors: [] } },
+          },
+          error: null,
+        })
+
+      const res = await POST(makeRequest({ email: 'norole@test.com', password: 'pass123' }))
+      const body = await res.json()
+
+      expect(body.user.role).toBe('admin')
+      expect(mockUpdateUserById).toHaveBeenCalledWith('user-1', {
+        app_metadata: { role: 'admin', organization_id: 'org-1' },
+      })
+      expect(mockSignInWithPassword).toHaveBeenCalledTimes(2)
+    })
+
+    it('metadata esitleme basarisizsa login basarili sayilmaz', async () => {
+      mockUpdateUserById.mockResolvedValueOnce({ error: new Error('metadata update failed') })
       mockSignInWithPassword.mockResolvedValue({
         data: {
           user: { id: 'user-1', email: 'norole@test.com', user_metadata: {} },
-          session: { user: { factors: [] } },
+          session: { access_token: 'stale-login-token', user: { factors: [] } },
         },
         error: null,
       })
@@ -238,7 +290,61 @@ describe('POST /api/auth/login', () => {
       const res = await POST(makeRequest({ email: 'norole@test.com', password: 'pass123' }))
       const body = await res.json()
 
-      expect(body.user.role).toBe('staff')
+      expect(res.status).toBe(500)
+      expect(body.error).toContain('Oturum bilgileriniz güncellenemedi')
+      expect(mockSignOut).toHaveBeenCalled()
+    })
+
+    it('metadata sonrasi yeni token alinamazsa login basarili sayilmaz', async () => {
+      mockSignInWithPassword
+        .mockResolvedValueOnce({
+            data: {
+              user: { id: 'user-1', email: 'norole@test.com', user_metadata: {} },
+              session: { access_token: 'stale-login-token', user: { factors: [] } },
+            },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { user: null, session: null },
+          error: new Error('refresh failed'),
+        })
+
+      const res = await POST(makeRequest({ email: 'norole@test.com', password: 'pass123' }))
+      const body = await res.json()
+
+      expect(res.status).toBe(500)
+      expect(body.error).toContain('Oturum bilgileriniz güncellenemedi')
+      expect(mockSignOut).toHaveBeenCalled()
+    })
+
+    it('metadata sonrasi token hala DB roluyle eslesmiyorsa login basarili sayilmaz', async () => {
+      mockSignInWithPassword
+        .mockResolvedValueOnce({
+          data: {
+            user: { id: 'user-1', email: 'norole@test.com', user_metadata: {} },
+            session: { access_token: 'stale-login-token', user: { factors: [] } },
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            user: {
+              id: 'user-1',
+              email: 'norole@test.com',
+              app_metadata: { role: 'admin', organization_id: 'org-1' },
+              user_metadata: {},
+            },
+            session: { access_token: 'stale-login-token', user: { factors: [] } },
+          },
+          error: null,
+        })
+
+      const res = await POST(makeRequest({ email: 'norole@test.com', password: 'pass123' }))
+      const body = await res.json()
+
+      expect(res.status).toBe(500)
+      expect(body.error).toContain('Oturum bilgileriniz güncellenemedi')
+      expect(mockSignOut).toHaveBeenCalled()
     })
   })
 })
