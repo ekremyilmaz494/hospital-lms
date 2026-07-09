@@ -22,7 +22,9 @@ interface OrganizationData {
   plan: string;
   expiresAt: string;
   maxStaff: number | null;
-  _count?: { users: number };
+  // Dolu koltuk = aktif personel (role='staff') + bekleyen personel daveti.
+  // Seat limiti zorlamasıyla (countStaffSeats) BİREBİR aynı — yöneticiler SAYILMAZ.
+  staffSeatUsage?: number;
 }
 
 export default function EditOrganizationPage() {
@@ -202,9 +204,9 @@ export default function EditOrganizationPage() {
                 />
                 <p className="mt-1 text-xs" style={{ color: 'var(--color-text-secondary)', opacity: 0.75 }}>
                   Sözleşmeli personel sayısı. Doldurulduğunda kurum bu sayıya ulaşınca yeni personel/davet
-                  engellenir (aktif personel + bekleyen davet sayılır). Boş bırakılırsa sınır kalkar (plan limitine düşer).
-                  {typeof organization._count?.users === 'number' && (
-                    <> Şu an kayıtlı kullanıcı: <strong>{organization._count.users}</strong>.</>
+                  engellenir (aktif personel + bekleyen davet sayılır; yöneticiler sayılmaz). Boş bırakılırsa sınır kalkar (plan limitine düşer).
+                  {typeof organization.staffSeatUsage === 'number' && (
+                    <> Şu an dolu koltuk: <strong>{organization.staffSeatUsage}</strong>.</>
                   )}
                 </p>
               </div>
