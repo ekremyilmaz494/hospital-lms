@@ -77,7 +77,12 @@ export const createOrganizationWithAdminSchema = createOrganizationSchema.extend
   }
 })
 
-export const updateOrganizationSchema = createOrganizationSchema.partial().extend({
+// createOrganizationSchema'nın `planId`/`trialDays` alanları YALNIZ hastane oluşturmada
+// abonelik bağlamak içindir; Organization tablosunda kolonları yoktur. `.partial()` ile
+// devralınırsa `trialDays.default(14)` her PATCH payload'ına `trialDays: 14` ENJEKTE eder →
+// `prisma.organization.update({ data })` "Unknown argument trialDays" ile 500 atardı
+// (org düzenle → "beklenmeyen hata"). Bu yüzden update şemasından omit edilirler.
+export const updateOrganizationSchema = createOrganizationSchema.omit({ planId: true, trialDays: true }).partial().extend({
   isActive: z.boolean().optional(),
   isSuspended: z.boolean().optional(),
   suspendedReason: z.string().max(500).optional(),
