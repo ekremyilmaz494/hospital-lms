@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { checkRateLimit, getCached } from '@/lib/redis'
-import { createAuditLog } from '@/lib/api-helpers'
+import { checkRateLimit } from '@/lib/redis'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -34,25 +33,6 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // İmpersonation token varsa Redis'ten doğrula ve audit log yaz
-      const impToken = searchParams.get('imp_token')
-      if (impToken) {
-        const impData = await getCached<{
-          impersonatedBy: string
-          impersonatorName: string
-          targetUserId: string
-        }>(`impersonation:${impToken}`)
-        if (impData) {
-          await createAuditLog({
-            userId: impData.impersonatedBy,
-            action: 'impersonate_login',
-            entityType: 'user',
-            entityId: impData.targetUserId,
-            newData: { impersonatorName: impData.impersonatorName },
-            request,
-          }).catch(() => {})
-        }
-      }
       return NextResponse.redirect(`${origin}${redirectTo}`)
     }
   }

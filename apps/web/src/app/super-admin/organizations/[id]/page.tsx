@@ -4,7 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
 import {
   ArrowLeft, Users, GraduationCap, TrendingUp,
-  Edit, Ban, CheckCircle, Calendar, Activity, UserCog, LogIn, UserPlus,
+  Edit, Ban, CheckCircle, Calendar, Activity, UserPlus, Eye,
   TriangleAlert, Shield, KeyRound,
 } from 'lucide-react';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -56,7 +56,7 @@ export default function OrganizationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error, refetch } = useFetch<OrganizationDetail>(`/api/super-admin/organizations/${id}`);
   const { toast } = useToast();
-  const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
+  const [viewingOrg, setViewingOrg] = useState(false);
   const [showNewAdminModal, setShowNewAdminModal] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminRow | null>(null);
   const [bulkResetOpen, setBulkResetOpen] = useState(false);
@@ -98,23 +98,24 @@ export default function OrganizationDetailPage() {
     }
   };
 
-  // G3.4 — Opens a magic-link session for the target user in a new tab
-  const handleImpersonate = async (adminUser: { id: string; name: string; email: string }) => {
-    setImpersonatingId(adminUser.id);
+  // Bu org'un yönetici panelini SALT-OKUNUR görüntüle. Kimlik değişmez
+  // (impersonation YOK): kendi süper-admin oturumu korunur, imzalı klx-acting-org
+  // cookie'si istekleri bu org'a scope'lar. Sonra /admin/dashboard'a gidilir.
+  const handleViewOrg = async () => {
+    setViewingOrg(true);
     try {
-      const res = await fetch('/api/super-admin/impersonate', {
+      const res = await fetch('/api/super-admin/act-as', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: adminUser.id }),
+        body: JSON.stringify({ organizationId: id }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'Impersonation başarısız');
-      window.open(body.actionLink, '_blank', 'noopener,noreferrer');
-      toast(`"${adminUser.name}" olarak yeni sekmede açıldı`, 'success');
+      if (!res.ok) throw new Error(body.error || 'Görüntüleme başlatılamadı');
+      // Full reload — middleware süper-admin'i /admin'e alır, banner acting durumu okur.
+      window.location.href = '/admin/dashboard';
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Hata oluştu', 'error');
-    } finally {
-      setImpersonatingId(null);
+      setViewingOrg(false);
     }
   };
 
@@ -169,6 +170,15 @@ export default function OrganizationDetailPage() {
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
+          <Button
+            className="gap-2"
+            onClick={handleViewOrg}
+            disabled={viewingOrg}
+            style={{ background: 'var(--color-primary)', color: 'white' }}
+            title="Bu organizasyonun yönetici panelini salt-okunur görüntüle (kendi süper-admin oturumun korunur)"
+          >
+            <Eye className="h-4 w-4" /> {viewingOrg ? 'Açılıyor…' : 'Org Panelini Görüntüle'}
+          </Button>
           <Button
             variant="outline"
             className="gap-2"
@@ -313,19 +323,6 @@ export default function OrganizationDetailPage() {
                     style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)', background: 'var(--color-surface)' }}
                   >
                     <KeyRound className="h-3 w-3" /> Şifre
-                  </button>
-                  <button
-                    title={`"${admin.name}" olarak giriş yap`}
-                    disabled={impersonatingId === admin.id}
-                    onClick={() => handleImpersonate(admin)}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-opacity duration-150 disabled:opacity-40"
-                    style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}
-                  >
-                    {impersonatingId === admin.id ? (
-                      <span>...</span>
-                    ) : (
-                      <><UserCog className="h-3 w-3" /> Giriş</>
-                    )}
                   </button>
                 </div>
               ))}

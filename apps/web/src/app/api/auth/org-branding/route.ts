@@ -2,13 +2,31 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCached, setCached } from '@/lib/redis'
+import { readActingOrgCookie, verifyActingOrgToken } from '@/lib/auth/acting-org'
+
+/** Sidebar/topbar branding için ortak org select shape'i. */
+const ORG_BRANDING_SELECT = {
+  name: true,
+  code: true,
+  logoUrl: true,
+  brandColor: true,
+  secondaryColor: true,
+  ownerUserId: true,
+  maxAdmins: true,
+  sector: true,
+  isDemo: true,
+} as const
 
 /**
  * GET /api/auth/org-branding
  * Authenticated kullanicinin organizasyon branding bilgilerini doner.
  * Layout'larda sidebar/topbar'da kullanilir.
+ *
+ * Süper-admin bir org'u SALT-OKUNUR görüntülüyorsa (imzalı klx-acting-org cookie),
+ * o org'un branding'i döner — aksi halde süper-admin'in kendi org'u olmadığı için
+ * 404 olur ve panel markasız görünürdü. Cache key acting org'a göre ayrılır.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -18,8 +36,19 @@ export async function GET() {
     }
 
     const userId = session.user.id
-    // v5: isDemo eklendi — demo hesaplarda sol üst logo/monogram bastırılır.
-    const cacheKey = `org-branding:v5:${userId}`
+    const role = (session.user.app_metadata?.role ?? session.user.user_metadata?.role) as
+      | string
+      | undefined
+
+    // Süper-admin görüntüleme bağlamı (yalnız super_admin + geçerli imzalı cookie).
+    const actingOrgId =
+      role === 'super_admin'
+        ? verifyActingOrgToken(readActingOrgCookie(request), userId, Date.now())
+        : null
+
+    // v6: acting-org segmenti eklendi — süper-admin'in görüntülediği org'un
+    // branding'i kendi (org'suz) durumuyla karışmasın.
+    const cacheKey = `org-branding:v6:${userId}:${actingOrgId ?? 'self'}`
 
     // Redis cache — branding nadiren değişir (10 dk TTL)
     const cached = await getCached<object>(cacheKey)
@@ -29,34 +58,27 @@ export async function GET() {
       })
     }
 
-    // Tek sorgu: user → organization join ile
+    // Acting modda seçilen org; aksi halde kullanıcının kendi org'u.
     // ownerUserId + maxAdmins: Esas Yönetici davet UI'ı için (sidebar gating, /admin/yoneticiler)
-    const dbUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        organization: {
-          select: {
-            name: true,
-            code: true,
-            logoUrl: true,
-            brandColor: true,
-            secondaryColor: true,
-            ownerUserId: true,
-            maxAdmins: true,
-            sector: true,
-            isDemo: true,
-          },
-        },
-      },
-    })
+    const organization = actingOrgId
+      ? await prisma.organization.findUnique({
+          where: { id: actingOrgId },
+          select: ORG_BRANDING_SELECT,
+        })
+      : (
+          await prisma.user.findUnique({
+            where: { id: userId },
+            select: { organization: { select: ORG_BRANDING_SELECT } },
+          })
+        )?.organization ?? null
 
-    if (!dbUser?.organization) {
+    if (!organization) {
       return NextResponse.json({ error: 'Organizasyon bulunamadi' }, { status: 404 })
     }
 
-    await setCached(cacheKey, dbUser.organization, 600)
+    await setCached(cacheKey, organization, 600)
 
-    return NextResponse.json(dbUser.organization, {
+    return NextResponse.json(organization, {
       headers: { 'Cache-Control': 'private, max-age=300' },
     })
   } catch {

@@ -12,7 +12,7 @@ import { LayoutDashboard, Users as UsersIcon, GraduationCap, BarChart3 } from 'l
 import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { useMobile } from '@/hooks/use-mobile';
-import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
+import { ActingOrgBanner } from '@/components/shared/acting-org-banner';
 import { LicenseBanner } from '@/components/shared/license-banner';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { performLogout } from '@/lib/auth/logout';
@@ -132,7 +132,7 @@ export default function AdminLayout({
             transition: 'padding-left 320ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
-          <ImpersonationBanner />
+          {isOrgOwner && <ActingOrgBanner />}
           <AdminTopbar
             onToggleSidebar={toggleSidebar}
             userName={fullName}

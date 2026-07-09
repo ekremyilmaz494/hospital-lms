@@ -9,7 +9,6 @@ import { staffNav, filterNavBySector } from '@/components/layouts/sidebar/sideba
 import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { useMobile } from '@/hooks/use-mobile';
-import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 import { LicenseBanner } from '@/components/shared/license-banner';
 import { MobileSidebarDrawer } from '@/components/layouts/mobile-sidebar-drawer';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
@@ -112,7 +111,6 @@ export default function StaffLayout({
             background: 'var(--ed-cream, #f4ead5)',
           }}
         >
-          <ImpersonationBanner />
           <AppTopbar
             title=""
             orgName={branding?.orgName}
