@@ -73,6 +73,8 @@ cp deploy/onprem/backup-volumes.sh "$OUT/"
 cp deploy/onprem/update.sh "$OUT/"
 cp deploy/onprem/restore-offsite.sh "$OUT/"
 cp deploy/onprem/dead-man-check.sh "$OUT/"
+cp deploy/onprem/disk-guard.sh "$OUT/"
+cp deploy/onprem/status.sh "$OUT/"
 cp deploy/onprem/README.md "$OUT/" 2>/dev/null || true
 
 # Sürüm manifesti — install.sh ilk satırdaki pinli tag'i .env APP_IMAGE'e yazar; müşteri-başına takip.

@@ -55,6 +55,21 @@ preflight_host() {
     warn "Boş disk ~${free_gb}GB (<50GB önerilir). MinIO video büyümesi diski doldurursa postgres kesintiye girer."
   fi
 
+  # RAM (≥8GB önerilir — 11 servis + Next.js).
+  local ram_gb
+  ram_gb="$(awk '/MemTotal/{printf "%d", $2/1024/1024}' /proc/meminfo 2>/dev/null || echo '')"
+  if [ -n "$ram_gb" ] && [ "$ram_gb" -lt 8 ] 2>/dev/null; then
+    warn "Toplam RAM ~${ram_gb}GB (<8GB önerilir); yük altında yetersiz kalabilir."
+  fi
+
+  # Port çakışması — YALNIZ fresh kurulumda (re-install'da kendi stack'imiz zaten dinler → false-positive).
+  if [ ! -f .env ] && command -v ss >/dev/null 2>&1; then
+    local p
+    for p in 3000 8000 9000; do
+      ss -ltnH "sport = :$p" 2>/dev/null | grep -q LISTEN && warn "Port $p zaten kullanımda — kurulum çakışabilir (başka servis mi çalışıyor?)."
+    done
+  fi
+
   # KVKK at-rest hatırlatması (güvenilir otomatik tespit yok → uyarı).
   warn "KVKK: veri diskinin (Docker volume'leri + off-site yedek) at-rest ŞİFRELİ (LUKS/dm-crypt) olduğundan emin olun."
 }
@@ -293,5 +308,15 @@ else
   warn "Off-site yedek cron'u ATLANDI. Felaket kurtarma için MUTLAKA elle kurun (README > Yedekleme)."
 fi
 
+# ── Disk-dolum guard cron'u (off-site'tan BAĞIMSIZ — disk dolması #1 kesinti nedeni) ──
+if command -v crontab >/dev/null 2>&1; then
+  DG_DIR="$(pwd)"
+  CRON_DG="17 * * * *  cd ${DG_DIR} && ./disk-guard.sh >> /var/log/klinovax-disk.log 2>&1  # klinovax-diskguard"
+  dg_new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-diskguard' )"
+  printf '%s\n%s\n' "$dg_new" "$CRON_DG" | crontab - \
+    && log "Host crontab: saatlik disk-dolum kontrolü kuruldu (./status.sh ile görün)."
+fi
+
 log "Uygulama:  $(grep '^PUBLIC_APP_URL=' .env | cut -d= -f2-)"
+log "Durum özeti için: ./status.sh"
 log "Lisansı etkinleştirmek için giriş yapıp /license ekranına gidin."

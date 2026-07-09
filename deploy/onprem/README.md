@@ -125,6 +125,13 @@ mutlaka kurum relay'i girin (aksi halde bozuk yedek fark edilmez).
 **`.env`'i AYRI yedekleyin** — `ENCRYPTION_KEY`/`BACKUP_ENCRYPTION_KEY` kaybı **kalıcı veri
 kaybıdır** (şifreli TC Kimlik alanları + şifreli yedekler açılamaz).
 
+## İzleme (operasyon)
+
+- **`./status.sh`** — tek-bakışta durum: servis sağlığı + lisans + disk + son off-site yedek yaşı + saat/NTP.
+- **Disk-dolum guard** — `install.sh` saatlik `disk-guard.sh` cron'u kurar; disk %85 aşınca syslog +
+  `.disk-health` durum-dosyası + (relay varsa) e-posta ile alarm. Disk %100 = postgres WAL kırılır = kesinti,
+  bu yüzden önden uyarır. Eşik: `.env`'de `DISK_ALERT_PCT`.
+
 ## Geri Yükleme (Restore)
 
 **Senaryo A — uygulama-içi yedekten (aynı sunucu ayakta).** Süper-admin → `/super-admin/backups`
