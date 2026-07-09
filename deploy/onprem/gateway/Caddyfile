@@ -1,0 +1,41 @@
+# Klinovax on-prem TLS reverse-proxy (Caddy).
+#
+# NEDEN: Varsayılan düz HTTP hastane LAN'ında PII/oturum çerezlerini açık akıtır (KVKK ihlali)
+# ve proxy'siz kurulumda realtime/token-refresh SESSİZCE kırıktır. Bu proxy TLS sonlandırır +
+# aynı-origin auth/realtime yönlendirmesiyle o kırığı da kapatır.
+#
+# `tls internal`: Caddy'nin GÖMÜLÜ iç-CA'sı sertifikayı tamamen OFFLINE üretir (ACME/internet YOK)
+# → air-gap'e uygun. Hastane-güvenilir kurum sertifikası istenirse `tls internal` yerine
+# `tls /etc/caddy/cert.pem /etc/caddy/key.pem` yapıp cert/key bind-mount edin.
+#
+# Site adresleri .env'den ({$CADDY_MAIN_SITE}, {$CADDY_STORAGE_SITE}) — tek generic imaj,
+# hastaneye özel hostname runtime'da gelir.
+
+{
+	# Caddy admin API'sine gerek yok — kapat (saldırı yüzeyi).
+	admin off
+}
+
+# ── Ana site (443): uygulama + Supabase auth + realtime ──
+{$CADDY_MAIN_SITE} {
+	tls internal
+
+	# Supabase auth (GoTrue) + realtime (WebSocket) → Kong gateway. Aynı-origin olduğundan
+	# CORS gerekmez. Caddy reverse_proxy WebSocket upgrade'ini OTOMATİK yapar (realtime kanalı).
+	@supabase path /auth/v1/* /realtime/v1/*
+	reverse_proxy @supabase gateway:8000
+
+	# Diğer her şey → Next.js uygulaması.
+	reverse_proxy app:3000
+}
+
+# ── Storage site (ayrı port, örn. 9443): MinIO presigned nesne erişimi ──
+# MinIO presigned URL'leri SigV4 (path-style) ile İMZALANIR ve imza Host header'ını da kapsar.
+# Bu yüzden: (1) MinIO'yu path-prefix (/storage/…) ALTINA ALMA — imzalı path bozulur; ayrı site.
+# (2) Orijinal Host header'ını KORU (`header_up Host {host}`) — aksi halde MinIO SigV4'ü 403 ile reddeder.
+{$CADDY_STORAGE_SITE} {
+	tls internal
+	reverse_proxy minio:9000 {
+		header_up Host {host}
+	}
+}

@@ -148,37 +148,31 @@ bütünlüğü ön-doğrular, PostgreSQL + MinIO'yu geri yükler ve `/api/health
 > **Restore'u satıştan sonra DEĞİL, ilk kurulumda bir kez tatbik edin** — test edilmemiş
 > yedek = yedek yok. Aktif sınav timer'ları/streak Redis'te tutulur, off-site yedeğe DAHİL DEĞİL.
 
-## TLS ile kurulum (reverse proxy)
+## TLS ile kurulum (HTTPS)
 
-Tarayıcı 3 endpoint'e erişir: **app** (3000), **gateway** (8000, auth+realtime/ws),
-**MinIO** (9000, presigned). Hepsini TLS sonlandıran bir reverse proxy arkasına alın ve
-`.env`'de PUBLIC URL'leri **https** yapın (`PUBLIC_APP_URL`, `PUBLIC_STORAGE_URL`).
+Düz HTTP hastane LAN'ında oturum çerezleri + PII'yi AÇIK akıtır (KVKK) ve realtime/token-refresh
+proxy'siz SESSİZCE kırıktır. **`install.sh` "TLS kurulsun mu?" diye sorar** (varsayılan Evet).
 
-> **Mixed-content tuzağı:** app https, `PUBLIC_STORAGE_URL` http kalırsa video/dosya
-> sessizce yüklenmez. İkisini birlikte https yapın.
+**Gömülü Caddy (önerilen — tamamen offline).** TLS seçilirse:
+- Hostname sorulur (ör. `lms.hastane.local`) → `.env`: `PUBLIC_APP_URL=https://<host>`,
+  `PUBLIC_STORAGE_URL=https://<host>:9443`, `COMPOSE_PROFILES=tls`, `SERVICE_BIND=127.0.0.1`.
+- Caddy (`gateway/Caddyfile`) `tls internal` ile sertifikayı OFFLINE üretir (ACME/internet YOK).
+- **443**: uygulama + `/auth/v1` + `/realtime/v1` (WebSocket) → gateway. **9443**: MinIO presigned
+  (ayrı site; SigV4 imzası Host+path'e bağlı → path-prefix YOK, Host korunur).
+- `SERVICE_BIND=127.0.0.1` → doğrudan 3000/8000/9000 portları LAN'a KAPALI; erişim yalnız HTTPS.
+- İlk erişimde tarayıcı **iç-CA sertifika uyarısı** verebilir; kurum içinde Caddy iç-CA kök
+  sertifikasını (`caddydata` volume: `/data/caddy/pki/authorities/local/root.crt`) istemci
+  makinelere güvenilir olarak dağıtın.
 
-Örnek nginx (tek domain, path-tabanlı — CSP on-prem'de şema-bazlı olduğundan çalışır):
+**Kurum/kamu SM sertifikası.** `gateway/Caddyfile`'da `tls internal` yerine
+`tls /etc/caddy/cert.pem /etc/caddy/key.pem` yapıp cert+key'i proxy servisine bind-mount edin.
 
-```nginx
-server {
-  listen 443 ssl;
-  server_name lms.hastane.local;
-  ssl_certificate     /etc/ssl/hastane/fullchain.pem;   # kurum sertifikası
-  ssl_certificate_key /etc/ssl/hastane/privkey.pem;
+> **Mixed-content tuzağı:** `PUBLIC_APP_URL` https, `PUBLIC_STORAGE_URL` http kalırsa video/dosya
+> sessizce yüklenmez — install.sh TLS modunda ikisini de https yapar.
 
-  location /auth/     { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host; }
-  location /realtime/ {                                   # WebSocket (realtime bildirimler)
-    proxy_pass http://127.0.0.1:8000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-  }
-  location /storage/  { proxy_pass http://127.0.0.1:9000; proxy_set_header Host $host; client_max_body_size 512m; }
-  location /          { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; client_max_body_size 512m; }
-}
-```
-
-Self-signed kurum CA kullanıyorsanız istemci makinelerin bu CA'ya güvenmesi gerekir.
+**Alternatif (harici proxy).** Kurumun kendi nginx/HAProxy'sini kullanacaksanız TLS'i "hayır"
+yapıp `PUBLIC_*` URL'leri elle https ayarlayın; `/auth/`+`/realtime/` (WS upgrade) → :8000,
+`/storage/` (Host korunur) → :9000, `/` → :3000 yönlendirin.
 
 ## Log rotasyonu
 

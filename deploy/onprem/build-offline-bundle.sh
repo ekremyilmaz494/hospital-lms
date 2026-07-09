@@ -46,6 +46,7 @@ DEP_IMAGES=(
   "minio/minio:RELEASE.2025-09-07T16-13-09Z"
   "minio/mc:RELEASE.2025-08-13T08-35-41Z"
   "axllent/mailpit:v1.30.3"
+  "caddy:2.8.4-alpine"
 )
 
 echo "[bundle] Pin drift guard: her yardımcı imaj compose'da birebir mi?"

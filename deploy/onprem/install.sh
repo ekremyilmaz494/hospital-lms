@@ -115,11 +115,29 @@ else
   ANON_KEY="$(gen_jwt anon)"
   SERVICE_ROLE_KEY="$(gen_jwt service_role)"
 
-  # Kullanıcıdan erişim bilgileri (varsayılanlar localhost).
-  read -rp "Public uygulama URL'i [http://localhost:3000]: " PUBLIC_APP_URL
-  PUBLIC_APP_URL="${PUBLIC_APP_URL:-http://localhost:3000}"
-  read -rp "Public nesne-deposu (MinIO) URL'i [http://localhost:9000]: " PUBLIC_STORAGE_URL
-  PUBLIC_STORAGE_URL="${PUBLIC_STORAGE_URL:-http://localhost:9000}"
+  # ── TLS (HTTPS) — KVKK: düz HTTP LAN'da PII/oturum sızdırır; ayrıca realtime proxy'siz KIRIK ──
+  SERVICE_BIND="0.0.0.0"; COMPOSE_PROFILES=""; CADDY_MAIN_SITE=""; CADDY_STORAGE_SITE=""
+  HTTPS_PORT=443; HTTPS_STORAGE_PORT=9443
+  read -rp "TLS/HTTPS (gömülü Caddy reverse-proxy) kurulsun mu? [E/h]: " TLS_ANS
+  if [ "${TLS_ANS:-E}" != "h" ] && [ "${TLS_ANS:-E}" != "H" ]; then
+    read -rp "  HTTPS hostname (ör. lms.hastane.local): " TLS_HOST
+    while [ -z "${TLS_HOST:-}" ]; do read -rp "  Hostname zorunlu (ör. lms.hastane.local): " TLS_HOST; done
+    read -rp "  Storage HTTPS portu [9443]: " HTTPS_STORAGE_PORT; HTTPS_STORAGE_PORT="${HTTPS_STORAGE_PORT:-9443}"
+    PUBLIC_APP_URL="https://${TLS_HOST}"
+    PUBLIC_STORAGE_URL="https://${TLS_HOST}:${HTTPS_STORAGE_PORT}"
+    CADDY_MAIN_SITE="${TLS_HOST}"
+    CADDY_STORAGE_SITE="${TLS_HOST}:${HTTPS_STORAGE_PORT}"
+    SERVICE_BIND="127.0.0.1"   # doğrudan 3000/8000/9000 LAN'a KAPALI; erişim yalnız Caddy (HTTPS)
+    COMPOSE_PROFILES="tls"
+    log "  → TLS: ${PUBLIC_APP_URL} (Caddy self-signed iç-CA — ilk erişimde tarayıcı sertifika uyarısı verebilir)."
+    log "     Kurum/kamu SM sertifikası için: Caddyfile 'tls internal'ı cert+key ile değiştirin (README > TLS)."
+  else
+    warn "TLS ATLANDI — düz HTTP. Hastane LAN'ında PII/oturum çerezleri AÇIK akar (KVKK riski) + realtime kırık kalabilir."
+    read -rp "Public uygulama URL'i [http://localhost:3000]: " PUBLIC_APP_URL
+    PUBLIC_APP_URL="${PUBLIC_APP_URL:-http://localhost:3000}"
+    read -rp "Public nesne-deposu (MinIO) URL'i [http://localhost:9000]: " PUBLIC_STORAGE_URL
+    PUBLIC_STORAGE_URL="${PUBLIC_STORAGE_URL:-http://localhost:9000}"
+  fi
   read -rp "İlk süper-admin e-postası [admin@hastane.local]: " ONPREM_ADMIN_EMAIL
   ONPREM_ADMIN_EMAIL="${ONPREM_ADMIN_EMAIL:-admin@hastane.local}"
   read -rp "Lisans sunucusu URL'i [https://app.klinovax.com]: " LICENSE_SERVER_URL
@@ -156,6 +174,12 @@ APP_IMAGE=${APP_IMAGE_REF}
 PUBLIC_APP_URL=${PUBLIC_APP_URL}
 BASE_DOMAIN=${BASE_DOMAIN}
 PUBLIC_STORAGE_URL=${PUBLIC_STORAGE_URL}
+SERVICE_BIND=${SERVICE_BIND}
+COMPOSE_PROFILES=${COMPOSE_PROFILES}
+CADDY_MAIN_SITE=${CADDY_MAIN_SITE}
+CADDY_STORAGE_SITE=${CADDY_STORAGE_SITE}
+HTTPS_PORT=${HTTPS_PORT}
+HTTPS_STORAGE_PORT=${HTTPS_STORAGE_PORT}
 APP_PORT=3000
 GATEWAY_PORT=8000
 MINIO_PORT=9000
