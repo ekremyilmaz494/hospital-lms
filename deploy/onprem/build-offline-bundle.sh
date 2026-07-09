@@ -5,7 +5,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo kökü
 
-TAG="${1:-klinovax/hospital-lms:onprem}"
+# Sürüm damgası — müşteri-başına takip + rollback hedefi. BUNDLE_VERSION verilmezse git tag/sha.
+# Pinli tag (:onprem-<ver>) hareketli :onprem yerine; install.sh bunu .env'e ve VERSION'a yazar.
+BUNDLE_VERSION="${BUNDLE_VERSION:-$(git describe --tags --always 2>/dev/null || date +%Y%m%d)}"
+TAG="${1:-klinovax/hospital-lms:onprem-${BUNDLE_VERSION}}"
 # Hedef mimari: hastane sunucuları çoğunlukla x86_64. Bu makinede (ör. Apple Silicon arm64)
 # --platform'suz build/pull YEREL mimariyi üretir → müşterinin x86 sunucusunda TÜM konteynerler
 # "exec format error" ile sonsuz restart-loop (lokal Docker smoke arm64'te 10/10 geçse bile).
@@ -66,7 +69,13 @@ cp deploy/onprem/docker-compose.yml "$OUT/"
 cp deploy/onprem/.env.example "$OUT/"
 cp deploy/onprem/install.sh "$OUT/"
 cp deploy/onprem/backup-volumes.sh "$OUT/"
+cp deploy/onprem/update.sh "$OUT/"
+cp deploy/onprem/restore-offsite.sh "$OUT/"
+cp deploy/onprem/dead-man-check.sh "$OUT/"
 cp deploy/onprem/README.md "$OUT/" 2>/dev/null || true
+
+# Sürüm manifesti — install.sh ilk satırdaki pinli tag'i .env APP_IMAGE'e yazar; müşteri-başına takip.
+{ printf '%s\n' "$TAG"; printf 'built: %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; printf 'git: %s\n' "$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"; } > "$OUT/VERSION"
 cp -r deploy/onprem/gateway "$OUT/"
 cp -r deploy/onprem/scheduler "$OUT/"
 # db-init/: postgres ilk-boot init script'i (alt-rol parola senkronu + Prisma
@@ -91,14 +100,30 @@ if [ "$missing" = 1 ]; then
   exit 1
 fi
 
-cat > "$OUT/LOAD.md" <<'EOF'
-# Offline kurulum
+cat > "$OUT/LOAD.md" <<EOF
+# Offline kurulum — ${TAG}
 
-1. İmajları yükle:  `docker load < klinovax-onprem-images.tar.gz`
-2. `./install.sh` çalıştır (sırları üretir, .env yazar, stack'i başlatır).
+0. **Bütünlüğü doğrula** (USB/harici disk transferi bit-çürümesi/kurcalama):
+   \`\`\`
+   sha256sum -c SHA256SUMS
+   \`\`\`
+   Hepsi \`OK\` değilse transfer bozuk — TEKRAR kopyalayın, yüklemeyin.
+1. İmajları yükle:  \`docker load < klinovax-onprem-images.tar.gz\`
+2. \`./install.sh\` çalıştır (sırları üretir, .env yazar, sağlık doğrulayana kadar bekler).
 3. Tarayıcıdan uygulamaya gir, /license ekranından lisansı etkinleştir
    (internet yoksa Klinovax'tan aldığın receipt.klr'i yükle).
+
+## Güncelleme (yeni sürüm geldiğinde)
+\`\`\`
+sha256sum -c SHA256SUMS                       # yeni bundle'ı doğrula
+./update.sh klinovax-onprem-images.tar.gz     # yedek-önce + sağlık + başarısızsa oto-rollback
+\`\`\`
 EOF
 
-echo "[bundle] Hazır: $OUT/"
+# ── SHA256 checksum — sneakernet (USB/harici disk) bütünlük doğrulaması ──
+# install.sh/LOAD.md 'sha256sum -c SHA256SUMS' ile transfer bozulmasını yakalar.
+echo "[bundle] SHA256SUMS üretiliyor…"
+( cd "$OUT" && find . -maxdepth 2 -type f ! -name 'SHA256SUMS' -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS )
+
+echo "[bundle] Hazır: $OUT/  (sürüm: $TAG)"
 ls -lh "$OUT/"

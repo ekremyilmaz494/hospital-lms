@@ -74,32 +74,32 @@ docker load < klinovax-onprem-images.tar.gz
 
 ## Güncelleme
 
-**Önce yedek al** (migration'lar ileri-yönlüdür; kötü sürümden dönüş için gerekir):
+> **Kapalı container kendini güncellemez** (imaj değişmez — air-gap için doğru). Güncelleme
+> operatör-tetiklidir ve `update.sh` ile geri-dönülebilir yapılır.
+
+**Önerilen yol — `update.sh` (yedek-önce + sağlık + oto-rollback):**
 
 ```bash
 cd deploy/onprem
-./backup-volumes.sh /mnt/nas/klinovax-backups   # DB + dosyalar (aşağıya bkz.)
-docker compose pull        # yeni imaj (offline'da: docker load < yeni-tarball)
-docker compose up -d       # migration'lar entrypoint'te otomatik uygulanır
+sha256sum -c SHA256SUMS                          # yeni bundle'ı doğrula (sneakernet bütünlüğü)
+./update.sh klinovax-onprem-images.tar.gz        # AIR-GAP: yeni tarball
+#   veya  ./update.sh --pull                     # KISITLI-ÇIKIŞ: registry'den çek
 ```
 
-Migration'lar konteyner açılışında `prisma migrate deploy` ile idempotent çalışır.
+`update.sh` sırasıyla: **güncelleme-öncesi off-site yedeği ZORLAR** → yeni imajı yükler →
+`docker compose up -d` (migration'lar entrypoint'te `prisma migrate deploy` ile otomatik) →
+`/api/health` ile **sağlık poll** → **başarısızsa oto-rollback**:
+- **Yeni migration YOKSA** → eski `APP_IMAGE`'e döner (`.env`'i geri yazar) + `up -d`.
+- **Yeni migration UYGULANDIYSA** (şema ileri-yönlü, imaj geri alınamaz) → güncelleme-öncesi
+  yedekten `restore-offsite.sh` ile otomatik geri yükler.
 
-**Sürüm sabitleme (önerilir).** Varsayılan `:onprem` tag'i değişkendir (her `pull` en sonu
-getirir). Hangi sürümde olduğunuzu bilmek + geri dönebilmek için `.env`'de sabit sürüm pinleyin:
+Sürüm bundle'daki `VERSION` dosyasından pinlenir (`:onprem-<ver>`); kurulu sürüm
+`.installed-version`'da tutulur (müşteri-başına takip).
 
-```bash
-# .env
-APP_IMAGE=klinovax/hospital-lms:onprem-1.4.2   # sabit sürüm tag'i
-```
-
-**Geri alma (rollback).** Şema değiştiren bir güncelleme sonrası:
-
-1. Sorun yalnız uygulama kodundaysa (şema aynı): `.env`'de `APP_IMAGE`'i önceki sürüme
-   çevir → `docker compose up -d`.
-2. Migration da geldiyse: eski imaja dönmek TANIMSIZDIR (Prisma ileri-yönlü). Güncelleme
-   ÖNCESİ alınan yedeğe **Geri Yükleme** (aşağı) yap → sonra eski imajı başlat.
-   Bu yüzden her güncelleme öncesi yedek ŞARTTIR.
+**Elle (ileri düzey).** `update.sh` kullanamıyorsanız: önce `./backup-volumes.sh`, sonra
+`docker load < yeni-tarball` (veya `docker compose pull`), `.env`'de `APP_IMAGE`'i yeni pinli
+tag'e çevir, `docker compose up -d`. Rollback için yukarıdaki iki durumu elle uygulayın —
+**her güncelleme öncesi yedek ŞARTTIR** (şema-değiştiren güncellemede tek geri-dönüş yoludur).
 
 ## Yedekleme
 
@@ -130,32 +130,23 @@ kaybıdır** (şifreli TC Kimlik alanları + şifreli yedekler açılamaz).
 **Senaryo A — uygulama-içi yedekten (aynı sunucu ayakta).** Süper-admin → `/super-admin/backups`
 → yedeği seç → geri yükle. `BACKUP_ENCRYPTION_KEY` `.env`'de aynı olmalı.
 
-**Senaryo B — tam sunucu kaybı (off-site yedekten yeni sunucuya).**
+**Senaryo B — tam sunucu kaybı (off-site yedekten yeni sunucuya).** Betikli yol:
 
 ```bash
-# 1) Yeni sunucuda stack'i kur ama ESKİ .env'i geri koy (yeni üretME):
+# 1) Yeni sunucuda ESKİ .env'i geri koy (install.sh'ı .env varken ÇALIŞTIRMA):
 cd deploy/onprem
-cp /güvenli/yer/.env .env        # ESKİ anahtarlarla — install.sh'ı .env varken çalıştırma
-docker compose up -d postgres minio    # önce veri servisleri
-sleep 20
+cp /güvenli/yer/.env .env                 # ESKİ anahtarlarla (BACKUP_ENCRYPTION_KEY şifreli yedeği çözer)
 
-# 2) PostgreSQL dump'ını geri yükle:
-gunzip -c /mnt/nas/klinovax/db-YYYYMMDD-HHMMSS.sql.gz \
-  | docker compose exec -T postgres psql -U postgres -d postgres
-
-# 3) MinIO nesne deposunu geri yükle (dosyalar/videolar):
-docker run --rm -v klinovax-onprem_miniodata:/data \
-  -v /mnt/nas/klinovax:/backup alpine \
-  sh -c 'cd /data && tar xzf /backup/minio-YYYYMMDD-HHMMSS.tar.gz'
-
-# 4) Tüm stack'i başlat + doğrula:
-docker compose up -d
-docker compose ps                         # 10/10 healthy?
-curl -s http://localhost:3000/api/health  # license.state + servisler
+# 2) Off-site yedekten otomatik restore (şifre çözme + postgres + minio + sağlık):
+OFFSITE_BACKUP_DIR=/mnt/nas/klinovax ./restore-offsite.sh
+#   veya belirli dosyalar:  ./restore-offsite.sh db-YYYYMMDD-HHMMSS.sql.gz.enc minio-YYYYMMDD-HHMMSS.tar.gz.enc
 ```
 
-> Restore'u satıştan sonra DEĞİL, ilk kurulumda bir kez **tatbik edin** — test edilmemiş
-> yedek = yedek yok. Örnek dosya adlarını (`YYYYMMDD-HHMMSS`) gerçek yedeğinizle değiştirin.
+`restore-offsite.sh` en yeni (veya verilen) yedeği bulur, `BACKUP_ENCRYPTION_KEY` ile çözer,
+bütünlüğü ön-doğrular, PostgreSQL + MinIO'yu geri yükler ve `/api/health` ile doğrular.
+
+> **Restore'u satıştan sonra DEĞİL, ilk kurulumda bir kez tatbik edin** — test edilmemiş
+> yedek = yedek yok. Aktif sınav timer'ları/streak Redis'te tutulur, off-site yedeğe DAHİL DEĞİL.
 
 ## TLS ile kurulum (reverse proxy)
 
