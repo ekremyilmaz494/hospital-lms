@@ -27,6 +27,7 @@ import {
 import type { UserRole } from '@/types/database'
 import { logger } from '@/lib/logger'
 import { licenseApiGate, isReadonlyWriteExempt } from '@/lib/license/enforcement'
+import { readActingOrgCookie, verifyActingOrgToken } from '@/lib/auth/acting-org'
 
 /** İstek URL'inden pathname çıkarır (parse hatasında boş string). */
 function pathOf(request: Request): string {
@@ -221,9 +222,29 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
         }
       }
 
-      // requireOrganization — super_admin null orgId ile gelirse tenant-scoped
-      // route'lara giremez. Cross-tenant write/impersonation hatalarını engeller.
-      if (requireOrganization && !dbUser.organizationId) {
+      // ── Süper-admin "Org panelini görüntüle" (salt-okunur acting-org) ──
+      // super_admin bir org'un /admin panelini görüntülerken, imzalı klx-acting-org
+      // cookie'si isteği o org'a scope'lar. Kendi süper-admin oturumu (sb-*-auth-token)
+      // ASLA değişmez → self-logout yok. PATH-GATE: yalnız /api/admin — /api/super-admin
+      // rotaları ve global süper-admin davranışı ETKİLENMEZ (cookie yoksa da tıpatıp aynı).
+      // Cookie her istekte taze okunur (dbUser authCache'ine dokunulmaz → bayatlık yok).
+      let actingOrgId: string | null = null
+      if (dbUser.role === 'super_admin' && pathname.startsWith('/api/admin')) {
+        actingOrgId = verifyActingOrgToken(readActingOrgCookie(request), dbUser.id, Date.now())
+      }
+      const effectiveOrgId = actingOrgId ?? dbUser.organizationId ?? null
+
+      // Salt-okunur ray — acting modda hiçbir tenant mutation'ı geçmez (GET dışı 403).
+      // super_admin normalde write-guard'dan muaf; bu ray o muafiyeti acting modda kapatır.
+      if (actingOrgId && WRITE_METHODS.has(request.method.toUpperCase())) {
+        return errorResponse('Salt-okunur: kuruluş görüntüleme modunda değişiklik yapılamaz.', 403)
+      }
+
+      // requireOrganization — org bağlamı yoksa tenant-scoped route'lara giremez.
+      // Cross-tenant write/impersonation hatalarını engeller. Acting-org bağlamı
+      // da geçerli bir org sağlar (effectiveOrgId), yoksa super_admin 94 GET
+      // admin rotasında 400 alırdı.
+      if (requireOrganization && !effectiveOrgId) {
         return errorResponse('Bu işlem için bir kurum bağlamı gerekir', 400)
       }
 
@@ -240,10 +261,10 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
         params,
         user,
         dbUser,
-        organizationId: dbUser.organizationId ?? null,
+        organizationId: effectiveOrgId,
         audit: (p) => createAuditLog({
           userId: dbUser.id,
-          organizationId: dbUser.organizationId,
+          organizationId: effectiveOrgId,
           request,
           ...p,
         }),

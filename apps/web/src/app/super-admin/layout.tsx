@@ -9,7 +9,6 @@ import { AppTopbar } from '@/components/layouts/topbar/app-topbar';
 import { superAdminNav } from '@/components/layouts/sidebar/sidebar-config';
 import { useAuth } from '@/hooks/use-auth';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
-import { ImpersonationBanner } from '@/components/shared/impersonation-banner';
 
 export default function SuperAdminLayout({
   children,
@@ -43,7 +42,6 @@ export default function SuperAdminLayout({
 
   return (
     <TooltipProvider>
-      <ImpersonationBanner />
       <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
         <AppSidebar
           navGroups={superAdminNav}
