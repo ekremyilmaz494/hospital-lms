@@ -272,6 +272,24 @@ describe('countStaffSeats — aktif personel + bekleyen davet', () => {
 
     expect(await countStaffSeats(ORG_ID)).toBe(148)
   })
+
+  it('YALNIZ role=staff (aktif) sayar — YÖNETİCİLER (admin) koltuk tüketmez', async () => {
+    mockUserCount.mockResolvedValue(150)
+    mockInviteCount.mockResolvedValue(0)
+
+    await countStaffSeats(ORG_ID)
+
+    // Kullanıcı sayımı role='staff' + isActive ile filtrelenmeli; admin/super_admin hariç.
+    expect(mockUserCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: ORG_ID, role: 'staff', isActive: true }),
+      }),
+    )
+    // Bekleyen davet de yalnız role='staff' olmalı (yönetici daveti koltuk tüketmez).
+    expect(mockInviteCount).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ role: 'staff' }) }),
+    )
+  })
 })
 
 describe('checkStaffLimit — seat guard', () => {
