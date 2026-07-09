@@ -7,8 +7,15 @@ umask 077   # .env sır içerir → yaratılış anından itibaren yalnız sahib
 
 log()  { printf '\033[0;36m[install]\033[0m %s\n' "$*"; }
 err()  { printf '\033[0;31m[install] HATA:\033[0m %s\n' "$*" >&2; }
+warn() { printf '\033[0;33m[install] UYARI:\033[0m %s\n' "$*"; }
 
-APP_IMAGE_REF="klinovax/hospital-lms:onprem"
+# Pinli imaj tag'i — bundle'daki VERSION dosyasının ilk satırından (build-offline-bundle.sh
+# damgalar); yoksa hareketli :onprem'e düş. Hem node-from-image fallback'i hem .env APP_IMAGE bunu kullanır.
+if [ -f VERSION ]; then
+  APP_IMAGE_REF="$(head -1 VERSION)"
+else
+  APP_IMAGE_REF="klinovax/hospital-lms:onprem"
+fi
 
 # ── Önkoşullar ──
 command -v docker >/dev/null 2>&1 || { err "docker bulunamadı."; exit 1; }
@@ -16,6 +23,42 @@ docker compose version >/dev/null 2>&1 || { err "docker compose (v2) bulunamadı
 command -v openssl >/dev/null 2>&1 || { err "openssl bulunamadı (sır üretimi için gerekli)."; exit 1; }
 # NOT: node yalnızca .env İLK üretilirken (ANON/SERVICE JWT mint) gerekir. Host'ta yoksa
 # app imajından çalıştırılır (air-gap: imaj 'docker load' ile yüklü) → burada HARD-FAIL YOK.
+
+# ── Host ön-kontrolü (Docker daemon, bundle bütünlüğü, NTP/saat, disk, at-rest) ──
+preflight_host() {
+  docker info >/dev/null 2>&1 || { err "Docker daemon çalışmıyor (ör. 'sudo systemctl start docker')."; exit 1; }
+
+  # Bundle bütünlüğü — SHA256SUMS varsa transfer bozulmasını docker load ÖNCESİ yakala.
+  if [ -f SHA256SUMS ] && command -v sha256sum >/dev/null 2>&1; then
+    log "Bundle bütünlüğü doğrulanıyor (SHA256SUMS)…"
+    sha256sum -c SHA256SUMS >/dev/null 2>&1 || { err "SHA256 doğrulaması BAŞARISIZ — bundle transferi bozuk/eksik. Tekrar kopyalayın, yüklemeyin."; exit 1; }
+    log "  → bundle bütünlüğü tamam."
+  fi
+
+  # NTP/saat senkronu — lisans saat-geri tespiti (>24s) sistem saatine dayanır; senkronsuz
+  # sunucuda saat sıçraması lisansı 'clock_tampering' ile LOCKED yapar = TOPYEKÛN KESİNTİ.
+  if command -v timedatectl >/dev/null 2>&1; then
+    if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = "yes" ]; then
+      log "NTP senkronu: tamam."
+    else
+      warn "Sistem saati NTP ile senkron DEĞİL. Kapalı ağda YEREL bir NTP sunucusuna bağlayın —"
+      warn "  aksi halde saat kayması lisansı 'clock_tampering' ile kilitleyip TÜM sistemi durdurabilir."
+    fi
+  else
+    warn "timedatectl yok — saat/NTP senkronu doğrulanamadı. Sunucu saatinin doğru+senkron olduğundan EMİN olun (lisans saat-geri kilidi riski)."
+  fi
+
+  # Disk (video-ağırlıklı LMS; ≥50GB önerilir).
+  local free_gb
+  free_gb="$(df -Pk . 2>/dev/null | awk 'NR==2{printf "%d", $4/1024/1024}')"
+  if [ -n "$free_gb" ] && [ "$free_gb" -lt 50 ] 2>/dev/null; then
+    warn "Boş disk ~${free_gb}GB (<50GB önerilir). MinIO video büyümesi diski doldurursa postgres kesintiye girer."
+  fi
+
+  # KVKK at-rest hatırlatması (güvenilir otomatik tespit yok → uyarı).
+  warn "KVKK: veri diskinin (Docker volume'leri + off-site yedek) at-rest ŞİFRELİ (LUKS/dm-crypt) olduğundan emin olun."
+}
+preflight_host
 
 if [ -f .env ]; then
   log ".env zaten var — üzerine yazılmayacak. Yeniden üretmek için .env'i silin."
@@ -72,11 +115,29 @@ else
   ANON_KEY="$(gen_jwt anon)"
   SERVICE_ROLE_KEY="$(gen_jwt service_role)"
 
-  # Kullanıcıdan erişim bilgileri (varsayılanlar localhost).
-  read -rp "Public uygulama URL'i [http://localhost:3000]: " PUBLIC_APP_URL
-  PUBLIC_APP_URL="${PUBLIC_APP_URL:-http://localhost:3000}"
-  read -rp "Public nesne-deposu (MinIO) URL'i [http://localhost:9000]: " PUBLIC_STORAGE_URL
-  PUBLIC_STORAGE_URL="${PUBLIC_STORAGE_URL:-http://localhost:9000}"
+  # ── TLS (HTTPS) — KVKK: düz HTTP LAN'da PII/oturum sızdırır; ayrıca realtime proxy'siz KIRIK ──
+  SERVICE_BIND="0.0.0.0"; COMPOSE_PROFILES=""; CADDY_MAIN_SITE=""; CADDY_STORAGE_SITE=""
+  HTTPS_PORT=443; HTTPS_STORAGE_PORT=9443
+  read -rp "TLS/HTTPS (gömülü Caddy reverse-proxy) kurulsun mu? [E/h]: " TLS_ANS
+  if [ "${TLS_ANS:-E}" != "h" ] && [ "${TLS_ANS:-E}" != "H" ]; then
+    read -rp "  HTTPS hostname (ör. lms.hastane.local): " TLS_HOST
+    while [ -z "${TLS_HOST:-}" ]; do read -rp "  Hostname zorunlu (ör. lms.hastane.local): " TLS_HOST; done
+    read -rp "  Storage HTTPS portu [9443]: " HTTPS_STORAGE_PORT; HTTPS_STORAGE_PORT="${HTTPS_STORAGE_PORT:-9443}"
+    PUBLIC_APP_URL="https://${TLS_HOST}"
+    PUBLIC_STORAGE_URL="https://${TLS_HOST}:${HTTPS_STORAGE_PORT}"
+    CADDY_MAIN_SITE="${TLS_HOST}"
+    CADDY_STORAGE_SITE="${TLS_HOST}:${HTTPS_STORAGE_PORT}"
+    SERVICE_BIND="127.0.0.1"   # doğrudan 3000/8000/9000 LAN'a KAPALI; erişim yalnız Caddy (HTTPS)
+    COMPOSE_PROFILES="tls"
+    log "  → TLS: ${PUBLIC_APP_URL} (Caddy self-signed iç-CA — ilk erişimde tarayıcı sertifika uyarısı verebilir)."
+    log "     Kurum/kamu SM sertifikası için: Caddyfile 'tls internal'ı cert+key ile değiştirin (README > TLS)."
+  else
+    warn "TLS ATLANDI — düz HTTP. Hastane LAN'ında PII/oturum çerezleri AÇIK akar (KVKK riski) + realtime kırık kalabilir."
+    read -rp "Public uygulama URL'i [http://localhost:3000]: " PUBLIC_APP_URL
+    PUBLIC_APP_URL="${PUBLIC_APP_URL:-http://localhost:3000}"
+    read -rp "Public nesne-deposu (MinIO) URL'i [http://localhost:9000]: " PUBLIC_STORAGE_URL
+    PUBLIC_STORAGE_URL="${PUBLIC_STORAGE_URL:-http://localhost:9000}"
+  fi
   read -rp "İlk süper-admin e-postası [admin@hastane.local]: " ONPREM_ADMIN_EMAIL
   ONPREM_ADMIN_EMAIL="${ONPREM_ADMIN_EMAIL:-admin@hastane.local}"
   read -rp "Lisans sunucusu URL'i [https://app.klinovax.com]: " LICENSE_SERVER_URL
@@ -109,10 +170,16 @@ else
   BASE_DOMAIN="$(printf '%s' "$PUBLIC_APP_URL" | sed -E 's#^https?://##')"
 
   cat > .env <<EOF
-APP_IMAGE=klinovax/hospital-lms:onprem
+APP_IMAGE=${APP_IMAGE_REF}
 PUBLIC_APP_URL=${PUBLIC_APP_URL}
 BASE_DOMAIN=${BASE_DOMAIN}
 PUBLIC_STORAGE_URL=${PUBLIC_STORAGE_URL}
+SERVICE_BIND=${SERVICE_BIND}
+COMPOSE_PROFILES=${COMPOSE_PROFILES}
+CADDY_MAIN_SITE=${CADDY_MAIN_SITE}
+CADDY_STORAGE_SITE=${CADDY_STORAGE_SITE}
+HTTPS_PORT=${HTTPS_PORT}
+HTTPS_STORAGE_PORT=${HTTPS_STORAGE_PORT}
 APP_PORT=3000
 GATEWAY_PORT=8000
 MINIO_PORT=9000
@@ -179,6 +246,52 @@ preflight_secrets
 log "Stack başlatılıyor (docker compose up -d)…"
 docker compose up -d
 
-log "Tamamlandı. Durumu izlemek için: docker compose logs -f app"
+# ── Kurulum-sonrası SAĞLIK KAPISI ──
+# Prisma/Docker bilmeyen operatöre net "sağlıklı + URL" doğrulaması ver; sessiz yarım-boot'u yakala.
+# .env'den oku (hem taze hem mevcut-.env yolunda çalışsın).
+APP_PORT_V="$(grep -E '^APP_PORT=' .env | head -1 | cut -d= -f2-)"; APP_PORT_V="${APP_PORT_V:-3000}"
+HEALTH_SECRET_V="$(grep -E '^HEALTH_CHECK_SECRET=' .env | head -1 | cut -d= -f2-)"  # secret-scanner-disable-line (.env'den OKUR, literal değil)
+HEALTH_WAIT="${HEALTH_WAIT:-240}"
+log "Sağlık bekleniyor (≤${HEALTH_WAIT}sn; ilk migrate/bootstrap uzun sürebilir)…"
+healthy=0
+for i in $(seq 1 "$HEALTH_WAIT"); do
+  if curl -fsS "http://localhost:${APP_PORT_V}/api/health" >/dev/null 2>&1; then healthy=1; break; fi
+  sleep 1
+done
+echo
+docker compose ps
+if [ "$healthy" -ne 1 ]; then
+  err "Uygulama ${HEALTH_WAIT}sn içinde sağlıklı olmadı. 'docker compose logs -f app' ile inceleyin."
+  exit 1
+fi
+# Kurulu sürüm manifesti (müşteri-başına takip) + sağlık/lisans özeti.
+grep -E '^APP_IMAGE=' .env | head -1 | cut -d= -f2- > .installed-version 2>/dev/null || true
+if [ -n "$HEALTH_SECRET_V" ]; then
+  summary="$(curl -fsS -H "x-health-secret: ${HEALTH_SECRET_V}" "http://localhost:${APP_PORT_V}/api/health" 2>/dev/null || true)"
+  log "Sağlık: $(printf '%s' "$summary" | grep -oE '"status":"[^"]*"' | head -1)"
+  lic="$(printf '%s' "$summary" | grep -oE '"state":"[^"]*"' | head -1)"
+  [ -n "$lic" ] && log "Lisans durumu: $lic"
+fi
+log "✅ Kurulum tamam — uygulama sağlıklı."
+
+# ── Off-site yedek cron'u (opt-in) — konteyner-içi supercronic Docker soketine erişemez ──
+read -rp "Off-site yedek dizini (harici disk/NAS; boş=atla): " OFFSITE_DIR
+if [ -n "$OFFSITE_DIR" ]; then
+  INSTALL_DIR="$(pwd)"
+  CRON_BK="30 2 * * *  cd ${INSTALL_DIR} && OFFSITE_BACKUP_DIR=${OFFSITE_DIR} ./backup-volumes.sh >> /var/log/klinovax-offsite.log 2>&1  # klinovax-offsite-backup"
+  CRON_DM="30 3 * * *  cd ${INSTALL_DIR} && OFFSITE_BACKUP_DIR=${OFFSITE_DIR} ./dead-man-check.sh >> /var/log/klinovax-offsite.log 2>&1  # klinovax-deadman"
+  if command -v crontab >/dev/null 2>&1; then
+    # Marker-idempotent: eski klinovax satırlarını çıkar, yenilerini ekle.
+    new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-offsite-backup' | grep -v 'klinovax-deadman' )"
+    printf '%s\n%s\n%s\n' "$new" "$CRON_BK" "$CRON_DM" | crontab - \
+      && log "Host crontab kuruldu: 02:30 off-site yedek + 03:30 ölü-adam kontrolü ($OFFSITE_DIR)."
+    warn "  → ${OFFSITE_DIR} SUNUCU-DIŞI bir mount (NAS/harici disk) OLMALI; aynı diskteyse off-site kopya YOKTUR."
+  else
+    warn "crontab komutu yok — off-site yedeği elle kurun (README > Yedekleme)."
+  fi
+else
+  warn "Off-site yedek cron'u ATLANDI. Felaket kurtarma için MUTLAKA elle kurun (README > Yedekleme)."
+fi
+
 log "Uygulama:  $(grep '^PUBLIC_APP_URL=' .env | cut -d= -f2-)"
 log "Lisansı etkinleştirmek için giriş yapıp /license ekranına gidin."

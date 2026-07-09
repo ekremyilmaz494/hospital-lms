@@ -136,7 +136,9 @@ services:
       ONPREM_ADMIN_PASSWORD: ${ONPREM_ADMIN_PASSWORD}
       SUPABASE_URL: http://gateway:8000
     ports:
-      - "${APP_PORT:-3000}:3000"
+      # SERVICE_BIND: TLS modunda install.sh 127.0.0.1 yapar → doğrudan port LAN'a KAPALI,
+      # erişim yalnız Caddy (443/HTTPS) üzerinden. Varsayılan 0.0.0.0 (TLS'siz mevcut davranış).
+      - "${SERVICE_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
 
   # ── PostgreSQL (uygulama + auth şeması) ──
   postgres:
@@ -274,7 +276,8 @@ services:
       retries: 6
       start_period: 30s
     ports:
-      - "${GATEWAY_PORT:-8000}:8000"
+      # TLS modunda 127.0.0.1'e bağlanır (yalnız Caddy erişir); aksi 0.0.0.0.
+      - "${SERVICE_BIND:-0.0.0.0}:${GATEWAY_PORT:-8000}:8000"
 
   # ── Redis + SRH (Upstash REST uyumlu proxy — @upstash/redis istemcisi değişmez) ──
   redis:
@@ -335,7 +338,8 @@ services:
       - miniodata:/data
     ports:
       # 9000 = S3 API (presigned URL host'u; tarayıcı erişir → reverse-proxy arkası önerilir).
-      - "${MINIO_PORT:-9000}:9000"
+      # TLS modunda 127.0.0.1'e bağlanır (erişim Caddy storage-site 9443/HTTPS üzerinden).
+      - "${SERVICE_BIND:-0.0.0.0}:${MINIO_PORT:-9000}:9000"
       # 9001 = yönetim konsolu — YALNIZ 127.0.0.1 (LAN'a açma; erişim için SSH tüneli).
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     healthcheck:
@@ -400,7 +404,35 @@ services:
     expose:
       - "1025"
 
+  # ── TLS reverse-proxy (Caddy) — YALNIZ 'tls' profilinde başlar ──
+  # KVKK: düz HTTP LAN'da PII/oturum sızdırır. Bu proxy TLS sonlandırır + realtime/token-refresh'i
+  # düzeltir (proxy'siz kırık). profiles:[tls] → TLS seçilmezse başlamaz, mevcut (localhost) akış
+  # BİT-BİT AYNI kalır. Site adresleri .env'den (CADDY_MAIN_SITE / CADDY_STORAGE_SITE).
+  proxy:
+    <<: [*hardening, *logging]
+    image: caddy:2.8.4-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 256
+    depends_on:
+      app: { condition: service_healthy }
+      gateway: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    environment:
+      CADDY_MAIN_SITE: ${CADDY_MAIN_SITE:-:443}
+      CADDY_STORAGE_SITE: ${CADDY_STORAGE_SITE:-:9443}
+    ports:
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_STORAGE_PORT:-9443}:9443"
+    volumes:
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data        # iç-CA kök sertifikası + issued leaf'ler burada KALICI
+      - caddyconfig:/config
+
 volumes:
   pgdata:
   redisdata:
   miniodata:
+  caddydata:
+  caddyconfig:

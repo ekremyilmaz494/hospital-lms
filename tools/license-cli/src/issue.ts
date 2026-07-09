@@ -33,6 +33,7 @@ const { values } = parseArgs({
     perpetual: { type: 'boolean', default: false },
     'max-staff': { type: 'string' },
     'max-orgs': { type: 'string' },
+    'max-instances': { type: 'string' },
     'grace-days': { type: 'string', default: '14' },
     type: { type: 'string', default: 'standard' },
     out: { type: 'string' },
@@ -70,8 +71,12 @@ if (!Number.isInteger(graceDays) || graceDays < 1 || graceDays > 90) {
 }
 const maxStaff = values['max-staff'] ? Number(values['max-staff']) : null
 const maxOrgs = values['max-orgs'] ? Number(values['max-orgs']) : null
+// maxInstances: gelir koruma (klon limiti). Verilmezse null (sınırsız — geriye uyumlu).
+// KISITLI-ÇIKIŞ kurulumlarda heartbeat aşımda lisansı kilitler; tam air-gap'te zorlanamaz.
+const maxInstances = values['max-instances'] ? Number(values['max-instances']) : null
 if (maxStaff !== null && (!Number.isInteger(maxStaff) || maxStaff < 1)) fail('--max-staff pozitif tam sayı olmalı')
 if (maxOrgs !== null && (!Number.isInteger(maxOrgs) || maxOrgs < 1)) fail('--max-orgs pozitif tam sayı olmalı')
+if (maxInstances !== null && (!Number.isInteger(maxInstances) || maxInstances < 1)) fail('--max-instances pozitif tam sayı olmalı')
 
 const privateJwk = JSON.parse(readFileSync(values.key, 'utf8')) as Record<string, string>
 if (privateJwk.kty !== 'OKP' || privateJwk.crv !== 'Ed25519' || !privateJwk.d) {
@@ -89,7 +94,7 @@ const claims = {
   customerName: values.customer,
   licenseType: values.type as 'standard' | 'trial',
   validUntil,
-  limits: { maxOrganizations: maxOrgs, maxStaff },
+  limits: { maxOrganizations: maxOrgs, maxStaff, maxInstances },
   graceDays,
 }
 
@@ -101,7 +106,7 @@ console.log(`   Dosya:      ${values.out}`)
 console.log(`   licenseId:  ${licenseId}`)
 console.log(`   Müşteri:    ${values.customer} (${values.slug})`)
 console.log(`   Bitiş:      ${validUntil ?? 'SÜRESİZ'}`)
-console.log(`   Limitler:   org=${maxOrgs ?? '∞'} personel=${maxStaff ?? '∞'} grace=${graceDays}g`)
+console.log(`   Limitler:   org=${maxOrgs ?? '∞'} personel=${maxStaff ?? '∞'} instance=${maxInstances ?? '∞'} grace=${graceDays}g`)
 console.log('')
 console.log('SONRAKİ ADIMLAR:')
 console.log('  1. JWT içeriğini super-admin → Lisanslar → "Lisans Kaydet"e yapıştır (iptal/izleme için ŞART)')

@@ -16,6 +16,13 @@ export const licenseLimitsSchema = z.object({
   maxOrganizations: z.number().int().positive().nullable(),
   /** Aktif personel (staff) üst sınırı (null = sınırsız). */
   maxStaff: z.number().int().positive().nullable(),
+  /**
+   * Aynı lisansla eşzamanlı çalışabilecek en fazla KURULUM (instance) sayısı — gelir koruma
+   * (bir lisansı N sunucuya klonlama). Heartbeat'te aşım → makbuz 'revoked' → LOCKED.
+   * OPTIONAL + nullable ki daha ÖNCE üretilmiş lisanslar (bu alan yok) kırılmasın:
+   *   yok(undefined) = eski lisans → zorlanmaz · null = sınırsız · sayı = zorlanır.
+   */
+  maxInstances: z.number().int().positive().nullable().optional(),
 })
 
 export const licenseClaimsSchema = z.object({

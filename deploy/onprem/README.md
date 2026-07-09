@@ -74,32 +74,32 @@ docker load < klinovax-onprem-images.tar.gz
 
 ## Güncelleme
 
-**Önce yedek al** (migration'lar ileri-yönlüdür; kötü sürümden dönüş için gerekir):
+> **Kapalı container kendini güncellemez** (imaj değişmez — air-gap için doğru). Güncelleme
+> operatör-tetiklidir ve `update.sh` ile geri-dönülebilir yapılır.
+
+**Önerilen yol — `update.sh` (yedek-önce + sağlık + oto-rollback):**
 
 ```bash
 cd deploy/onprem
-./backup-volumes.sh /mnt/nas/klinovax-backups   # DB + dosyalar (aşağıya bkz.)
-docker compose pull        # yeni imaj (offline'da: docker load < yeni-tarball)
-docker compose up -d       # migration'lar entrypoint'te otomatik uygulanır
+sha256sum -c SHA256SUMS                          # yeni bundle'ı doğrula (sneakernet bütünlüğü)
+./update.sh klinovax-onprem-images.tar.gz        # AIR-GAP: yeni tarball
+#   veya  ./update.sh --pull                     # KISITLI-ÇIKIŞ: registry'den çek
 ```
 
-Migration'lar konteyner açılışında `prisma migrate deploy` ile idempotent çalışır.
+`update.sh` sırasıyla: **güncelleme-öncesi off-site yedeği ZORLAR** → yeni imajı yükler →
+`docker compose up -d` (migration'lar entrypoint'te `prisma migrate deploy` ile otomatik) →
+`/api/health` ile **sağlık poll** → **başarısızsa oto-rollback**:
+- **Yeni migration YOKSA** → eski `APP_IMAGE`'e döner (`.env`'i geri yazar) + `up -d`.
+- **Yeni migration UYGULANDIYSA** (şema ileri-yönlü, imaj geri alınamaz) → güncelleme-öncesi
+  yedekten `restore-offsite.sh` ile otomatik geri yükler.
 
-**Sürüm sabitleme (önerilir).** Varsayılan `:onprem` tag'i değişkendir (her `pull` en sonu
-getirir). Hangi sürümde olduğunuzu bilmek + geri dönebilmek için `.env`'de sabit sürüm pinleyin:
+Sürüm bundle'daki `VERSION` dosyasından pinlenir (`:onprem-<ver>`); kurulu sürüm
+`.installed-version`'da tutulur (müşteri-başına takip).
 
-```bash
-# .env
-APP_IMAGE=klinovax/hospital-lms:onprem-1.4.2   # sabit sürüm tag'i
-```
-
-**Geri alma (rollback).** Şema değiştiren bir güncelleme sonrası:
-
-1. Sorun yalnız uygulama kodundaysa (şema aynı): `.env`'de `APP_IMAGE`'i önceki sürüme
-   çevir → `docker compose up -d`.
-2. Migration da geldiyse: eski imaja dönmek TANIMSIZDIR (Prisma ileri-yönlü). Güncelleme
-   ÖNCESİ alınan yedeğe **Geri Yükleme** (aşağı) yap → sonra eski imajı başlat.
-   Bu yüzden her güncelleme öncesi yedek ŞARTTIR.
+**Elle (ileri düzey).** `update.sh` kullanamıyorsanız: önce `./backup-volumes.sh`, sonra
+`docker load < yeni-tarball` (veya `docker compose pull`), `.env`'de `APP_IMAGE`'i yeni pinli
+tag'e çevir, `docker compose up -d`. Rollback için yukarıdaki iki durumu elle uygulayın —
+**her güncelleme öncesi yedek ŞARTTIR** (şema-değiştiren güncellemede tek geri-dönüş yoludur).
 
 ## Yedekleme
 
@@ -130,64 +130,49 @@ kaybıdır** (şifreli TC Kimlik alanları + şifreli yedekler açılamaz).
 **Senaryo A — uygulama-içi yedekten (aynı sunucu ayakta).** Süper-admin → `/super-admin/backups`
 → yedeği seç → geri yükle. `BACKUP_ENCRYPTION_KEY` `.env`'de aynı olmalı.
 
-**Senaryo B — tam sunucu kaybı (off-site yedekten yeni sunucuya).**
+**Senaryo B — tam sunucu kaybı (off-site yedekten yeni sunucuya).** Betikli yol:
 
 ```bash
-# 1) Yeni sunucuda stack'i kur ama ESKİ .env'i geri koy (yeni üretME):
+# 1) Yeni sunucuda ESKİ .env'i geri koy (install.sh'ı .env varken ÇALIŞTIRMA):
 cd deploy/onprem
-cp /güvenli/yer/.env .env        # ESKİ anahtarlarla — install.sh'ı .env varken çalıştırma
-docker compose up -d postgres minio    # önce veri servisleri
-sleep 20
+cp /güvenli/yer/.env .env                 # ESKİ anahtarlarla (BACKUP_ENCRYPTION_KEY şifreli yedeği çözer)
 
-# 2) PostgreSQL dump'ını geri yükle:
-gunzip -c /mnt/nas/klinovax/db-YYYYMMDD-HHMMSS.sql.gz \
-  | docker compose exec -T postgres psql -U postgres -d postgres
-
-# 3) MinIO nesne deposunu geri yükle (dosyalar/videolar):
-docker run --rm -v klinovax-onprem_miniodata:/data \
-  -v /mnt/nas/klinovax:/backup alpine \
-  sh -c 'cd /data && tar xzf /backup/minio-YYYYMMDD-HHMMSS.tar.gz'
-
-# 4) Tüm stack'i başlat + doğrula:
-docker compose up -d
-docker compose ps                         # 10/10 healthy?
-curl -s http://localhost:3000/api/health  # license.state + servisler
+# 2) Off-site yedekten otomatik restore (şifre çözme + postgres + minio + sağlık):
+OFFSITE_BACKUP_DIR=/mnt/nas/klinovax ./restore-offsite.sh
+#   veya belirli dosyalar:  ./restore-offsite.sh db-YYYYMMDD-HHMMSS.sql.gz.enc minio-YYYYMMDD-HHMMSS.tar.gz.enc
 ```
 
-> Restore'u satıştan sonra DEĞİL, ilk kurulumda bir kez **tatbik edin** — test edilmemiş
-> yedek = yedek yok. Örnek dosya adlarını (`YYYYMMDD-HHMMSS`) gerçek yedeğinizle değiştirin.
+`restore-offsite.sh` en yeni (veya verilen) yedeği bulur, `BACKUP_ENCRYPTION_KEY` ile çözer,
+bütünlüğü ön-doğrular, PostgreSQL + MinIO'yu geri yükler ve `/api/health` ile doğrular.
 
-## TLS ile kurulum (reverse proxy)
+> **Restore'u satıştan sonra DEĞİL, ilk kurulumda bir kez tatbik edin** — test edilmemiş
+> yedek = yedek yok. Aktif sınav timer'ları/streak Redis'te tutulur, off-site yedeğe DAHİL DEĞİL.
 
-Tarayıcı 3 endpoint'e erişir: **app** (3000), **gateway** (8000, auth+realtime/ws),
-**MinIO** (9000, presigned). Hepsini TLS sonlandıran bir reverse proxy arkasına alın ve
-`.env`'de PUBLIC URL'leri **https** yapın (`PUBLIC_APP_URL`, `PUBLIC_STORAGE_URL`).
+## TLS ile kurulum (HTTPS)
 
-> **Mixed-content tuzağı:** app https, `PUBLIC_STORAGE_URL` http kalırsa video/dosya
-> sessizce yüklenmez. İkisini birlikte https yapın.
+Düz HTTP hastane LAN'ında oturum çerezleri + PII'yi AÇIK akıtır (KVKK) ve realtime/token-refresh
+proxy'siz SESSİZCE kırıktır. **`install.sh` "TLS kurulsun mu?" diye sorar** (varsayılan Evet).
 
-Örnek nginx (tek domain, path-tabanlı — CSP on-prem'de şema-bazlı olduğundan çalışır):
+**Gömülü Caddy (önerilen — tamamen offline).** TLS seçilirse:
+- Hostname sorulur (ör. `lms.hastane.local`) → `.env`: `PUBLIC_APP_URL=https://<host>`,
+  `PUBLIC_STORAGE_URL=https://<host>:9443`, `COMPOSE_PROFILES=tls`, `SERVICE_BIND=127.0.0.1`.
+- Caddy (`gateway/Caddyfile`) `tls internal` ile sertifikayı OFFLINE üretir (ACME/internet YOK).
+- **443**: uygulama + `/auth/v1` + `/realtime/v1` (WebSocket) → gateway. **9443**: MinIO presigned
+  (ayrı site; SigV4 imzası Host+path'e bağlı → path-prefix YOK, Host korunur).
+- `SERVICE_BIND=127.0.0.1` → doğrudan 3000/8000/9000 portları LAN'a KAPALI; erişim yalnız HTTPS.
+- İlk erişimde tarayıcı **iç-CA sertifika uyarısı** verebilir; kurum içinde Caddy iç-CA kök
+  sertifikasını (`caddydata` volume: `/data/caddy/pki/authorities/local/root.crt`) istemci
+  makinelere güvenilir olarak dağıtın.
 
-```nginx
-server {
-  listen 443 ssl;
-  server_name lms.hastane.local;
-  ssl_certificate     /etc/ssl/hastane/fullchain.pem;   # kurum sertifikası
-  ssl_certificate_key /etc/ssl/hastane/privkey.pem;
+**Kurum/kamu SM sertifikası.** `gateway/Caddyfile`'da `tls internal` yerine
+`tls /etc/caddy/cert.pem /etc/caddy/key.pem` yapıp cert+key'i proxy servisine bind-mount edin.
 
-  location /auth/     { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host; }
-  location /realtime/ {                                   # WebSocket (realtime bildirimler)
-    proxy_pass http://127.0.0.1:8000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-  }
-  location /storage/  { proxy_pass http://127.0.0.1:9000; proxy_set_header Host $host; client_max_body_size 512m; }
-  location /          { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; client_max_body_size 512m; }
-}
-```
+> **Mixed-content tuzağı:** `PUBLIC_APP_URL` https, `PUBLIC_STORAGE_URL` http kalırsa video/dosya
+> sessizce yüklenmez — install.sh TLS modunda ikisini de https yapar.
 
-Self-signed kurum CA kullanıyorsanız istemci makinelerin bu CA'ya güvenmesi gerekir.
+**Alternatif (harici proxy).** Kurumun kendi nginx/HAProxy'sini kullanacaksanız TLS'i "hayır"
+yapıp `PUBLIC_*` URL'leri elle https ayarlayın; `/auth/`+`/realtime/` (WS upgrade) → :8000,
+`/storage/` (Host korunur) → :9000, `/` → :3000 yönlendirin.
 
 ## Log rotasyonu
 

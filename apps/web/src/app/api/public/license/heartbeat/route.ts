@@ -6,6 +6,7 @@ import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { verifyLicenseJwt, LicenseVerifyError } from '@/lib/license/verify'
 import { signReceipt } from '@/lib/license/receipt-signer'
+import { resolveReceiptStatus } from '@/lib/license/instance-limit'
 import { isOnPrem } from '@/lib/deployment'
 
 /**
@@ -104,13 +105,33 @@ export async function POST(request: NextRequest) {
       }),
     ])
 
-    // Kopyalama anomalisi: son 24 saatte birden fazla instance aynı lisansla yaşıyor.
+    // Son 24 saatte aynı lisansla yaşayan FARKLI instance sayısı.
     const distinctInstances = new Set(recentActivations.map((a) => a.instanceId))
     distinctInstances.add(instanceId)
-    if (distinctInstances.size > 1) {
+
+    // Gelir koruma — HARD instance (klon) limiti. İmzalı limits.maxInstances aşılırsa makbuz
+    // 'revoked' → client LOCKED (mevcut yol). Limit yok/null → yalnız informatif anomali logu.
+    const { status: receiptStatus, overLimit } = resolveReceiptStatus(
+      license.status,
+      distinctInstances.size,
+      claims.limits.maxInstances,
+    )
+    if (overLimit) {
       logger.warn(
         'license-server',
-        `Lisans paylaşım anomalisi: ${license.customerName} — 24s içinde ${distinctInstances.size} farklı instance`,
+        `Lisans instance limiti AŞILDI (KİLİTLENDİ): ${license.customerName} — ${distinctInstances.size}/${claims.limits.maxInstances} instance`,
+      )
+      await createAuditLog({
+        action: 'license.locked.over_instance_limit',
+        entityType: 'license',
+        entityId: license.id,
+        newData: { distinctInstances: distinctInstances.size, maxInstances: claims.limits.maxInstances, reportingInstance: instanceId },
+      })
+    } else if (distinctInstances.size > 1) {
+      // Limit dahilinde ama çoklu-instance — izleme için (henüz kilitlemez).
+      logger.warn(
+        'license-server',
+        `Lisans çoklu-instance: ${license.customerName} — 24s içinde ${distinctInstances.size} farklı instance`,
       )
       await createAuditLog({
         action: 'license.anomaly.multi_instance',
@@ -129,7 +150,7 @@ export async function POST(request: NextRequest) {
     const receipt = await signReceipt({
       licenseId: license.id,
       instanceId,
-      status: license.status === 'revoked' ? 'revoked' : 'valid',
+      status: receiptStatus,
       renewedLicense,
     })
 
