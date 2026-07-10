@@ -23,9 +23,12 @@ hdr "KlinoVax on-prem — durum ($(date '+%Y-%m-%d %H:%M'))"
 hdr "Servisler (docker compose)"
 if docker compose ps --format '{{.Service}} {{.Status}}' >/tmp/klx-ps.txt 2>/dev/null; then
   total="$(wc -l < /tmp/klx-ps.txt | tr -d ' ')"
-  healthy="$(grep -icE 'healthy|running|Up' /tmp/klx-ps.txt || true)"
+  # 'unhealthy' string'i 'healthy' glob'una uyar → sayımdan ÖNCE ele (yoksa unhealthy
+  # container yanlışlıkla sağlıklı sayılırdı). Aşağıdaki case'te de *unhealthy* ÖNCE gelir.
+  healthy="$(grep -ivE 'unhealthy' /tmp/klx-ps.txt | grep -icE 'healthy|running|Up' || true)"
   while IFS= read -r line; do
     case "$line" in
+      *unhealthy*) bad "$line" ;;
       *healthy*|*"Up "*|*running*) ok "$line" ;;
       *) bad "$line" ;;
     esac
@@ -71,6 +74,24 @@ else
   else
     warn "Off-site yedek bulunamadı ($OFFSITE) — kurulu mu? (README > Yedekleme)"
   fi
+fi
+
+# ── Scheduler (zamanlanmış işler) ──
+# supercronic sessizce ölürse KVKK-imha/yedek/heartbeat durur → lisans LOCKED riski.
+hdr "Zamanlanmış işler (scheduler)"
+if [ -f .scheduler-health ]; then
+  head -1 .scheduler-health | grep -q '^OK' && ok "$(tail -1 .scheduler-health)" || bad "$(tail -1 .scheduler-health) (scheduler-guard alarmı)"
+else
+  # Guard cron kurulu değilse doğrudan container health'ine bak.
+  sc_cid="$(docker compose ps -q scheduler 2>/dev/null || true)"
+  sc_status="$([ -n "$sc_cid" ] && docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$sc_cid" 2>/dev/null || true)"
+  case "$sc_status" in
+    healthy)   ok "Scheduler: healthy (liveness beacon taze)" ;;
+    unhealthy) bad "Scheduler: unhealthy — supercronic takılmış olabilir (KVKK-imha/yedek/heartbeat durdu)" ;;
+    starting)  warn "Scheduler: starting (ilk beacon bekleniyor)" ;;
+    none)      warn "Scheduler: healthcheck yok (eski compose olabilir)" ;;
+    *)         warn "Scheduler durumu okunamadı (çalışmıyor olabilir)" ;;
+  esac
 fi
 
 # ── Saat / NTP ──

@@ -317,6 +317,17 @@ if command -v crontab >/dev/null 2>&1; then
     && log "Host crontab: saatlik disk-dolum kontrolü kuruldu (./status.sh ile görün)."
 fi
 
+# ── Scheduler-liveness guard cron'u (supercronic sessiz-ölüm tespiti) ──
+# scheduler takılırsa KVKK-imha/yedek/heartbeat durur → lisans LOCKED riski (44-günlük
+# sessiz-yedek olayının kardeşi). Saatlik host cron container health'ini alarma çevirir.
+if command -v crontab >/dev/null 2>&1; then
+  SG_DIR="$(pwd)"
+  CRON_SG="47 * * * *  cd ${SG_DIR} && ./scheduler-guard.sh >> /var/log/klinovax-scheduler.log 2>&1  # klinovax-schedguard"
+  sg_new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-schedguard' )"
+  printf '%s\n%s\n' "$sg_new" "$CRON_SG" | crontab - \
+    && log "Host crontab: saatlik scheduler-liveness kontrolü kuruldu (./status.sh ile görün)."
+fi
+
 log "Uygulama:  $(grep '^PUBLIC_APP_URL=' .env | cut -d= -f2-)"
 log "Durum özeti için: ./status.sh"
 log "Lisansı etkinleştirmek için giriş yapıp /license ekranına gidin."

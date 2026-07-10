@@ -20,6 +20,20 @@ export default function Error({
 }) {
   useEffect(() => {
     Sentry.captureException(error)
+    // Air-gap backstop: Sentry DSN yoksa (on-prem) captureException no-op → boundary hatası
+    // hiçbir yerde görünmez. Sunucuya da bildir → container stdout (`docker logs app`).
+    // Best-effort; başarısızlığı yut (zaten hata ekranındayız).
+    void fetch('/api/telemetry/client-error', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        message: error?.message ?? String(error),
+        digest: error?.digest,
+        stack: error?.stack,
+        url: typeof window !== 'undefined' ? window.location.href : undefined,
+      }),
+    }).catch(() => {})
   }, [error])
 
   return (

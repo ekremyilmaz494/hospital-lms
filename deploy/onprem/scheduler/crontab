@@ -12,6 +12,13 @@
 
 RETRY=--retry 5 --retry-delay 90 --retry-all-errors --max-time 600
 
+# ── Liveness beacon ──
+# Supercronic'in canlı VE tetikliyor olduğunu kanıtlar: her 5 dk /tmp/scheduler-alive'a
+# epoch yazar. Compose healthcheck bu dosyanın tazeliğine bakar (bkz. docker-compose.yml
+# scheduler.healthcheck) — bayatlarsa container 'unhealthy'. supercronic komutu /bin/sh -c
+# ile çalıştırır → redirection çalışır. Ağ/app gerektirmez; saf yerel yazım.
+*/5 * * * *  date +%s > /tmp/scheduler-alive
+
 # ── Altyapı ──
 0 3 * * *    curl -fsS $RETRY -H "Authorization: Bearer $CRON_SECRET" $APP_URL/api/cron/cleanup
 15 3 * * *   curl -fsS $RETRY -H "Authorization: Bearer $CRON_SECRET" $APP_URL/api/cron/backup
