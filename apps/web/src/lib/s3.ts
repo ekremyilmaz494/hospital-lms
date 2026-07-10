@@ -9,6 +9,8 @@ import {
   UploadPartCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
   type ServerSideEncryption,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -265,6 +267,46 @@ export async function getStreamUrl(key: string) {
   return getDownloadUrl(key)
 }
 
+/** Bir S3 objesinin boyutunu (ContentLength) döner; yoksa null. Büyük indirmeden
+ * önce boyut ön-kontrolü için (SCORM process endpoint'i). */
+export async function getObjectSize(key: string): Promise<number | null> {
+  try {
+    const res = await (s3Internal ?? s3).send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
+    return typeof res.ContentLength === 'number' ? res.ContentLength : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Bir prefix altındaki TÜM objeleri sil (sayfalı ListObjectsV2 + toplu DeleteObjects).
+ * SCORM eğitimi silinince `scorm/{orgId}/{trainingId}/` altını temizlemek için.
+ * Hata fırlatmaz — best-effort, orphan'ları loglar.
+ */
+export async function deletePrefix(prefix: string): Promise<void> {
+  const client = s3Internal ?? s3
+  try {
+    let token: string | undefined
+    do {
+      const list = await client.send(
+        new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: token }),
+      )
+      const objects = (list.Contents ?? [])
+        .map((o) => o.Key)
+        .filter((k): k is string => typeof k === 'string')
+        .map((Key) => ({ Key }))
+      if (objects.length > 0) {
+        await client.send(
+          new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: objects, Quiet: true } }),
+        )
+      }
+      token = list.IsTruncated ? list.NextContinuationToken : undefined
+    } while (token)
+  } catch (err) {
+    logger.warn('s3-delete-prefix', `Prefix silme başarısız (orphan olabilir): ${prefix}`, err)
+  }
+}
+
 /** Delete object from S3 — hata fırlatmaz, orphan key'i loglar */
 export async function deleteObject(key: string) {
   try {
@@ -411,6 +453,53 @@ export function audioKey(orgId: string, trainingId: string, filename: string) {
   }
   const id = crypto.randomUUID()
   return `audio/${orgId}/${trainingId}/${id}.${ext}`
+}
+
+/**
+ * SCORM geçici zip anahtarı — presigned PUT hedefi. Ham paket buraya yüklenir;
+ * process endpoint'i indirir, açar, çıkarılmış içeriği kalıcı prefix'e yazar ve
+ * bu geçici zip'i siler.
+ */
+export function scormTmpKey(orgId: string) {
+  return `scorm/${orgId}/_tmp/${crypto.randomUUID()}.zip`
+}
+
+/**
+ * SCORM çıkarılmış içerik anahtarı. `safeEntryPath` MUTLAKA zip-slip'e karşı
+ * sanitize edilmiş olmalı (bkz. lib/scorm/extract.ts `sanitizeEntryPath`).
+ * Diğer key üreticilerin aksine UUID'lenmez — paket içi göreli yol (iç içe
+ * dizinler) korunur ki content route dosyaları doğru sunabilsin.
+ */
+export function scormKey(orgId: string, trainingId: string, safeEntryPath: string) {
+  return `scorm/${orgId}/${trainingId}/${safeEntryPath}`
+}
+
+/**
+ * SCORM geçici zip anahtarının çağıran org'a ait olduğunu doğrula (IDOR guard —
+ * process endpoint'i istemciden `tempKey` alır). Format: `scorm/{orgId}/_tmp/{uuid}.zip`.
+ */
+const _SCORM_TMP_KEY_RE = /^scorm\/([^/]+)\/_tmp\/[0-9a-fA-F-]+\.zip$/
+export function isValidScormTmpKeyForOrg(key: unknown, orgId: string): boolean {
+  if (typeof key !== 'string' || key.length === 0) return false
+  if (key.includes('://') || key.includes('..')) return false
+  const m = _SCORM_TMP_KEY_RE.exec(key)
+  if (!m) return false
+  return m[1] === orgId
+}
+
+/**
+ * SCORM zip'i için presigned PUT URL'i. Genel medya allowlist'ini (`getUploadUrl`)
+ * BİLİNÇLİ bypass eder — yalnız SCORM ingest'inde, sabit `application/zip`
+ * content-type'ıyla. `key` mutlaka `scormTmpKey` ile üretilmeli (org-scope + IDOR
+ * guard `isValidScormTmpKeyForOrg` process endpoint'inde uygulanır).
+ */
+export async function getScormUploadUrl(key: string) {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: 'application/zip',
+  })
+  return getSignedUrl(s3Accelerate, command, { expiresIn: 1800 })
 }
 
 /** Organizasyonun toplam storage kullanımını byte cinsinden hesapla.

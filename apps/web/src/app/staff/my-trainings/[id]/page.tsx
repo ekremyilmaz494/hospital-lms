@@ -47,6 +47,9 @@ interface TrainingDetail {
   videosCompleted: boolean;
   postExamCompleted: boolean;
   needsRetry?: boolean;
+  /** SCORM eğitimi mi? True ise pre/post-exam akışı YOK; CTA doğrudan SCORM
+   *  player'ına (`/exam/{trainingId}/scorm`) yönlendirir. */
+  isScorm?: boolean;
   /** Cron eğitim süresi geçince attempt'i 'expired' işaretledi ama kullanıcının
    *  hâlâ deneme hakkı var. Retry-pending'den farklı UX (banner mesajı + CTA). */
   isExpiredRetryable?: boolean;
@@ -247,7 +250,13 @@ export default function TrainingDetailPage() {
   let ctaHref = `/exam/${examId}/post-exam`;
   let ctaLabel = 'Sınava Başla';
   let ctaIcon: LucideIcon = Award;
-  if (isExamOnly) {
+  if (training.isScorm) {
+    // SCORM: pre/post-exam yok — doğrudan player'a (trainingId ile). Tamamlanmışsa
+    // "tekrar aç" (SCORM içeriği yeniden görüntülenebilir).
+    ctaHref = `/exam/${training.id}/scorm`;
+    ctaLabel = allDone ? 'İçeriği Tekrar Aç' : 'Eğitime Başla';
+    ctaIcon = Play;
+  } else if (isExamOnly) {
     ctaHref = `/exam/${examId}/post-exam`; ctaLabel = 'Sınava Başla'; ctaIcon = Award;
   } else if (isRetry) {
     if (currentStep === 0) { ctaHref = `/exam/${examId}/videos`; ctaLabel = 'Videoları İzle'; ctaIcon = Play; }

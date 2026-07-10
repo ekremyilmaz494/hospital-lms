@@ -2,95 +2,136 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
+import {
+  downloadBuffer,
+  deleteObject,
+  getObjectSize,
+  isValidScormTmpKeyForOrg,
+} from '@/lib/s3'
+import { checkFeature } from '@/lib/feature-gate'
+import { checkRateLimit } from '@/lib/redis'
+import { extractScormPackage, cleanupScormKeys, ScormExtractError } from '@/lib/scorm/extract'
+import { ScormManifestError } from '@/lib/scorm/manifest'
+import { SCORM_FEATURE_DISABLED_MSG, scormMaxPackageBytes, scormMaxPackageMb } from '@/lib/scorm/config'
 
-/** POST /api/admin/scorm/upload — Upload a SCORM package (.zip) */
+// Zip indirme + açma + S3'e yeniden yazma uzun sürebilir (Vercel default 10s yetmez).
+export const maxDuration = 300
+
+/**
+ * POST /api/admin/scorm/upload — presign ile S3'e yüklenmiş bir SCORM zip'ini
+ * işler: indir → aç → imsmanifest.xml parse et → dosyaları kalıcı prefix'e çıkar →
+ * Training satırını SCORM alanlarıyla yayınla. Başarısızlıkta her şeyi geri alır.
+ */
 export const POST = withAdminRoute(async ({ request, dbUser, organizationId, audit }) => {
+  const enabled = await checkFeature(organizationId, 'scormSupport')
+  if (!enabled) return errorResponse(SCORM_FEATURE_DISABLED_MSG, 403)
+
+  const allowed = await checkRateLimit(`scorm-process:${dbUser.id}`, 10, 3600)
+  if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
+
+  const body = (await request.json().catch(() => null)) as { tempKey?: unknown; title?: unknown } | null
+  if (!body) return errorResponse('Geçersiz istek verisi', 400)
+
+  const tempKey = typeof body.tempKey === 'string' ? body.tempKey : ''
+  const title = typeof body.title === 'string' ? body.title.trim() : ''
+
+  if (!isValidScormTmpKeyForOrg(tempKey, organizationId)) {
+    return errorResponse('Geçersiz yükleme anahtarı', 400)
+  }
+  if (title.length < 3) {
+    return errorResponse('Eğitim başlığı en az 3 karakter olmalıdır.', 400)
+  }
+
+  // Boyut ön-kontrolü (indirmeden önce) — client presign'da bildirdiğinden büyük yükleyebilir.
+  const size = await getObjectSize(tempKey)
+  if (size === null) {
+    return errorResponse('Yüklenen paket bulunamadı. Lütfen tekrar yükleyin.', 400)
+  }
+  if (size > scormMaxPackageBytes()) {
+    await deleteObject(tempKey)
+    return errorResponse(`Paket boyutu ${scormMaxPackageMb()}MB sınırını aşıyor.`, 400)
+  }
+
+  const now = new Date()
+  const endDate = new Date(now)
+  endDate.setFullYear(endDate.getFullYear() + 1)
+
+  // Training'i ÖNCE oluştur (trainingId çıkarma anahtarları için gerekli); taslak/pasif.
+  const training = await prisma.training.create({
+    data: {
+      organizationId,
+      title,
+      description: 'SCORM eğitimi',
+      category: 'scorm',
+      isActive: false,
+      publishStatus: 'draft',
+      startDate: now,
+      endDate,
+      passingScore: 70,
+      maxAttempts: 3,
+      examDurationMinutes: 30,
+      createdById: dbUser.id,
+    },
+  })
+
+  let uploadedKeys: string[] = []
   try {
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-    const title = formData.get('title') as string | null
+    const buffer = await downloadBuffer(tempKey)
+    const result = await extractScormPackage(buffer, { orgId: organizationId, trainingId: training.id })
+    uploadedKeys = result.uploadedKeys
 
-    if (!file) {
-      return errorResponse('Dosya yuklenemedi. Lutfen bir .zip dosyasi secin.', 400)
-    }
-
-    // B5.4 — Hem uzantı hem MIME type doğrula; sadece uzantı kontrolü bypass edilebilir
-    const validMimeTypes = [
-      'application/zip',
-      'application/x-zip-compressed',
-      'application/x-zip',
-    ]
-    const hasValidExt = file.name.toLowerCase().endsWith('.zip')
-    const hasValidMime = validMimeTypes.includes(file.type) || file.type === 'application/octet-stream'
-    if (!hasValidExt || !hasValidMime) {
-      return errorResponse('Sadece .zip dosyalari kabul edilmektedir.', 400)
-    }
-
-    if (!title || title.trim().length < 3) {
-      return errorResponse('Egitim basligi en az 3 karakter olmalidir.', 400)
-    }
-
-    // File size check (max 500MB)
-    const maxSize = 500 * 1024 * 1024
-    if (file.size > maxSize) {
-      return errorResponse('Dosya boyutu 500MB sinirini asiyor.', 400)
-    }
-
-    // Placeholder: In production, the zip would be uploaded to S3
-    // and unzipped to serve SCORM content. For now, we store file info.
-    const zipUrl = `scorm-packages/${organizationId}/${Date.now()}-${file.name}`
-
-    const now = new Date()
-    const endDate = new Date(now)
-    endDate.setFullYear(endDate.getFullYear() + 1)
-
-    const training = await prisma.training.create({
+    await prisma.training.update({
+      where: { id: training.id },
       data: {
-        organizationId,
-        title: title.trim(),
-        description: `SCORM paketi: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`,
-        category: 'scorm',
-        thumbnailUrl: zipUrl,
+        scormManifestPath: result.manifestKey,
+        scormEntryPoint: result.manifest.entryHref,
+        scormVersion: result.manifest.version,
+        ...(result.manifest.masteryScore !== null ? { passingScore: result.manifest.masteryScore } : {}),
         isActive: true,
-        startDate: now,
-        endDate,
-        passingScore: 70,
-        maxAttempts: 3,
-        examDurationMinutes: 30,
-        createdById: dbUser.id,
+        publishStatus: 'published',
       },
     })
+
+    await deleteObject(tempKey)
 
     await audit({
       action: 'scorm_upload',
       entityType: 'training',
       entityId: training.id,
       newData: {
-        title: training.title,
-        fileName: file.name,
-        fileSize: file.size,
-        zipUrl,
+        title,
+        scormVersion: result.manifest.version,
+        entryPoint: result.manifest.entryHref,
+        fileCount: uploadedKeys.length,
       },
     })
 
-    logger.info('SCORM Upload', `SCORM paketi yuklendi: ${training.title}`, {
+    logger.info('SCORM Upload', `SCORM paketi işlendi: ${title}`, {
       trainingId: training.id,
-      fileName: file.name,
+      version: result.manifest.version,
     })
 
     return jsonResponse(
       {
         id: training.id,
-        title: training.title,
-        description: training.description,
-        category: training.category,
-        zipUrl,
+        title,
+        scormVersion: result.manifest.version,
+        scormEntryPoint: result.manifest.entryHref,
         createdAt: training.createdAt.toISOString(),
       },
-      201
+      201,
     )
   } catch (err) {
-    logger.error('SCORM Upload', 'SCORM paketi yuklenemedi', err)
-    return errorResponse('SCORM paketi yuklenemedi', 500)
+    // Geri al: kısmi çıkarılmış objeler + taslak training + geçici zip.
+    await cleanupScormKeys(uploadedKeys)
+    await prisma.training.delete({ where: { id: training.id } }).catch(() => {})
+    await deleteObject(tempKey)
+
+    if (err instanceof ScormManifestError || err instanceof ScormExtractError) {
+      logger.warn('SCORM Upload', 'Geçersiz SCORM paketi', { message: err.message })
+      return errorResponse(`Geçersiz SCORM paketi: ${err.message}`, 400)
+    }
+    logger.error('SCORM Upload', 'SCORM paketi işlenemedi', err)
+    return errorResponse('SCORM paketi işlenemedi', 500)
   }
 }, { requireOrganization: true })

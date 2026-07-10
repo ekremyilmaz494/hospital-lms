@@ -1,26 +1,35 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
+import { checkFeature } from '@/lib/feature-gate'
+import { SCORM_FEATURE_DISABLED_MSG } from '@/lib/scorm/config'
 import { logger } from '@/lib/logger'
 
 /** GET /api/admin/scorm — List SCORM trainings for the admin's org */
 export const GET = withAdminRoute(async ({ organizationId }) => {
+  const enabled = await checkFeature(organizationId, 'scormSupport')
+  if (!enabled) return errorResponse(SCORM_FEATURE_DISABLED_MSG, 403)
+
   try {
     const trainings = await prisma.training.findMany({
       where: {
         organizationId,
         category: 'scorm',
+        publishStatus: { not: 'archived' },
       },
       select: {
         id: true,
         title: true,
         description: true,
         category: true,
-        thumbnailUrl: true,
+        scormVersion: true,
+        scormEntryPoint: true,
         isActive: true,
+        publishStatus: true,
         startDate: true,
         endDate: true,
         createdAt: true,
+        _count: { select: { assignments: true, scormAttempts: true } },
       },
       orderBy: { createdAt: 'desc' },
     })

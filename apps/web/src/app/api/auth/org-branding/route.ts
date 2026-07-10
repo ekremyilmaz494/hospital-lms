@@ -3,9 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { getCached, setCached } from '@/lib/redis'
 import { readActingOrgCookie, verifyActingOrgToken } from '@/lib/auth/acting-org'
+import { checkFeature } from '@/lib/feature-gate'
 
 /** Sidebar/topbar branding için ortak org select shape'i. */
 const ORG_BRANDING_SELECT = {
+  id: true,
   name: true,
   code: true,
   logoUrl: true,
@@ -46,9 +48,8 @@ export async function GET(request: Request) {
         ? verifyActingOrgToken(readActingOrgCookie(request), userId, Date.now())
         : null
 
-    // v6: acting-org segmenti eklendi — süper-admin'in görüntülediği org'un
-    // branding'i kendi (org'suz) durumuyla karışmasın.
-    const cacheKey = `org-branding:v6:${userId}:${actingOrgId ?? 'self'}`
+    // v7: hasScormSupport (plan feature) eklendi — sidebar SCORM menüsü gating'i.
+    const cacheKey = `org-branding:v7:${userId}:${actingOrgId ?? 'self'}`
 
     // Redis cache — branding nadiren değişir (10 dk TTL)
     const cached = await getCached<object>(cacheKey)
@@ -76,9 +77,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Organizasyon bulunamadi' }, { status: 404 })
     }
 
-    await setCached(cacheKey, organization, 600)
+    // SCORM menüsü gating'i — API gate'iyle AYNI kaynak (SubscriptionPlan.hasScormSupport).
+    // org.id yalnız bu sunucu-taraf hesap için seçildi; response'ta sızdırılmaz.
+    const hasScormSupport = await checkFeature(organization.id, 'scormSupport')
+    const { id: _orgId, ...brandingFields } = organization
+    void _orgId
+    const payload = { ...brandingFields, hasScormSupport }
 
-    return NextResponse.json(organization, {
+    await setCached(cacheKey, payload, 600)
+
+    return NextResponse.json(payload, {
       headers: { 'Cache-Control': 'private, max-age=300' },
     })
   } catch {

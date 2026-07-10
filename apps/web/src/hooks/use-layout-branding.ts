@@ -18,14 +18,16 @@ export interface LayoutBranding {
   sector: Sector
   /** Demo organizasyonlarda üst köşede kurum logosu/monogramı gösterilmez. */
   isDemo: boolean
+  /** Plan feature: SCORM desteği açık mı — sidebar SCORM menüsü gating'i. */
+  hasScormSupport: boolean
 }
 
 /**
  * Authenticated kullanicilar icin organizasyon branding'ini ceker.
  * CSS custom property'leri (--brand-primary, --brand-secondary) dinamik olarak gunceller.
  */
-// v5: isDemo eklendi — demo logolarını client cache'te doğru bastır.
-const CACHE_KEY = 'org-branding:v5'
+// v6: hasScormSupport eklendi — sidebar SCORM menüsü gating'i.
+const CACHE_KEY = 'org-branding:v6'
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 dakika
 
 function applyBrandingVars(b: LayoutBranding) {
@@ -71,6 +73,7 @@ export function useLayoutBranding() {
           maxAdmins: typeof data.maxAdmins === 'number' ? data.maxAdmins : 5,
           sector: (data.sector as Sector | undefined) ?? 'healthcare',
           isDemo: data.isDemo === true,
+          hasScormSupport: data.hasScormSupport === true,
         }
         setBranding(b)
         applyBrandingVars(b)
