@@ -51,7 +51,13 @@ jobs:
       - name: Migration drift check (schema.prisma ↔ migrations senkron mu?)
         env:
           SHADOW_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shadow  # secret-scanner-disable-line
+          PGPASSWORD: ci  # secret-scanner-disable-line
         run: |
+          # Supabase 'auth' şemasını shadow DB'ye kur — sade postgres'te yok, migration'ların
+          # RLS blokları auth.uid()/auth.jwt()/rolleri referanslar (bkz. .github/ci-auth-shim.sql).
+          # Bu olmadan 20260704_add_contact_messages replay'i "schema auth does not exist" (P3006)
+          # ile düşer ve TÜM sonraki adımlar (tsc/lint/test/build) atlanır.
+          psql -h localhost -p 5432 -U ci -d ci_shadow -v ON_ERROR_STOP=1 -f .github/ci-auth-shim.sql
           pnpm --filter web exec prisma migrate diff \
             --from-migrations ./prisma/migrations \
             --to-schema ./prisma/schema.prisma \
