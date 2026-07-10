@@ -45,3 +45,20 @@ BEGIN
   END IF;
 END
 $$;
+
+-- auth.users — SADECE dr-drill CI job'u için (backup/restore auth.users'ı taşır: parola
+-- hash geri-yükleme DR'nin kalbi). Gerçek Supabase auth.users çok kolonlu; burada yalnız
+-- backup SELECT'inin çektiği + restore INSERT'inin yazdığı kolonlar (id + nullable gerisi).
+-- Prisma bu tabloyu YÖNETMEZ (non-public şema) → drift-check'e görünmez. Migration'lar
+-- auth.users'a dokunmaz; yalnız dr-drill.test.ts $executeRaw ile kullanır.
+CREATE TABLE IF NOT EXISTS auth.users (
+  id                 uuid PRIMARY KEY,
+  email              text,
+  encrypted_password text,
+  email_confirmed_at timestamptz,
+  phone              text,
+  created_at         timestamptz,
+  updated_at         timestamptz,
+  raw_user_meta_data jsonb,
+  raw_app_meta_data  jsonb
+);
