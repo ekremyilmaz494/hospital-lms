@@ -39,7 +39,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const allowed = await checkRateLimit(rateLimitKey, 30, 60)
     if (!allowed) return noContent() // sessizce düş — telemetri best-effort
 
-    // ── Gövde: boyut sınırı + güvenli parse ──
+    // ── GLOBAL rate limit — 300/dk (toplam) ──
+    // On-prem'de app portu LAN'a açık ve güvenilir proxy yoksa X-Forwarded-For istemci-kontrollü
+    // → saldırgan her istekte XFF'i değiştirip IP-bucket'ı sıfırlayabilir. Bu global bucket, spoof
+    // edilse bile toplam log hacmini tavanlar (json-file 20m×5 rotasyonu gerçek logları silmesin).
+    const globalOk = await checkRateLimit('client-error:global', 300, 60)
+    if (!globalOk) return noContent()
+
+    // ── Gövde: content-length ÖN-kontrolü (belleğe okumadan) — public uç, on-prem'de platform
+    // gövde sınırı yok (next.config proxyClientMaxBodySize 512mb) → dev'siz büyük gövde OOM riski.
+    const declaredLen = Number(request.headers.get('content-length') ?? '0')
+    if (Number.isFinite(declaredLen) && declaredLen > MAX_RAW_BYTES) return noContent()
+
+    // ── Gövde: boyut sınırı + güvenli parse (chunked/undeclared için okuma-sonrası cap) ──
     const raw = await request.text()
     if (raw.length > MAX_RAW_BYTES) return noContent()
 

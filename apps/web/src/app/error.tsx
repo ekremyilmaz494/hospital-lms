@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
-import * as Sentry from '@sentry/nextjs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
 import Link from 'next/link'
+import { reportBoundaryError } from '@/lib/report-boundary-error'
 
 /**
  * Route-level error boundary — sayfa seviyesindeki hatalari yakalar.
@@ -19,21 +19,9 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    Sentry.captureException(error)
-    // Air-gap backstop: Sentry DSN yoksa (on-prem) captureException no-op → boundary hatası
-    // hiçbir yerde görünmez. Sunucuya da bildir → container stdout (`docker logs app`).
-    // Best-effort; başarısızlığı yut (zaten hata ekranındayız).
-    void fetch('/api/telemetry/client-error', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      keepalive: true,
-      body: JSON.stringify({
-        message: error?.message ?? String(error),
-        digest: error?.digest,
-        stack: error?.stack,
-        url: typeof window !== 'undefined' ? window.location.href : undefined,
-      }),
-    }).catch(() => {})
+    // Sentry (bulut) + /api/telemetry/client-error (air-gap on-prem → docker logs). Bkz.
+    // report-boundary-error.ts (alanlar kısaltılır → route'un 4KB kapısına takılmaz).
+    reportBoundaryError(error)
   }, [error])
 
   return (

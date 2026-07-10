@@ -55,14 +55,27 @@ describe('POST /api/telemetry/client-error', () => {
     )
   })
 
-  it('rate limit dolu → 204, LOG YOK', async () => {
-    rateLimitMock.mockResolvedValueOnce(false)
+  it('IP rate limit dolu → 204, LOG YOK', async () => {
+    rateLimitMock.mockResolvedValueOnce(false) // ilk çağrı = IP bucket
     const res = await POST(errReq({ message: 'boom' }))
     expect(res.status).toBe(204)
     expect(loggerMock.error).not.toHaveBeenCalled()
   })
 
-  it('gövde > 4KB → 204, LOG YOK', async () => {
+  it('GLOBAL rate limit dolu (XFF-spoof backstop) → 204, LOG YOK', async () => {
+    rateLimitMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false) // IP geçer, global düşer
+    const res = await POST(errReq({ message: 'boom' }))
+    expect(res.status).toBe(204)
+    expect(loggerMock.error).not.toHaveBeenCalled()
+  })
+
+  it('content-length > 4KB → 204, LOG YOK (gövde belleğe okunmadan reddedilir)', async () => {
+    const res = await POST(errReq({ message: 'boom' }, { 'content-length': '5000' }))
+    expect(res.status).toBe(204)
+    expect(loggerMock.error).not.toHaveBeenCalled()
+  })
+
+  it('gövde > 4KB (content-length yok/chunked) → 204, LOG YOK', async () => {
     const huge = { message: 'x'.repeat(5000) }
     const res = await POST(errReq(huge))
     expect(res.status).toBe(204)
