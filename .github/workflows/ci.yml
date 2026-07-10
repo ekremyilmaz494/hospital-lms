@@ -88,6 +88,66 @@ jobs:
           NEXT_PUBLIC_VAPID_KEY: placeholder
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci  # secret-scanner-disable-line
 
+  # DR restore tatbikatı — backup → wipe → restore → verify UÇTAN UCA (gerçek DB, gerçek
+  # route). Restore-yolu regresyon koruması: `ci` job yalnız migrate DIFF yapar (deploy ETMEZ);
+  # bu job migrate DEPLOY + DR_DRILL ile parola-hash geri-yükleme dahil TAM restore'u doğrular.
+  # Yıkıcı drill fixture'ı sabit 'dddddddd-…' UUID'li throwaway org kullanır + kendini temizler.
+  # auth-farkında postgres için .github/ci-auth-shim.sql (auth şeması+fonksiyon+rol+users tablosu).
+  dr-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter web exec prisma generate
+
+      - name: Auth şeması shim (Supabase 'auth' — sade postgres'te yok)
+        env:
+          PGPASSWORD: ci  # secret-scanner-disable-line
+        # auth şeması/fonksiyon/rol + auth.users tablosu (drill INSERT eder). Migrate deploy'dan
+        # ÖNCE — RLS blokları auth.*'ı referanslar (bkz. .github/ci-auth-shim.sql).
+        run: psql -h localhost -p 5432 -U ci -d ci -v ON_ERROR_STOP=1 -f .github/ci-auth-shim.sql
+
+      - name: Migrate deploy (gerçek şema uygula — diff değil deploy)
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci  # secret-scanner-disable-line
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci  # secret-scanner-disable-line
+        run: pnpm --filter web exec prisma migrate deploy
+
+      - name: DR restore tatbikatı (backup→wipe→restore→verify)
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci  # secret-scanner-disable-line
+          ALLOW_PLAINTEXT_BACKUP: "true"
+        # dr:drill = DR_DRILL=1 vitest run …/dr-drill.test.ts. Prod-guard host=localhost ile geçer.
+        run: pnpm --filter web dr:drill
+
   # On-prem build smoke — DEPLOYMENT_MODE=onprem standalone çıktısı bozulmasın
   # (ref guard atlanır, output:standalone, CSP env'den). Docker'ı çalıştırmaz;
   # yalnız `next build`'in onprem modda geçtiğini + standalone üretimini doğrular.
