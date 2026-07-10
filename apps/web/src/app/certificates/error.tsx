@@ -1,7 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
+
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { reportBoundaryError } from '@/lib/report-boundary-error';
 
 export default function CertificatesVerifyError({
   error,
@@ -10,6 +13,10 @@ export default function CertificatesVerifyError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    reportBoundaryError(error);
+  }, [error]);
+
   return (
     <div className="flex min-h-[60vh] items-center justify-center p-8">
       <div

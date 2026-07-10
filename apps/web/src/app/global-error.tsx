@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import * as Sentry from '@sentry/nextjs'
+import { reportBoundaryError } from '@/lib/report-boundary-error'
 
 /**
  * Global error boundary — tum uygulamada yakalanmayan hatalari yakalar.
@@ -15,7 +15,9 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    Sentry.captureException(error)
+    // Sentry (bulut) + /api/telemetry/client-error (air-gap on-prem → docker logs). Bkz.
+    // report-boundary-error.ts (alanlar kısaltılır → route'un 4KB kapısına takılmaz).
+    reportBoundaryError(error)
   }, [error])
 
   return (

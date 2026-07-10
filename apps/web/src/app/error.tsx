@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
-import * as Sentry from '@sentry/nextjs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
 import Link from 'next/link'
+import { reportBoundaryError } from '@/lib/report-boundary-error'
 
 /**
  * Route-level error boundary — sayfa seviyesindeki hatalari yakalar.
@@ -19,7 +19,9 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    Sentry.captureException(error)
+    // Sentry (bulut) + /api/telemetry/client-error (air-gap on-prem → docker logs). Bkz.
+    // report-boundary-error.ts (alanlar kısaltılır → route'un 4KB kapısına takılmaz).
+    reportBoundaryError(error)
   }, [error])
 
   return (

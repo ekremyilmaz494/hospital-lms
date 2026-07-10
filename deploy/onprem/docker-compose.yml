@@ -265,6 +265,13 @@ services:
       # (18-çekirdek makinede 18 worker → her biri Lua VM preallocate → mem_limit'i aşıp OOM).
       # On-prem düşük-trafik için 2 worker fazlasıyla yeter (~150MB).
       KONG_NGINX_WORKER_PROCESSES: "2"
+      # Admin API'yi konteyner-içi loopback'e kilitle. Varsayılan 0.0.0.0:8001 → host'a
+      # yayınlı olmasa da AYNI Docker ağındaki kardeş konteynerlerden erişilebilir; DB-less
+      # modda /config reload ile routing ele geçirilebilir (ele-geçmiş kardeş /auth/v1'i
+      # kötücül upstream'e yönlendirir; Kong OSS'de admin-auth yok). Declarative config
+      # kullandığımız için hiçbir servis admin API'ye ihtiyaç duymaz → 127.0.0.1'e bağlamak
+      # güvenli. 8444 (admin ssl) de kapanır; gerek yok.
+      KONG_ADMIN_LISTEN: "127.0.0.1:8001"
     volumes:
       - ./gateway/kong.yml:/home/kong/kong.yml:ro
     # 'kong health' yalnız master süreç canlı mı bakar (OOM-thrashing worker'ları HEALTHY sanır).
@@ -374,10 +381,20 @@ services:
     depends_on:
       app: { condition: service_started }
     entrypoint: ["/usr/local/bin/supercronic", "/crontab"]
-    # App imajından miras kalan HTTP healthcheck burada geçersiz (supercronic çalışır,
-    # 3000'de sunucu yok) → sürekli "unhealthy" gürültüsü. Bu serviste devre dışı.
+    # Liveness: crontab'daki '*/5' beacon /tmp/scheduler-alive'a epoch yazar. Supercronic
+    # sessizce takılırsa (wedge) beacon bayatlar → sentinel eskir → container 'unhealthy'.
+    # KVKK-imha/yedek/heartbeat gibi TÜM işler bu tek servise bağlı; sessiz ölüm yalnız
+    # DOLAYLI (heartbeat yenilenmeyince günler sonra lisans LOCKED = topyekûn kesinti) fark
+    # edilirdi — bu healthcheck onu ANINDA görünür kılar. 960s = 3 kaçırılan beacon (~15dk)
+    # toleransı. restart:unless-stopped unhealthy'de RESTART ETMEZ (compose default) → durum
+    # görünür kalır; scheduler-guard.sh host-cron'u ayrıca alarm üretir. '$$' compose-escape:
+    # değer host'ta değil KONTEYNER sh'inde (healthcheck anında) değerlendirilir.
     healthcheck:
-      disable: true
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(cat /tmp/scheduler-alive 2>/dev/null || echo 0) )) -lt 960"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 420s
     environment:
       CRON_SECRET: ${CRON_SECRET}
       APP_URL: http://app:3000

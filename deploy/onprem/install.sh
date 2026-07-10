@@ -297,7 +297,10 @@ if [ -n "$OFFSITE_DIR" ]; then
   CRON_DM="30 3 * * *  cd ${INSTALL_DIR} && OFFSITE_BACKUP_DIR=${OFFSITE_DIR} ./dead-man-check.sh >> /var/log/klinovax-offsite.log 2>&1  # klinovax-deadman"
   if command -v crontab >/dev/null 2>&1; then
     # Marker-idempotent: eski klinovax satırlarını çıkar, yenilerini ekle.
-    new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-offsite-backup' | grep -v 'klinovax-deadman' )"
+    # `|| true`: boş/tam-eşleşen crontab'da `grep -v` exit 1 döner; `set -euo pipefail` altında
+    # bu, komut-ikamesi atamasını düşürüp install.sh'ı SESSİZCE öldürürdü → TAZE sunucuda (boş
+    # root crontab) bu ilk cron bloğu install'u abort eder, hiçbir cron (bu blok dahil) kurulmazdı.
+    new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-offsite-backup' | grep -v 'klinovax-deadman' || true )"
     printf '%s\n%s\n%s\n' "$new" "$CRON_BK" "$CRON_DM" | crontab - \
       && log "Host crontab kuruldu: 02:30 off-site yedek + 03:30 ölü-adam kontrolü ($OFFSITE_DIR)."
     warn "  → ${OFFSITE_DIR} SUNUCU-DIŞI bir mount (NAS/harici disk) OLMALI; aynı diskteyse off-site kopya YOKTUR."
@@ -312,9 +315,20 @@ fi
 if command -v crontab >/dev/null 2>&1; then
   DG_DIR="$(pwd)"
   CRON_DG="17 * * * *  cd ${DG_DIR} && ./disk-guard.sh >> /var/log/klinovax-disk.log 2>&1  # klinovax-diskguard"
-  dg_new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-diskguard' )"
+  dg_new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-diskguard' || true )"  # || true: boş crontab'da grep -v exit 1 → set -e abort'u önle
   printf '%s\n%s\n' "$dg_new" "$CRON_DG" | crontab - \
     && log "Host crontab: saatlik disk-dolum kontrolü kuruldu (./status.sh ile görün)."
+fi
+
+# ── Scheduler-liveness guard cron'u (supercronic sessiz-ölüm tespiti) ──
+# scheduler takılırsa KVKK-imha/yedek/heartbeat durur → lisans LOCKED riski (44-günlük
+# sessiz-yedek olayının kardeşi). Saatlik host cron container health'ini alarma çevirir.
+if command -v crontab >/dev/null 2>&1; then
+  SG_DIR="$(pwd)"
+  CRON_SG="47 * * * *  cd ${SG_DIR} && ./scheduler-guard.sh >> /var/log/klinovax-scheduler.log 2>&1  # klinovax-schedguard"
+  sg_new="$( { crontab -l 2>/dev/null || true; } | grep -v 'klinovax-schedguard' || true )"  # || true: boş crontab'da grep -v exit 1 → set -e abort'u önle
+  printf '%s\n%s\n' "$sg_new" "$CRON_SG" | crontab - \
+    && log "Host crontab: saatlik scheduler-liveness kontrolü kuruldu (./status.sh ile görün)."
 fi
 
 log "Uygulama:  $(grep '^PUBLIC_APP_URL=' .env | cut -d= -f2-)"
