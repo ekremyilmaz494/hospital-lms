@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
+import { checkFeature } from '@/lib/feature-gate'
+import { SCORM_FEATURE_DISABLED_MSG } from '@/lib/scorm/config'
+import { isScormPassed } from '@/lib/scorm/completion'
 import { assignmentNextStatus, ASSIGNMENT_TERMINAL_STATUSES, type AssignmentStatus } from '@/lib/exam-state-machine'
 import { logger } from '@/lib/logger'
 
@@ -42,6 +45,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
 /** POST /api/exam/[id]/scorm/tracking — Create new SCORM attempt */
 export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: trainingId } = params
+
+  const enabled = await checkFeature(organizationId, 'scormSupport')
+  if (!enabled) return errorResponse(SCORM_FEATURE_DISABLED_MSG, 403)
 
   // Oturum oluşturma seyrek olmalı — abuse/yanlışlıkla tekrar mount koruması.
   const allowed = await checkRateLimit(`scorm-attempt-create:${dbUser.id}`, 5, 60)
@@ -100,6 +106,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
   const { id: trainingId } = params
 
+  const enabled = await checkFeature(organizationId, 'scormSupport')
+  if (!enabled) return errorResponse(SCORM_FEATURE_DISABLED_MSG, 403)
+
   // SCORM commit'leri sık gelir (istemci ~2sn debounce → ~30/dk); burst için tavan 40/dk.
   const allowed = await checkRateLimit(`scorm-attempt-update:${dbUser.id}`, 40, 60)
   if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
@@ -147,12 +156,18 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
       },
     })
 
-    // Auto-create certificate if passed or completed
-    const status = body.lessonStatus ?? existing.lessonStatus
+    // Auto-create certificate if passed/completed — SÜRÜMDEN BAĞIMSIZ karar.
+    // SCORM 2004 içeriği lesson_status GÖNDERMEZ; completion_status/success_status
+    // üstünden karar verilmezse 2004 tamamlaması sertifika/geçiş üretmez (bkz. isScormPassed).
+    const passed = isScormPassed({
+      lessonStatus: body.lessonStatus ?? existing.lessonStatus,
+      completionStatus: body.completionStatus ?? existing.completionStatus,
+      successStatus: body.successStatus ?? existing.successStatus,
+    })
     const elapsedSeconds = (Date.now() - new Date(existing.createdAt).getTime()) / 1000
     const engaged = elapsedSeconds >= MIN_SCORM_ENGAGEMENT_SECONDS
 
-    if ((status === 'passed' || status === 'completed') && !engaged) {
+    if (passed && !engaged) {
       // Şüpheli hızlı tamamlama — attempt verisi yine kaydedildi (yukarıda) ama geçiş +
       // sertifika ÜRETİLMEZ. İz bırak ki sahte instant-complete tespit edilebilsin.
       logger.warn('SCORM Tracking', 'Şüpheli hızlı SCORM tamamlama — geçiş/sertifika atlandı', {
@@ -163,7 +178,7 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
       })
     }
 
-    if ((status === 'passed' || status === 'completed') && engaged) {
+    if (passed && engaged) {
       // D1a — SCORM tamamlandı/geçti → assignment'ı 'passed' yap. Eskiden SCORM
       // tamamlanması assignment durumunu HİÇ güncellemiyordu (rapor/dashboard'da
       // personel "atandı"da kalıyordu). State machine üzerinden: assigned ise önce

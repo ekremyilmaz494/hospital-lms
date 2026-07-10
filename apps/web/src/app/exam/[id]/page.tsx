@@ -56,12 +56,15 @@ export default async function ExamEntrypoint({ params }: { params: Promise<{ id:
   // 4. SCORM eğitimi: kendi sayfasına (pre/post exam akışı geçerli değil)
   // `scormEntryPoint` null değilse SCORM paketi yüklenmiş demektir
   // (scorm/page.tsx:91 ve content/[...path]/route.ts:51 ile aynı tespit pattern'i).
+  // NOT: SCORM alt-route'ları (info/content/tracking) id'yi TRAININGID olarak alır
+  // (ScormAttempt'in doğal anahtarı: user×training). Bu yüzden buradan assignmentId
+  // DEĞİL trainingId ile yönlendirilir — aksi halde tracking/content 404/403 verir.
   const training = await prisma.training.findFirst({
     where: { id: state.assignment.trainingId, organizationId: dbUser.organizationId },
     select: { scormEntryPoint: true },
   });
   if (training?.scormEntryPoint) {
-    redirect(`/exam/${examId}/scorm`);
+    redirect(`/exam/${state.assignment.trainingId}/scorm`);
   }
 
   // 5. Hiç attempt yoksa: pre-exam'a (tek mutasyon noktası — POST /start orada)

@@ -177,7 +177,11 @@ const nextConfig: NextConfig = {
   ],
   headers: async () => [
     {
-      source: '/(.*)',
+      // SCORM içerik yolu (/api/exam/{id}/scorm/content/*) HARİÇ tüm rotalar. SCORM
+      // paketleri aynı origin'den iframe içinde çalışmalı (SCORM API keşfi same-origin
+      // ister) → o path'e ayrı, çerçevelemeye izin veren kural aşağıda. Diğer her yer
+      // DENY + frame-ancestors 'none' (clickjacking koruması) olarak KALIR.
+      source: '/((?!api/exam/[^/]+/scorm/content/).*)',
       headers: [
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -221,6 +225,38 @@ const nextConfig: NextConfig = {
             "worker-src 'self' blob:",
             "manifest-src 'self'",
             "frame-ancestors 'none'",
+          ].join('; '),
+        },
+      ],
+    },
+    {
+      // SCORM içerik yolu — admin-yüklenen paket dosyaları (HTML/JS) same-origin
+      // iframe'de çalışır (SCORM API keşfi için zorunlu). Global DENY yerine SAMEORIGIN
+      // + frame-ancestors 'self' → yalnız KENDİ player sayfamız çerçeveleyebilir
+      // (üçüncü-taraf clickjacking hâlâ engelli). SCO'lar inline script/eval kullanır →
+      // script-src gevşetilir; bu path yalnız paket varlıklarını sunar. Diğer güvenlik
+      // başlıkları (nosniff/HSTS/Referrer) parite için tekrar eklenir. Güven sınırı:
+      // yükleme admin-only + org-scope; ayrıntı docs/scorm.md.
+      source: '/api/exam/:id/scorm/content/:path*',
+      headers: [
+        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        {
+          key: 'Content-Security-Policy',
+          value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "media-src 'self' data: blob:",
+            "font-src 'self' data:",
+            "connect-src 'self'",
+            "frame-src 'self'",
+            "worker-src 'self' blob:",
+            "frame-ancestors 'self'",
           ].join('; '),
         },
       ],

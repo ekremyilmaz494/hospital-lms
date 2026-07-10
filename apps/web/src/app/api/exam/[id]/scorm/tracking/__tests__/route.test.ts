@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * Tümü state machine üzerinden (bypass yok), org-filtreli, atomik guard + audit.
  */
 
-const { prismaMock, auditMock, rateLimitMock } = vi.hoisted(() => ({
+const { prismaMock, auditMock, rateLimitMock, checkFeatureMock } = vi.hoisted(() => ({
   prismaMock: {
     trainingAssignment: { findFirst: vi.fn(), updateMany: vi.fn() },
     scormAttempt: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
@@ -20,10 +20,12 @@ const { prismaMock, auditMock, rateLimitMock } = vi.hoisted(() => ({
   },
   auditMock: vi.fn().mockResolvedValue(undefined),
   rateLimitMock: vi.fn().mockResolvedValue(true),
+  checkFeatureMock: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }))
 vi.mock('@/lib/redis', () => ({ checkRateLimit: rateLimitMock }))
+vi.mock('@/lib/feature-gate', () => ({ checkFeature: checkFeatureMock }))
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }))
 vi.mock('@/lib/api-helpers', () => ({
   jsonResponse: (data: unknown, status = 200) => Response.json(data as object, { status }),
@@ -70,11 +72,28 @@ const params = () => ({ params: Promise.resolve({ id: TRAINING_ID }) })
 beforeEach(() => {
   vi.clearAllMocks()
   rateLimitMock.mockResolvedValue(true)
+  checkFeatureMock.mockResolvedValue(true)
   prismaMock.scormAttempt.create.mockResolvedValue({ id: 'scorm-1', attemptId: 'att-1' })
   prismaMock.scormAttempt.update.mockResolvedValue({ id: 'scorm-1' })
   prismaMock.trainingAssignment.updateMany.mockResolvedValue({ count: 1 })
   // Sertifika bloğunu izole et: mevcut cert var → cert üretimi atlanır.
   prismaMock.certificate.findFirst.mockResolvedValue({ id: 'cert-1' })
+})
+
+describe('SCORM tracking — feature gate (scormSupport)', () => {
+  it('feature kapalıysa POST 403 döner ve attempt oluşturulmaz', async () => {
+    checkFeatureMock.mockResolvedValue(false)
+    const res = await POST(postReq(), params())
+    expect(res.status).toBe(403)
+    expect(prismaMock.scormAttempt.create).not.toHaveBeenCalled()
+  })
+
+  it('feature kapalıysa PATCH 403 döner ve attempt güncellenmez', async () => {
+    checkFeatureMock.mockResolvedValue(false)
+    const res = await PATCH(patchReq({ lessonStatus: 'passed' }), params())
+    expect(res.status).toBe(403)
+    expect(prismaMock.scormAttempt.update).not.toHaveBeenCalled()
+  })
 })
 
 describe('POST /scorm/tracking — oturum başlat (D1a)', () => {
@@ -183,6 +202,44 @@ describe('PATCH /scorm/tracking — tamamlanma → assignment passed (D1a)', () 
     expect(prismaMock.trainingAssignment.updateMany).not.toHaveBeenCalled()
   })
 
+  it("SCORM 2004: completionStatus 'completed' (lessonStatus YOK) → passed geçişi (regresyon)", async () => {
+    // 2004 client'ı lesson_status HİÇ göndermez → completion_status ile geçiş kurulmalı.
+    prismaMock.trainingAssignment.findFirst.mockResolvedValue({ id: 'asg-1', status: 'in_progress' })
+
+    const res = await PATCH(patchReq({ completionStatus: 'completed' }), params())
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.trainingAssignment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'passed' } }),
+    )
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({ action: 'scorm.assignment_passed' }))
+  })
+
+  it("SCORM 2004: completion 'completed' AMA success 'failed' → geçiş YOK (başarısızlık önceliği)", async () => {
+    prismaMock.trainingAssignment.findFirst.mockResolvedValue({ id: 'asg-1', status: 'in_progress' })
+
+    const res = await PATCH(patchReq({ completionStatus: 'completed', successStatus: 'failed' }), params())
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.trainingAssignment.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('anti-cheat: <30sn şüpheli hızlı tamamlama → geçiş/sertifika ATLANIR', async () => {
+    // Attempt 5sn önce başladı (< MIN_SCORM_ENGAGEMENT_SECONDS=30) → passed olsa bile geçiş yok.
+    prismaMock.scormAttempt.findFirst.mockResolvedValue({
+      id: 'scorm-1', lessonStatus: 'incomplete', suspendData: null, score: null,
+      totalTime: null, completionStatus: null, successStatus: null,
+      createdAt: new Date(Date.now() - 5_000),
+    })
+    prismaMock.trainingAssignment.findFirst.mockResolvedValue({ id: 'asg-1', status: 'in_progress' })
+
+    const res = await PATCH(patchReq({ lessonStatus: 'passed' }), params())
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.trainingAssignment.updateMany).not.toHaveBeenCalled()
+    expect(auditMock).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'scorm.assignment_passed' }))
+  })
+
   it('rate limit aşılırsa 429 döner', async () => {
     rateLimitMock.mockResolvedValue(false)
 
@@ -248,5 +305,16 @@ describe('PATCH /scorm/tracking — sertifika üretimi (D1b)', () => {
 
     expect(res.status).toBe(200)
     expect(prismaMock.certificate.create).not.toHaveBeenCalled()
+  })
+
+  it("SCORM 2004: completionStatus 'completed' (lessonStatus YOK) → sertifika üretilir (regresyon)", async () => {
+    prismaMock.examAttempt.findFirst.mockResolvedValue(null)
+
+    const res = await PATCH(patchReq({ completionStatus: 'completed' }), params())
+
+    expect(res.status).toBe(200)
+    const data = prismaMock.certificate.create.mock.calls[0][0].data
+    expect(data.scormAttemptId).toBe('scorm-1')
+    expect(data.attemptId).toBeUndefined()
   })
 })

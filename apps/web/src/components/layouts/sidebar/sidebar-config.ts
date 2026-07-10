@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   TrendingUp,
   Library,
+  Package,
   ClipboardCheck,
   ClipboardList,
   Activity,
@@ -44,6 +45,11 @@ export interface NavItem {
    * (SKS uyum gibi sektör özel kalemleri) sadece ilgili sektörlerde görünür.
    */
   sectors?: Sector[];
+  /**
+   * Yalnız bu plan feature'ı açıkken göster. `undefined` → her zaman görünür.
+   * SCORM menüsü orgun SubscriptionPlan.hasScormSupport'una göre gizlenir.
+   */
+  requiresFeature?: 'scormSupport';
 }
 
 export interface NavGroup {
@@ -61,6 +67,22 @@ export function filterNavBySector(groups: NavGroup[], sector: Sector): NavGroup[
     .map((g) => ({
       ...g,
       items: g.items.filter((it) => !it.sectors || it.sectors.includes(sector)),
+    }))
+    .filter((g) => g.items.length > 0);
+}
+
+/**
+ * Plan-feature'a bağlı nav item'larını filtrele.
+ * `requiresFeature` tanımsız → her zaman görünür. Boş kalan group'lar listeden düşer.
+ */
+export function filterNavByFeatures(
+  groups: NavGroup[],
+  features: { scormSupport?: boolean },
+): NavGroup[] {
+  return groups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((it) => !it.requiresFeature || features[it.requiresFeature] === true),
     }))
     .filter((g) => g.items.length > 0);
 }
@@ -148,6 +170,7 @@ export const adminNav: NavGroup[] = [
         ],
       },
       { title: 'Medya Kütüphanesi', href: '/admin/media-library', icon: Library },
+      { title: 'SCORM Eğitimleri', href: '/admin/scorm', icon: Package, requiresFeature: 'scormSupport' },
       { title: 'Eğitim Dönemleri', href: '/admin/training-periods', icon: Calendar },
     ],
   },

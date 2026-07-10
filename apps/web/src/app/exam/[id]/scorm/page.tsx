@@ -5,6 +5,8 @@ import { useFetch } from '@/hooks/use-fetch'
 import { PageLoading } from '@/components/shared/page-loading'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { AlertTriangle, CheckCircle2, LogOut, Play, ArrowLeft } from 'lucide-react'
+import { createScormApi, type ScormTrackingFields } from '@/lib/scorm/api-factory'
+import type { ScormVersion } from '@/lib/scorm/timespan'
 
 interface TrainingInfo {
   id: string
@@ -12,6 +14,7 @@ interface TrainingInfo {
   description: string | null
   category: string | null
   scormEntryPoint: string | null
+  scormVersion: string | null
 }
 
 interface ScormAttempt {
@@ -27,19 +30,10 @@ interface ScormAttempt {
 
 declare global {
   interface Window {
-    API?: ScormAPI
+    // SCORM SCO'ları LMS API'sini window zincirinde arar (1.2: API, 2004: API_1484_11).
+    API?: unknown
+    API_1484_11?: unknown
   }
-}
-
-interface ScormAPI {
-  LMSInitialize: (param: string) => string
-  LMSGetValue: (key: string) => string
-  LMSSetValue: (key: string, value: string) => string
-  LMSCommit: (param: string) => string
-  LMSFinish: (param: string) => string
-  LMSGetLastError: () => string
-  LMSGetErrorString: (code: string) => string
-  LMSGetDiagnostic: (code: string) => string
 }
 
 export default function ScormPlayerPage() {
@@ -60,7 +54,7 @@ export default function ScormPlayerPage() {
     attemptRef.current = attempt
   }, [attempt])
 
-  const patchAttempt = useCallback(async (data: Record<string, unknown>) => {
+  const patchAttempt = useCallback(async (data: ScormTrackingFields) => {
     try {
       const res = await fetch(`/api/exam/${id}/scorm/tracking`, {
         method: 'PATCH',
@@ -78,7 +72,7 @@ export default function ScormPlayerPage() {
     return null
   }, [id])
 
-  const debouncedPatch = useCallback((data: Record<string, unknown>) => {
+  const debouncedPatch = useCallback((data: ScormTrackingFields) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => { patchAttempt(data) }, 2000)
   }, [patchAttempt])
@@ -126,79 +120,51 @@ export default function ScormPlayerPage() {
     initAttempt()
   }, [training, id])
 
+  // Çıkışta finish/terminate çağrısı için (buton unmount'tan önce çağırır).
+  const terminateRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
     if (status !== 'ready') return
 
-    const cmiData: Record<string, string> = {
-      'cmi.core.student_id': '',
-      'cmi.core.student_name': '',
-      'cmi.core.lesson_status': attemptRef.current?.lessonStatus || 'not attempted',
-      'cmi.core.score.raw': attemptRef.current?.score?.toString() || '',
-      'cmi.core.score.min': '0',
-      'cmi.core.score.max': '100',
-      'cmi.core.total_time': attemptRef.current?.totalTime || '0000:00:00',
-      'cmi.core.lesson_location': '',
-      'cmi.core.exit': '',
-      'cmi.suspend_data': attemptRef.current?.suspendData || '',
-      'cmi.core.session_time': '0000:00:00',
-      'cmi.completion_status': attemptRef.current?.completionStatus || 'unknown',
-      'cmi.success_status': attemptRef.current?.successStatus || 'unknown',
-    }
+    const a = attemptRef.current
+    const version: ScormVersion = training?.scormVersion === '2004' ? '2004' : '1.2'
 
-    const api: ScormAPI = {
-      LMSInitialize: () => 'true',
-      LMSGetValue: (key: string) => cmiData[key] ?? '',
-      LMSSetValue: (key: string, value: string) => {
-        cmiData[key] = value
-        const patchData: Record<string, unknown> = {}
-        if (key === 'cmi.core.lesson_status') patchData.lessonStatus = value
-        else if (key === 'cmi.core.score.raw') patchData.score = parseFloat(value) || 0
-        else if (key === 'cmi.core.total_time' || key === 'cmi.core.session_time') patchData.totalTime = value
-        else if (key === 'cmi.suspend_data') patchData.suspendData = value
-        else if (key === 'cmi.completion_status') patchData.completionStatus = value
-        else if (key === 'cmi.success_status') patchData.successStatus = value
-        if (Object.keys(patchData).length > 0) debouncedPatch(patchData)
-        if (key === 'cmi.core.lesson_status' && (value === 'passed' || value === 'completed')) {
-          setStatus('completed')
-        }
-        return 'true'
+    const created = createScormApi({
+      version,
+      initial: {
+        lessonStatus: a?.lessonStatus ?? null,
+        score: a?.score ?? null,
+        totalTime: a?.totalTime ?? null,
+        suspendData: a?.suspendData ?? null,
+        completionStatus: a?.completionStatus ?? null,
+        successStatus: a?.successStatus ?? null,
       },
-      LMSCommit: () => {
+      onPersist: (fields) => debouncedPatch(fields),
+      onCommit: (fields) => {
         if (debounceTimer.current) clearTimeout(debounceTimer.current)
-        const data: Record<string, unknown> = {}
-        if (cmiData['cmi.core.lesson_status']) data.lessonStatus = cmiData['cmi.core.lesson_status']
-        if (cmiData['cmi.core.score.raw']) data.score = parseFloat(cmiData['cmi.core.score.raw']) || 0
-        if (cmiData['cmi.suspend_data']) data.suspendData = cmiData['cmi.suspend_data']
-        if (cmiData['cmi.core.total_time']) data.totalTime = cmiData['cmi.core.total_time']
-        if (cmiData['cmi.completion_status']) data.completionStatus = cmiData['cmi.completion_status']
-        if (cmiData['cmi.success_status']) data.successStatus = cmiData['cmi.success_status']
-        patchAttempt(data)
-        return 'true'
+        patchAttempt(fields)
       },
-      LMSFinish: () => {
-        if (debounceTimer.current) clearTimeout(debounceTimer.current)
-        const data: Record<string, unknown> = {}
-        if (cmiData['cmi.core.lesson_status']) data.lessonStatus = cmiData['cmi.core.lesson_status']
-        if (cmiData['cmi.core.score.raw']) data.score = parseFloat(cmiData['cmi.core.score.raw']) || 0
-        if (cmiData['cmi.suspend_data']) data.suspendData = cmiData['cmi.suspend_data']
-        if (cmiData['cmi.core.total_time']) data.totalTime = cmiData['cmi.core.total_time']
-        if (cmiData['cmi.completion_status']) data.completionStatus = cmiData['cmi.completion_status']
-        if (cmiData['cmi.success_status']) data.successStatus = cmiData['cmi.success_status']
-        patchAttempt(data)
-        return 'true'
-      },
-      LMSGetLastError: () => '0',
-      LMSGetErrorString: () => '',
-      LMSGetDiagnostic: () => '',
-    }
+      onComplete: () => setStatus('completed'),
+    })
 
-    window.API = api
+    // SCO'nun window zincirinde bulacağı global'i tak (1.2: API, 2004: API_1484_11).
+    const w = window as unknown as Record<string, unknown>
+    w[created.globalName] = created.api
+
+    terminateRef.current = () => {
+      if (created.globalName === 'API_1484_11') {
+        ;(created.api as { Terminate: (p: string) => string }).Terminate('')
+      } else {
+        ;(created.api as { LMSFinish: (p: string) => string }).LMSFinish('')
+      }
+    }
 
     return () => {
-      delete window.API
+      delete w[created.globalName]
+      terminateRef.current = null
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
     }
-  }, [status, debouncedPatch, patchAttempt])
+  }, [status, training?.scormVersion, debouncedPatch, patchAttempt])
 
   if (isLoading) return <PageLoading />
 
@@ -275,7 +241,7 @@ export default function ScormPlayerPage() {
           </span>
           <button
             onClick={() => {
-              if (window.API) window.API.LMSFinish('')
+              terminateRef.current?.()
               router.back()
             }}
             className="sc-exit-btn"

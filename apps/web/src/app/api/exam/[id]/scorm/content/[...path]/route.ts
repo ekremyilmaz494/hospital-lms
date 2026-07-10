@@ -2,44 +2,17 @@ import { errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
-import { s3 } from '@/lib/s3'
+import { s3, s3Internal } from '@/lib/s3'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
-import { Readable } from 'stream'
+import { scormContentType } from '@/lib/scorm/mime'
+import { sanitizeEntryPath } from '@/lib/scorm/extract'
+import { checkFeature } from '@/lib/feature-gate'
+import { SCORM_FEATURE_DISABLED_MSG } from '@/lib/scorm/config'
 
 const BUCKET = process.env.AWS_S3_BUCKET!
 
-/** Map file extension to Content-Type */
-function getContentType(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
-  const types: Record<string, string> = {
-    html: 'text/html',
-    htm: 'text/html',
-    js: 'application/javascript',
-    css: 'text/css',
-    json: 'application/json',
-    xml: 'application/xml',
-    png: 'image/png',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    gif: 'image/gif',
-    svg: 'image/svg+xml',
-    webp: 'image/webp',
-    mp3: 'audio/mpeg',
-    mp4: 'video/mp4',
-    webm: 'video/webm',
-    woff: 'font/woff',
-    woff2: 'font/woff2',
-    ttf: 'font/ttf',
-    eot: 'application/vnd.ms-fontobject',
-    swf: 'application/x-shockwave-flash',
-    xsd: 'application/xml',
-    dtd: 'application/xml-dtd',
-  }
-  return types[ext] ?? 'application/octet-stream'
-}
-
-/** GET /api/exam/[id]/scorm/content/[...path] — Serve SCORM package files */
-export const GET = withStaffRoute<{ id: string; path: string[] }>(async ({ params, dbUser, organizationId }) => {
+/** GET /api/exam/[id]/scorm/content/[...path] — Serve SCORM package files (Range destekli) */
+export const GET = withStaffRoute<{ id: string; path: string[] }>(async ({ request, params, dbUser, organizationId }) => {
   const { id: trainingId, path: pathSegments } = params
 
   try {
@@ -52,15 +25,17 @@ export const GET = withStaffRoute<{ id: string; path: string[] }>(async ({ param
       return errorResponse('SCORM içeriği bulunamadı', 404)
     }
 
-    // Org isolation
+    // Org izolasyonu (super_admin muaf — önizleme).
     if (dbUser.role !== 'super_admin' && training.organizationId !== organizationId) {
       return errorResponse('Bu içeriği görüntüleme yetkiniz yok', 403)
     }
 
-    // Atama sahipliği — org izolasyonu tek başına yetmez: aynı org'daki ama bu eğitime
-    // ATANMAMIŞ personel SCORM paketinin dosyalarını çekebiliyordu (IDOR). videos/route.ts:58
-    // ile aynı sınır. Yalnız 'staff' için zorlanır; admin/super_admin önizleme yapabilsin
-    // (onların ataması olmaz, org guard zaten super_admin'i muaf tutuyor).
+    // Feature gate — org'un planında SCORM kapalıysa içerik sunma.
+    const enabled = await checkFeature(training.organizationId, 'scormSupport')
+    if (!enabled) return errorResponse(SCORM_FEATURE_DISABLED_MSG, 403)
+
+    // Atama sahipliği — org izolasyonu tek başına yetmez (IDOR): aynı org'daki ama
+    // ATANMAMIŞ personel dosyaları çekemesin. Yalnız 'staff' için; admin/super_admin önizleyebilir.
     if (dbUser.role === 'staff') {
       const assignment = await prisma.trainingAssignment.findFirst({
         where: { trainingId, userId: dbUser.id },
@@ -71,47 +46,45 @@ export const GET = withStaffRoute<{ id: string; path: string[] }>(async ({ param
       }
     }
 
-    // Extract base path from manifest path (directory containing imsmanifest.xml)
+    // Manifest dizini = base; istenen göreli yolu zip-slip'e karşı normalize et.
     const basePath = training.scormManifestPath.replace(/\/[^/]+$/, '')
-    const filePath = pathSegments.join('/')
-
-    // Prevent path traversal
-    if (filePath.includes('..')) {
+    const safeRel = sanitizeEntryPath(pathSegments.join('/'))
+    if (!safeRel) {
       return errorResponse('Geçersiz dosya yolu', 400)
     }
+    const s3Key = `${basePath}/${safeRel}`
 
-    const s3Key = `${basePath}/${filePath}`
-
+    // Range desteği: SCO gömülü mp4/mp3'ünde seek için 206 Partial Content.
+    const rangeHeader = request.headers.get('range') ?? undefined
     const command = new GetObjectCommand({
       Bucket: BUCKET,
       Key: s3Key,
+      ...(rangeHeader ? { Range: rangeHeader } : {}),
     })
 
-    const response = await s3.send(command)
-
-    if (!response.Body) {
+    const s3res = await (s3Internal ?? s3).send(command)
+    if (!s3res.Body) {
       return errorResponse('Dosya bulunamadı', 404)
     }
 
-    // Convert S3 stream to buffer
-    const chunks: Uint8Array[] = []
-    const readable = response.Body as Readable
-    for await (const chunk of readable) {
-      chunks.push(chunk as Uint8Array)
+    const webStream = s3res.Body.transformToWebStream()
+    const headers: Record<string, string> = {
+      'Content-Type': scormContentType(safeRel),
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'private, max-age=3600',
     }
-    const buffer = Buffer.concat(chunks)
-
-    const contentType = getContentType(filePath)
-
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Length': String(buffer.length),
-        'Cache-Control': 'private, max-age=3600',
-      },
-    })
+    if (typeof s3res.ContentLength === 'number') {
+      headers['Content-Length'] = String(s3res.ContentLength)
+    }
+    if (rangeHeader && s3res.ContentRange) {
+      headers['Content-Range'] = s3res.ContentRange
+      return new Response(webStream, { status: 206, headers })
+    }
+    return new Response(webStream, { status: 200, headers })
   } catch (err) {
+    const httpStatus = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode
+    if (httpStatus === 404) return errorResponse('Dosya bulunamadı', 404)
+    if (httpStatus === 416) return errorResponse('Geçersiz aralık', 416)
     logger.error('SCORM Content', 'SCORM dosyasi sunulamadi', err)
     return errorResponse('SCORM icerigi yuklenemedi', 500)
   }
