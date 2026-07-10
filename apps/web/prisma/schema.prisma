@@ -816,7 +816,7 @@ model AuditLog {
 // ve demo talep formu buraya yazılır. organizationId YOK — henüz müşteri olmayan
 // kişilerden gelir. Sadece super_admin görür (RLS: super_admin_contact_messages_all).
 model ContactMessage {
-  id           String    @id @default(uuid()) @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   source       String    @default("contact") @db.VarChar(30) // 'contact' | 'demo'
   name         String    @db.VarChar(200)
   email        String    @db.VarChar(200)
