@@ -261,9 +261,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Org pasif/askıya alınmışsa (örn. demo iptali) giriş ekranında temiz ret — super_admin muaf.
-    // checkOrgActive (api-helpers.ts) ile birebir aynı kural/mesaj; aksi halde kullanıcı girip
-    // her API'den 403 alırdı.
-    if ((!dbUser.organization?.isActive || dbUser.organization?.isSuspended) && dbUser.role !== 'super_admin') {
+    // checkOrgActive (api-helpers.ts) ile birebir aynı kural/mesaj: org'u OLMAYAN kullanıcı
+    // (super_admin VEYA grup yöneticisi, organizationId=null) muaf — aksi halde `organization`
+    // relation null olduğu için grup yöneticisi (esas yönetici) girişte yanlışlıkla "askıya
+    // alındı" 403'ü alırdı (checkOrgActive `!organizationId` ile short-circuit ediyor, burası etmiyordu).
+    if (dbUser.organizationId && (!dbUser.organization?.isActive || dbUser.organization?.isSuspended) && dbUser.role !== 'super_admin') {
       return jsonResponse(
         { error: 'Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.' },
         403
