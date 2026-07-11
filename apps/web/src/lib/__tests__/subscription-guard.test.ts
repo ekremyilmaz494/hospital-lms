@@ -18,6 +18,9 @@ vi.mock('@/lib/prisma', () => ({
     training: {
       count: vi.fn(),
     },
+    organizationMembership: {
+      count: vi.fn(),
+    },
   },
 }))
 
@@ -50,6 +53,7 @@ const mockFindUnique = prisma.organizationSubscription.findUnique as ReturnType<
 const mockUserCount = prisma.user.count as ReturnType<typeof vi.fn>
 const mockInviteCount = prisma.invitation.count as ReturnType<typeof vi.fn>
 const mockTrainingCount = prisma.training.count as ReturnType<typeof vi.fn>
+const mockMembershipCount = prisma.organizationMembership.count as ReturnType<typeof vi.fn>
 const mockIsOnPrem = isOnPrem as ReturnType<typeof vi.fn>
 const mockGetLicenseState = getLicenseState as ReturnType<typeof vi.fn>
 
@@ -60,6 +64,7 @@ beforeEach(() => {
   // Sensible defaults — testler kendi ihtiyacına göre ezer.
   mockOrgFindUnique.mockResolvedValue({ maxStaff: null })
   mockInviteCount.mockResolvedValue(0)
+  mockMembershipCount.mockResolvedValue(0) // varsayılan: ortak personel yok (tekil-org paritesi)
   mockIsOnPrem.mockReturnValue(false) // varsayılan bulut; on-prem bloğu ezer
   mockGetLicenseState.mockResolvedValue({ state: 'VALID', limits: null })
 })
@@ -289,6 +294,29 @@ describe('countStaffSeats — aktif personel + bekleyen davet', () => {
     expect(mockInviteCount).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ role: 'staff' }) }),
     )
+  })
+
+  it('ortak personel üyeliklerini de sayar (çok-hastaneli grup — her hastane ayrı koltuk)', async () => {
+    mockUserCount.mockResolvedValue(140)
+    mockInviteCount.mockResolvedValue(8)
+    mockMembershipCount.mockResolvedValue(5) // 5 paylaşılan çalışan bu hastaneye EK-bağlı
+
+    expect(await countStaffSeats(ORG_ID)).toBe(153) // 140 + 8 + 5
+
+    // Üyelik sayımı org-scope + role=staff + aktif olmalı (disjoint invariant → çift saymaz).
+    expect(mockMembershipCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: ORG_ID, role: 'staff', isActive: true }),
+      }),
+    )
+  })
+
+  it('üyelik yokken tekil-org paritesi korunur (+0)', async () => {
+    mockUserCount.mockResolvedValue(100)
+    mockInviteCount.mockResolvedValue(0)
+    mockMembershipCount.mockResolvedValue(0)
+
+    expect(await countStaffSeats(ORG_ID)).toBe(100)
   })
 })
 

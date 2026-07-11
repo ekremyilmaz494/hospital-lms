@@ -225,13 +225,18 @@ export async function resolveStaffLimit(organizationId: string): Promise<number 
  */
 export async function countStaffSeats(organizationId: string): Promise<number> {
   const now = new Date()
-  const [staff, pendingInvites] = await Promise.all([
+  const [staff, pendingInvites, memberships] = await Promise.all([
     prisma.user.count({ where: { organizationId, role: 'staff', isActive: true } }),
     prisma.invitation.count({
       where: { organizationId, role: 'staff', acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
     }),
+    // Ortak personel (çok-hastaneli grup): bu hastaneye ÜYELİKLE (EK) bağlı aktif staff da
+    // koltuk tüketir → her hastane paylaşılan çalışan için AYRI seat öder (doğru faturalama).
+    // Invariant (membership.org ≠ primary org) sayesinde primary staff ile disjoint → çift saymaz.
+    // Faz 2.2'de üyelik boş → +0 (inert); provizyon (Faz 2.3) açılınca canlanır.
+    prisma.organizationMembership.count({ where: { organizationId, role: 'staff', isActive: true } }),
   ])
-  return staff + pendingInvites
+  return staff + pendingInvites + memberships
 }
 
 /**
@@ -249,13 +254,16 @@ async function checkOnPremStaffLicenseLimit(adding: number): Promise<Response | 
   // Deaktif personel koltuk tüketmez; bekleyen davetler sayılır (countStaffSeats ile
   // aynı semantik ama GLOBAL kapsam — org filtresi yok).
   const now = new Date()
-  const [staff, pendingInvites] = await Promise.all([
+  const [staff, pendingInvites, memberships] = await Promise.all([
     prisma.user.count({ where: { role: 'staff', isActive: true } }),
     prisma.invitation.count({
       where: { role: 'staff', acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
     }),
+    // Ortak personel üyelikleri de global lisans koltuğu tüketir (her hastane-koltuğu ayrı).
+    // Faz 2.2'de üyelik boş → +0 (inert). On-prem çok-hastaneli grup ender; provizyonla canlanır.
+    prisma.organizationMembership.count({ where: { role: 'staff', isActive: true } }),
   ])
-  const used = staff + pendingInvites
+  const used = staff + pendingInvites + memberships
   if (used + adding <= max) return null
 
   const remaining = Math.max(0, max - used)

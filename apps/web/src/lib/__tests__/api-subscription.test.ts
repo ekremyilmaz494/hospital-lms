@@ -9,6 +9,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { count: vi.fn() },
     invitation: { count: vi.fn() },
     training: { count: vi.fn() },
+    organizationMembership: { count: vi.fn() },
   },
 }))
 
@@ -43,6 +44,7 @@ beforeEach(() => {
   // Limit çözümü plan.maxStaff'a düşer (mevcut testlerin beklentisi korunur).
   mockOrgFindUnique.mockResolvedValue({ maxStaff: null })
   mockInviteCount.mockResolvedValue(0)
+  ;(prisma.organizationMembership.count as ReturnType<typeof vi.fn>).mockResolvedValue(0)
 })
 
 // ── Tests ──
