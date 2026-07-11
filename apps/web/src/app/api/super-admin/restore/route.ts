@@ -376,6 +376,16 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
         const o = backupData.organization as Record<string, unknown>
         // id ve ilişki alanlarını ayır
         const { id: _id, createdAt: _ca, updatedAt: _ua, ...orgUpdate } = o
+        // group_id yedekte var ama OrganizationGroup yedeğe GİRMEZ (INTENTIONALLY_EXCLUDED) →
+        // yedek alındıktan sonra grup silinip/çözülmüşse group_id dangling FK olur ve TÜM restore
+        // rollback ederdi. Grup hâlâ var mı kontrol et; yoksa null'la + logla (restore kırılmasın).
+        if (orgUpdate.groupId) {
+          const groupExists = await tx.organizationGroup.findUnique({ where: { id: orgUpdate.groupId as string }, select: { id: true } })
+          if (!groupExists) {
+            logger.warn('Restore', 'Yedekteki hastane grubu artık mevcut değil — org group_id NULL yapıldı', { orgId, staleGroupId: orgUpdate.groupId })
+            orgUpdate.groupId = null
+          }
+        }
         await tx.organization.update({
           where: { id: orgId },
           data: orgUpdate as Parameters<typeof tx.organization.update>[0]['data'],
@@ -476,8 +486,26 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
 
       // v6 — Ortak personel üyelikleri: User (yukarıda upsert) + Department (yukarıda upsert)
       // gerektirir → ikisinden SONRA. createMany tek round-trip (unique [user,org] yeniden kurulur).
+      //
+      // KRİTİK DR NÜANSI: üyelik ADITIF/disjoint'tir — membership.userId'nin PRIMARY org'u BAŞKA
+      // hastanedir (invariant), dolayısıyla bu org yedeğinin `users` dizisinde YOKTUR. Çok-org
+      // felaket kurtarmada o kullanıcının org'u henüz restore edilmemişse createMany user_id FK'sını
+      // ihlal edip TÜM restore'u rollback ederdi. Bu yüzden yalnız DB'de var olan user'a işaret eden
+      // üyelikleri ekle; kullanıcısı henüz gelmemiş olanları ATLA + logla (hard-fail → soft-skip).
+      // (Tam restore'da tüm org'lar geri geldiğinde re-link ayrı bir adım — bkz. Track 2 aktivasyonu.)
       if (backupData.organizationMemberships?.length) {
-        await tx.organizationMembership.createMany({ data: backupData.organizationMemberships as NonNullable<Parameters<typeof tx.organizationMembership.createMany>[0]>['data'] })
+        const rawMemberships = backupData.organizationMemberships as Array<Record<string, unknown>>
+        const memberUserIds = [...new Set(rawMemberships.map((m) => m.userId as string).filter(Boolean))]
+        const existingUsers = await tx.user.findMany({ where: { id: { in: memberUserIds } }, select: { id: true } })
+        const existingUserIdSet = new Set(existingUsers.map((u) => u.id))
+        const insertable = rawMemberships.filter((m) => existingUserIdSet.has(m.userId as string))
+        const skipped = rawMemberships.length - insertable.length
+        if (skipped > 0) {
+          logger.warn('Restore', 'Bazı ortak-personel üyelikleri atlandı (kullanıcı bu restore\'da yok — çok-org DR sırası)', { orgId, skipped, inserted: insertable.length })
+        }
+        if (insertable.length > 0) {
+          await tx.organizationMembership.createMany({ data: insertable as NonNullable<Parameters<typeof tx.organizationMembership.createMany>[0]>['data'] })
+        }
       }
 
       // ── v4 Tier-B: User / Tier-A parent gerektiren modeller (Training'den ÖNCE) ──
