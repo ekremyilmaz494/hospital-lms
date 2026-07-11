@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/auth-store';
 import { usePresenceTracker } from '@/hooks/use-presence-tracker';
 import { extractAdminAccess } from '@/lib/auth/admin-authority';
+import { extractGroupClaims } from '@/lib/auth/group-authority';
 import type { User } from '@/types/database';
 
 const DB_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 dakika — deaktive kullanıcı penceresi
@@ -98,6 +99,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           role: user.app_metadata?.role ?? user.user_metadata?.role ?? 'staff',
           // JWT app_metadata'dan — middleware ile AYNI kaynak (layout↔middleware tutarlılığı).
           adminAccessGranted: extractAdminAccess(user.app_metadata),
+          groupOwner: extractGroupClaims(user.app_metadata).groupOwner,
+          groupId: extractGroupClaims(user.app_metadata).groupId,
           organizationId: user.app_metadata?.organization_id ?? user.user_metadata?.organization_id ?? null,
           phone: user.user_metadata?.phone ?? null,
           departmentId: user.user_metadata?.department_id ?? null,
@@ -146,6 +149,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
               lastName: u.user_metadata?.last_name ?? '',
               role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
               adminAccessGranted: extractAdminAccess(u.app_metadata),
+              groupOwner: extractGroupClaims(u.app_metadata).groupOwner,
+              groupId: extractGroupClaims(u.app_metadata).groupId,
               organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
               phone: u.user_metadata?.phone ?? null,
               departmentId: u.user_metadata?.department_id ?? null,

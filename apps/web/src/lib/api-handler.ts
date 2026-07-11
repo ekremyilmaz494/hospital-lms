@@ -28,6 +28,8 @@ import type { UserRole } from '@/types/database'
 import { logger } from '@/lib/logger'
 import { licenseApiGate, isReadonlyWriteExempt } from '@/lib/license/enforcement'
 import { readActingOrgCookie, verifyActingOrgToken } from '@/lib/auth/acting-org'
+import { hasGroupAuthority } from '@/lib/auth/group-authority'
+import { orgInOwnerGroup } from '@/lib/auth/group-drill-in'
 
 /** İstek URL'inden pathname çıkarır (parse hatasında boş string). */
 function pathOf(request: Request): string {
@@ -222,37 +224,50 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
         }
       }
 
-      // ── Süper-admin "Org panelini görüntüle" (salt-okunur acting-org) ──
-      // super_admin bir org'un /admin panelini görüntülerken, imzalı klx-acting-org
-      // cookie'si isteği o org'a scope'lar. Kendi süper-admin oturumu (sb-*-auth-token)
-      // ASLA değişmez → self-logout yok. PATH-GATE: yalnız /api/admin — /api/super-admin
-      // rotaları ve global süper-admin davranışı ETKİLENMEZ (cookie yoksa da tıpatıp aynı).
-      // Cookie her istekte taze okunur (dbUser authCache'ine dokunulmaz → bayatlık yok).
+      // ── Acting-org (drill-in) bağlam çözümü — İKİ MOD ──
+      //  super_admin_ro: super_admin bir org'un /admin panelini SALT-OKUNUR görüntüler (destek).
+      //  group_rw:       grup yöneticisi (esas yönetici) KENDİ grubundaki bir hastaneye TAM
+      //                  KONTROL ile girer (YAZMA açık). Hedef org owner'ın grubuna ait OLMALI.
+      // İmzalı klx-acting-org cookie'si isteği hedef org'a scope'lar; Supabase oturumu ASLA
+      // değişmez (self-logout yok). PATH-GATE: yalnız /api/admin. Cookie her istekte taze okunur.
       let actingOrgId: string | null = null
-      if (dbUser.role === 'super_admin' && pathname.startsWith('/api/admin')) {
-        actingOrgId = verifyActingOrgToken(readActingOrgCookie(request), dbUser.id, Date.now())
+      let actingMode: 'super_admin_ro' | 'group_rw' | null = null
+      if (pathname.startsWith('/api/admin')) {
+        const cookieOrgId = verifyActingOrgToken(readActingOrgCookie(request), dbUser.id, Date.now())
+        if (cookieOrgId) {
+          if (dbUser.role === 'super_admin') {
+            actingOrgId = cookieOrgId
+            actingMode = 'super_admin_ro'
+          } else if (dbUser.groupId && (await orgInOwnerGroup(cookieOrgId, dbUser.groupId))) {
+            // Grup yöneticisi + hedef org gerçekten grubuna ait → tam kontrol drill-in.
+            actingOrgId = cookieOrgId
+            actingMode = 'group_rw'
+          }
+        }
       }
       const effectiveOrgId = actingOrgId ?? dbUser.organizationId ?? null
 
-      // Salt-okunur ray — acting modda hiçbir tenant mutation'ı geçmez (GET dışı 403).
-      // super_admin normalde write-guard'dan muaf; bu ray o muafiyeti acting modda kapatır.
-      if (actingOrgId && WRITE_METHODS.has(request.method.toUpperCase())) {
+      // Salt-okunur ray — YALNIZ super_admin görüntüleme modunda (GET dışı 403). group_rw
+      // yazabilir (TAM KONTROL — kullanıcının onaylı kararı). super_admin normalde write-guard'dan
+      // muaftır; bu ray o muafiyeti görüntüleme modunda kapatır.
+      if (actingMode === 'super_admin_ro' && WRITE_METHODS.has(request.method.toUpperCase())) {
         return errorResponse('Salt-okunur: kuruluş görüntüleme modunda değişiklik yapılamaz.', 403)
       }
 
       // requireOrganization — org bağlamı yoksa tenant-scoped route'lara giremez.
-      // Cross-tenant write/impersonation hatalarını engeller. Acting-org bağlamı
-      // da geçerli bir org sağlar (effectiveOrgId), yoksa super_admin 94 GET
-      // admin rotasında 400 alırdı.
+      // Cross-tenant write/impersonation hatalarını engeller. Acting-org bağlamı da
+      // geçerli bir org sağlar (effectiveOrgId).
       if (requireOrganization && !effectiveOrgId) {
         return errorResponse('Bu işlem için bir kurum bağlamı gerekir', 400)
       }
 
-      // Write guard — super_admin exempt, GET serbest. On-prem READONLY'de bu
-      // yol lisans-güdümlüdür (subscription-guard on-prem dalı); aktif sınav
-      // ilerlemesi pathname ile muaf tutulur.
-      if (writeGuard && WRITE_METHODS.has(request.method.toUpperCase()) && dbUser.role !== 'super_admin' && dbUser.organizationId) {
-        const block = await checkWritePermission(dbUser.organizationId, request.method, { pathname })
+      // Write guard — super_admin exempt, GET serbest. group_rw'de HEDEF hastanenin
+      // (effectiveOrgId) abonelik/seat durumu geçerlidir; normalde dbUser.organizationId.
+      // Grup yöneticisinin kendi org'u null olduğundan effectiveOrgId olmasa guard sessizce
+      // atlanırdı — bu yüzden acting hedefine bakılır.
+      const writeGuardOrgId = actingMode === 'group_rw' ? effectiveOrgId : dbUser.organizationId
+      if (writeGuard && WRITE_METHODS.has(request.method.toUpperCase()) && dbUser.role !== 'super_admin' && writeGuardOrgId) {
+        const block = await checkWritePermission(writeGuardOrgId, request.method, { pathname })
         if (block) return block
       }
 
@@ -328,3 +343,37 @@ export const withSuperAdminRoute = <P extends DefaultParams = DefaultParams>(
   handler: (ctx: HandlerContext<P, string | null>) => Promise<Response>,
   extra: PresetExtra = {},
 ) => withApiHandler<P>(handler, { roles: ['super_admin'], strict: true, ...extra })
+
+/**
+ * Grup yöneticisi (esas yönetici) route context'i — `groupId` non-null garantili.
+ * Çok-hastaneli grubun konsolide/yönetim uçları (`/api/group/*`) için.
+ */
+export interface GroupHandlerContext<P = unknown> extends HandlerContext<P, string | null> {
+  /** Grup yöneticisinin bağlı olduğu hastane grubu (non-null). */
+  groupId: string
+}
+
+/**
+ * `withGroupRoute` — yalnız grup yöneticisi (esas yönetici). Rol gate `admin`/`super_admin`
+ * geçirir, ardından TEK kaynak grup-yetkisi kontrolü yapar: `User.groupId` set ⟺ grup yöneticisi
+ * (invariant; bkz. `lib/auth/group-authority.ts`). super_admin (groupId yok) 403 alır — grup
+ * yönetimi `/super-admin/groups` üzerindendir. Tenant-scoped DEĞİL (grup yöneticisinin org'u null);
+ * `requireOrganization` KULLANMA. Belirli bir hastaneye yazma drill-in ile yapılır (/api/admin, Faz 1.5).
+ */
+export function withGroupRoute<P extends DefaultParams = DefaultParams>(
+  handler: (ctx: GroupHandlerContext<P>) => Promise<Response>,
+  extra: PresetExtra = {},
+): RouteHandler<P> {
+  return withApiHandler<P>(
+    async (ctx) => {
+      const groupId = ctx.dbUser.groupId
+      // TEK kaynak grup-yetkisi: User.groupId set ⟺ grup yöneticisi (invariant). Null kontrolü
+      // TS'i de string'e daraltır (GroupHandlerContext.groupId non-null).
+      if (groupId == null || !hasGroupAuthority({ groupOwner: true, groupId })) {
+        return errorResponse('Bu işlem için grup yöneticisi yetkisi gerekir', 403)
+      }
+      return handler({ ...ctx, groupId })
+    },
+    { roles: ['admin', 'super_admin'], ...extra },
+  )
+}

@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { getRolePath } from '@/lib/route-helpers';
 import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
 import { extractAdminAccess } from '@/lib/auth/admin-authority';
+import { extractGroupClaims } from '@/lib/auth/group-authority';
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/super-admin/dashboard',
@@ -220,9 +221,14 @@ function LoginForm() {
       const rolePrefix = getRolePath(role, 'dashboard');
       const isRedirectCompatible = redirectTo && redirectTo !== '/' && redirectTo.startsWith(rolePrefix);
       const targetPath = isRedirectCompatible ? redirectTo : (role && ROLE_ROUTES[role]) || '/staff/dashboard';
-      // Server zaten cross-subdomain ise tam URL hesapladı (apex → subdomain).
-      // Subdomain login'de data.redirectTo null → buildPostLoginUrl same-domain path döner.
-      const target = data.redirectTo ?? buildPostLoginUrl(targetPath, data.organizationSlug ?? null);
+      // Grup yöneticisi (esas yönetici): role='admin' + org=null olduğundan ROLE_ROUTES onu yanlış
+      // /admin'e atardı. Sunucu groupOwner=true döndürürse konsolide grup paneline git — subdomain
+      // zıplaması yok (grubun org slug'ı yok, apex'te kalır).
+      // Aksi halde: server cross-subdomain ise tam URL hesapladı; subdomain login'de redirectTo null →
+      // buildPostLoginUrl same-domain path döner.
+      const target = data.groupOwner === true
+        ? '/group/dashboard'
+        : (data.redirectTo ?? buildPostLoginUrl(targetPath, data.organizationSlug ?? null));
 
       // Setup wizard guard cache'ini önceden doldur — admin layout aynı anahtarı
       // okuyup /api/admin/setup fetch'ini atlar (ilk login'de 1 round-trip kazanç).
@@ -243,6 +249,8 @@ function LoginForm() {
           lastName: u.user_metadata?.last_name ?? '',
           role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
           adminAccessGranted: extractAdminAccess(u.app_metadata),
+          groupOwner: extractGroupClaims(u.app_metadata).groupOwner,
+          groupId: extractGroupClaims(u.app_metadata).groupId,
           organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
           phone: u.user_metadata?.phone ?? null,
           departmentId: u.user_metadata?.department_id ?? null,

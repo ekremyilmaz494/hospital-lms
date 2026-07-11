@@ -15,6 +15,7 @@
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE training_videos ENABLE ROW LEVEL SECURITY;
@@ -75,6 +76,12 @@ CREATE POLICY "staff_users_update" ON users FOR UPDATE USING (id = auth.uid()) W
 -- ORGANIZATIONS
 CREATE POLICY "super_admin_orgs_all" ON organizations FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "member_orgs_select" ON organizations FOR SELECT USING (id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+
+-- ORGANIZATION GROUPS (çok-hastaneli müşteri) — grup yöneticisi app_metadata.group_id claim'i ile kendi grubunu görür.
+-- Not: Prisma (postgres/table-owner) sunucu tarafı sorguları RLS'i bypass eder; bu policy tarayıcı Supabase
+-- client'ı (realtime/PostgREST) için savunma katmanıdır (bkz. supabase/verify-jwt.ts).
+CREATE POLICY "super_admin_groups_all" ON organization_groups FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "group_owner_groups_select" ON organization_groups FOR SELECT USING (id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'group_id')::uuid));
 
 -- SUBSCRIPTION PLANS
 CREATE POLICY "super_admin_plans_all" ON subscription_plans FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');

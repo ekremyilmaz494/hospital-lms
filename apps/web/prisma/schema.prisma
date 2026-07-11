@@ -65,6 +65,39 @@ model SubscriptionPlan {
   @@map("subscription_plans")
 }
 
+// ── HASTANE GRUPLARI (çok-hastaneli müşteri) ──
+// Bir müşteri (grup) birden çok Organization (hastane) barındırır. Grup yöneticisi
+// (esas yönetici) tüm hastaneleri konsolide görür + drill-in ile yönetir. Grup YENİ bir
+// UserRole DEĞİL — owner sıradan role='admin', organizationId=null, groupId set + JWT
+// app_metadata.group_owner=true (bkz. src/lib/auth/group-authority.ts, adminAccessGranted
+// deseninin ikizi). Standalone hastaneler groupId=null ile aynen çalışır (geriye uyumlu).
+// Provizyon Klinovax-only: grubu, hastaneleri ve owner'ı super_admin kurar.
+model OrganizationGroup {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @db.VarChar(255)
+  code             String   @unique @db.VarChar(50)
+  // Grup yöneticisi (esas yönetici). Yalnız bu user grubun konsolide panelini görür ve
+  // grup hastanelerine drill-in yapabilir. Atama super_admin tarafından.
+  ownerUserId      String?  @unique @map("owner_user_id") @db.Uuid
+  // Sözleşmeli hastane sayısı tavanı. null = sınırsız. Org gruba bağlanırken kontrol edilir
+  // (src/lib/subscription-guard.ts checkSubscriptionLimit deseni).
+  maxOrganizations Int?     @map("max_organizations")
+  // Opsiyonel grup markası (panel/export). Yoksa hastane logosu kullanılır.
+  logoUrl          String?  @map("logo_url") @db.Text
+  brandColor       String   @default("#0F172A") @map("brand_color") @db.VarChar(9)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdBy        String?  @map("created_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  ownerUser     User?          @relation("GroupOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  organizations Organization[]
+  members       User[]         @relation("UserGroup")
+
+  @@index([isActive], map: "organization_group_is_active_idx")
+  @@map("organization_groups")
+}
+
 // ── ORGANİZASYONLAR ──
 model Organization {
   id                  String    @id @default(uuid()) @db.Uuid
@@ -154,11 +187,16 @@ model Organization {
   // limiti aşınca yeni ücret talep edilir. Enforcement: src/lib/subscription-guard.ts
   maxStaff Int? @map("max_staff")
 
+  // Bağlı olduğu hastane grubu (çok-hastaneli müşteri). null = bağımsız/standalone hastane
+  // (mevcut tüm müşteriler böyle — geriye uyumlu). super_admin gruba bağlar/çözer.
+  groupId String? @map("group_id") @db.Uuid
+
   createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   ownerUser              User?                        @relation("OrganizationOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  group                  OrganizationGroup?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
   users                  User[]
   departments            Department[]
   trainings              Training[]
@@ -196,6 +234,7 @@ model Organization {
 
   @@index([sector], map: "organization_sector_idx")
   @@index([isDemo], map: "organization_is_demo_idx")
+  @@index([groupId], map: "organization_group_idx")
   @@map("organizations")
 }
 
@@ -358,6 +397,9 @@ model User {
   // Entegrasyon SADECE externalId'li kullanıcıları yönetir (deaktive dahil) —
   // manuel eklenen personele/adminlere asla dokunmaz (ingest.ts planSync).
   externalId               String?   @map("external_id") @db.VarChar(100)
+  // Grup yöneticisi (esas yönetici) ise bağlı olduğu hastane grubu. Sıradan hastane
+  // personeli/admini için null. JWT app_metadata.group_id ile senkron (group-authority.ts).
+  groupId                  String?   @map("group_id") @db.Uuid
   createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -397,6 +439,9 @@ model User {
   closedPeriods                 TrainingPeriod[]             @relation("PeriodClosedBy")
   // Esas Yönetici olduğu organizasyon (max 1)
   ownedOrganization             Organization?                @relation("OrganizationOwner")
+  // Bağlı olduğu hastane grubu (grup yöneticisiyse) + esas yönetici olduğu grup (max 1)
+  group                         OrganizationGroup?           @relation("UserGroup", fields: [groupId], references: [id], onDelete: SetNull)
+  ownedGroup                    OrganizationGroup?           @relation("GroupOwner")
   // Davet token'ları (gönderdiği + kabul ettiği)
   invitationsSent               Invitation[]                 @relation("InvitationsInvitedBy")
   invitationsAccepted           Invitation[]                 @relation("InvitationsAcceptedBy")
@@ -423,6 +468,7 @@ model User {
   @@index([organizationId, departmentId], map: "idx_users_org_department")
   @@index([organizationId, role], map: "idx_users_org_role")
   @@index([tcHash], map: "idx_users_tc_hash")
+  @@index([groupId], map: "idx_users_group")
   @@map("users")
 }
 

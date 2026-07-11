@@ -6,6 +6,7 @@ import { verifyAccessToken } from './verify-jwt';
 import { getServerSupabaseUrl, getSupabaseCookieOptions } from './onprem-config';
 import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
 import { hasAdminAuthority } from '@/lib/auth/admin-authority';
+import { hasGroupAuthority } from '@/lib/auth/group-authority';
 
 const PUBLIC_ROUTES = [
   '/',
@@ -188,6 +189,7 @@ export async function updateSession(request: NextRequest) {
         session && verified && verified.sub === session.user.id ? session.user : undefined;
       if (sessionUser) {
         const role = sanitizeRole(verified?.role);
+        const groupOwner = verified?.groupOwner ?? false;
         // Aydınlatma metni sürümü güncel değilse yeniden onay iste. TEK kaynak
         // isKvkkNoticeCurrent — login sayfasının modal-tetiğiyle AYNI kriter (sürüm-duyarlı);
         // aksi halde v1 onaylı kullanıcı login ⇄ dashboard sonsuz döngüsüne girer.
@@ -211,16 +213,17 @@ export async function updateSession(request: NextRequest) {
 
         // KVKK tamam: login/landing'de auth'luysa dashboard'a gönder (mevcut davranış)
         if (pathname === '/auth/login' || pathname === '/') {
-          const dashboardPath = getDashboardUrl(role);
+          const dashboardPath = getDashboardUrl(role, { groupOwner });
           // Apex'te authenticated kullanıcı + org cookie varsa subdomain'e zıpla.
           // Cookie cross-subdomain (.klinovax.com) — önceki subdomain ziyaretinde set edildi.
-          // super_admin için cookie yok → apex'te kal.
+          // super_admin ve grup yöneticisi için org cookie yok → apex'te kal (konsolide panel).
           const orgSlugCookie = request.cookies.get('x-org-slug')?.value;
           if (
             baseDomain &&
             !subdomain &&
             orgSlugCookie &&
             role !== 'super_admin' &&
+            !groupOwner &&
             !baseDomain.includes('localhost')
           ) {
             const protocol = request.nextUrl.protocol || 'https:';
@@ -321,23 +324,44 @@ export async function updateSession(request: NextRequest) {
     // Role-based access control — DOĞRULANMIŞ JWT payload'ından (imza kontrol edildi)
     const role = sanitizeRole(verified?.role);
     const adminAccess = verified?.adminAccess ?? false;
+    const groupOwner = verified?.groupOwner ?? false;
+    const groupId = verified?.groupId ?? null;
+    // Grup yöneticisi (esas yönetici) — TEK kaynak hasGroupAuthority (api-handler + group
+    // layout ile AYNI kriter). role='admin' olsa da null org'u drill-in gerektirir.
+    const groupAuthority = hasGroupAuthority({ groupOwner, groupId });
+    const dash = (r: ValidRole) => getDashboardUrl(r, { groupOwner });
 
-    // /super-admin/* → sadece super_admin (grant ASLA super_admin vermez)
+    // /super-admin/* → sadece super_admin (grant/grup ASLA super_admin vermez)
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
-      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
+      return NextResponse.redirect(new URL(dash(role), request.url));
+    }
+    // /group/* → yalnız grup yöneticisi. super_admin da grup panelini görmez (kendi
+    // platform paneli var); yetkisi olmayan → kendi dashboard'ına.
+    if (pathname.startsWith('/group') && !groupAuthority) {
+      return NextResponse.redirect(new URL(dash(role), request.url));
     }
     // /admin/* → admin, super_admin VEYA ek yönetici yetkisi verilmiş personel (dual-capability).
     // TEK kaynak hasAdminAuthority — api-handler + admin layout ile AYNI kriter (drift yok).
-    if (pathname.startsWith('/admin') && !hasAdminAuthority({ role, adminAccess })) {
-      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
+    if (pathname.startsWith('/admin')) {
+      if (groupAuthority) {
+        // Grup yöneticisi (role='admin') hasAdminAuthority'yi geçer AMA org'u null'dur.
+        // Yalnız aktif drill-in (klx-acting-present cookie, Faz 1.5) varken bir hastanenin
+        // /admin panelini görür; aksi halde konsolide grup paneline yollanır (boş panel/400 önlenir).
+        const drillActive = request.cookies.get('klx-acting-present')?.value === '1';
+        if (!drillActive) {
+          return NextResponse.redirect(new URL('/group/dashboard', request.url));
+        }
+      } else if (!hasAdminAuthority({ role, adminAccess })) {
+        return NextResponse.redirect(new URL(dash(role), request.url));
+      }
     }
     // /staff/* → staff, admin veya super_admin (tum roller)
     if (pathname.startsWith('/staff') && !VALID_ROLES.includes(role)) {
-      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
+      return NextResponse.redirect(new URL(dash(role), request.url));
     }
     // /exam/* → staff veya ustu
     if (pathname.startsWith('/exam') && !VALID_ROLES.includes(role)) {
-      return NextResponse.redirect(new URL(getDashboardUrl(role), request.url));
+      return NextResponse.redirect(new URL(dash(role), request.url));
     }
 
     return supabaseResponse;
@@ -349,7 +373,9 @@ export async function updateSession(request: NextRequest) {
   }
 }
 
-function getDashboardUrl(role: ValidRole): string {
+function getDashboardUrl(role: ValidRole, opts?: { groupOwner?: boolean }): string {
+  // Grup yöneticisi (esas yönetici) role='admin' olsa da konsolide grup paneline gider.
+  if (opts?.groupOwner) return '/group/dashboard';
   switch (role) {
     case 'super_admin':
       return '/super-admin/dashboard';

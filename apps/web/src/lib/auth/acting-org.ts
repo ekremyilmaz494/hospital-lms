@@ -19,6 +19,13 @@ import crypto from 'crypto'
 import { cookies } from 'next/headers'
 
 export const ACTING_ORG_COOKIE = 'klx-acting-org'
+/**
+ * Hassas OLMAYAN "drill-in aktif" işareti. Middleware imzalı httpOnly cookie'yi ucuz
+ * doğrulayamaz; grup yöneticisini bare /admin'den /group'a yönlendirip yönlendirmeyeceğine
+ * bu varlık-cookie'sine bakarak karar verir. Asıl yetki kararı api-handler'da (imzalı cookie
+ * + grup sınırı) verilir — bu yalnızca yönlendirme sinyali.
+ */
+export const ACTING_PRESENT_COOKIE = 'klx-acting-present'
 /** Görüntüleme bağlamı ömrü — destek oturumu için makul, kısa. */
 export const ACTING_ORG_TTL_SECONDS = 30 * 60
 /** HMAC domain-separation etiketi (başka HMAC kullanımlarıyla karışmasın). */
@@ -110,6 +117,30 @@ export async function setActingOrgCookie(orgId: string, uid: string): Promise<vo
 export async function clearActingOrgCookie(): Promise<void> {
   const store = await cookies()
   store.set(ACTING_ORG_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  })
+}
+
+/** Drill-in "aktif" varlık-işaretini set eder (middleware yönlendirme sinyali). */
+export async function setActingPresentCookie(): Promise<void> {
+  const store = await cookies()
+  store.set(ACTING_PRESENT_COOKIE, '1', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: ACTING_ORG_TTL_SECONDS,
+  })
+}
+
+/** Drill-in "aktif" varlık-işaretini siler. */
+export async function clearActingPresentCookie(): Promise<void> {
+  const store = await cookies()
+  store.set(ACTING_PRESENT_COOKIE, '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
