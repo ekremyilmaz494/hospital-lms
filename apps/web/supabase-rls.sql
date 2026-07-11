@@ -16,6 +16,7 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE training_videos ENABLE ROW LEVEL SECURITY;
@@ -82,6 +83,14 @@ CREATE POLICY "member_orgs_select" ON organizations FOR SELECT USING (id = ((SEL
 -- client'ı (realtime/PostgREST) için savunma katmanıdır (bkz. supabase/verify-jwt.ts).
 CREATE POLICY "super_admin_groups_all" ON organization_groups FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
 CREATE POLICY "group_owner_groups_select" ON organization_groups FOR SELECT USING (id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'group_id')::uuid));
+
+-- ORGANIZATION MEMBERSHIPS (ortak personel, Track 2) — bir çalışanın primary org'una EK hastane üyelikleri.
+-- GÜVENLİK: admin politikasında role='admin' kontrolü ŞART (staff JWT'si de organization_id taşır;
+-- rol predikatı olmadan personel org-geneli üyelik okuyup/değiştirebilirdi). Staff yalnız KENDİ
+-- üyeliklerini okur (birleşik gelen kutusu için). super_admin cross-org tam erişim.
+CREATE POLICY "super_admin_memberships_all" ON organization_memberships FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');
+CREATE POLICY "admin_memberships_all" ON organization_memberships FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' AND organization_id = ((SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid));
+CREATE POLICY "staff_memberships_own" ON organization_memberships FOR SELECT USING (user_id = auth.uid());
 
 -- SUBSCRIPTION PLANS
 CREATE POLICY "super_admin_plans_all" ON subscription_plans FOR ALL USING ((SELECT auth.jwt() -> 'app_metadata' ->> 'role') = 'super_admin');

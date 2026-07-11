@@ -22,7 +22,12 @@
 import { prisma } from '@/lib/prisma'
 
 /**
- * schemaVersion 5: İK entegrasyon konfigürasyonu eklendi — StaffIntegration (İK/HBYS kanal
+ * schemaVersion 6: OrganizationMembership eklendi — ortak personel kimliği (çok-hastaneli grup,
+ * Track 2). Bir çalışanın primary org'una EK hastane üyelikleri; per-org veri (org silinince
+ * cascade). Restore'da yoksa ortak personelin bu hastanedeki üyeliği (dolayısıyla eğitim
+ * görünürlüğü) kalıcı kaybolurdu. Kullanıcı satırı ayrı yedeklenir (primary org'unda); membership
+ * yalnız EK hastane bağını taşır.
+ * v5: İK entegrasyon konfigürasyonu eklendi — StaffIntegration (İK/HBYS kanal
  * ayarları; pullCredentialsEncrypted AES-256-GCM şifreli, ENCRYPTION_KEY olmadan açılmaz) +
  * IntegrationApiKey (yalnız SHA-256 hash, düz anahtar yok). Restore sonrası hastanenin
  * entegrasyonu çalışmaya devam etmeli. SyncRun/SyncRowResult KASITLI dışarıda (telemetri +
@@ -33,7 +38,7 @@ import { prisma } from '@/lib/prisma'
  * kalıcı kaybediliyordu.
  * v3: authUsers (parola hash'leri). v2: organization/subscription/auditLogs. v1: 9 dizi.
  */
-export const BACKUP_SCHEMA_VERSION = 5
+export const BACKUP_SCHEMA_VERSION = 6
 
 /** Org `dataRetentionDays` okunamazsa kullanılacak audit-log saklama süresi (DB default'u ile aynı). */
 const DEFAULT_AUDIT_RETENTION_DAYS = 365
@@ -106,6 +111,8 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     // ── v5: İK entegrasyon konfigürasyonu ──
     staffIntegrations,
     integrationApiKeys,
+    // ── v6: ortak personel üyelikleri (çok-hastaneli grup) ──
+    organizationMemberships,
     // ── Opsiyonel: Supabase auth.users (en sonda — koşullu) ──
     authUsers,
   ] = await Promise.all([
@@ -158,6 +165,8 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     // IntegrationApiKey yalnız SHA-256 hash taşır, düz anahtar hiç DB'ye yazılmaz.) ──
     prisma.staffIntegration.findMany({ where: { organizationId: orgId } }),
     prisma.integrationApiKey.findMany({ where: { organizationId: orgId } }),
+    // v6 — ortak personel üyelikleri (bu hastaneye EK-bağlı personel). org-scope, düz kolonlar.
+    prisma.organizationMembership.findMany({ where: { organizationId: orgId } }),
     // auth.users — parola hash'leri (encrypted_password) SADECE burada. Restore'da public.users'tan
     // ÖNCE INSERT ... ON CONFLICT (id) DO NOTHING ile geri yüklenir. includeAuthUsers=false ise hiç çekilmez.
     options.includeAuthUsers
@@ -216,6 +225,8 @@ export async function buildBackupSnapshot(orgId: string, options: BackupSnapshot
     // v5 — İK entegrasyon konfigürasyonu
     staffIntegrations,
     integrationApiKeys,
+    // v6 — ortak personel üyelikleri
+    organizationMemberships,
     // authUsers yalnız includeAuthUsers=true iken eklenir — aksi halde anahtar hiç çıkmaz.
     ...(authUsers ? { authUsers } : {}),
     exportedAt: (options.exportedAt ?? new Date()).toISOString(),

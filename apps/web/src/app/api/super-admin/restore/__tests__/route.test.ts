@@ -572,12 +572,24 @@ describe('POST /api/super-admin/restore', () => {
       expect(data.counts.integrationApiKeys).toBe(0)
     })
 
-    it('400: schemaVersion 6 (v5 kodundan yeni) reddedilir', async () => {
-      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({ ...validBackupData, schemaVersion: 6 }))
+    it('400: schemaVersion 7 (v6 kodundan yeni) reddedilir', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({ ...validBackupData, schemaVersion: 7 }))
       const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
       expect(res.status).toBe(400)
       const data = await res.json()
       expect(data.error).toMatch(/daha yeni|güncelleyin/i)
+    })
+
+    it('200: schemaVersion 6 (organizationMemberships) desteklenir + count döner', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 6,
+        organizationMemberships: [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }],
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.counts.organizationMemberships).toBe(3)
     })
   })
 })

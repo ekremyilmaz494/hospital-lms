@@ -21,13 +21,14 @@ export const maxDuration = 300
  * düşerdi → veri kaybı. Guard bunu 400 hatasına çevirir: "önce kodu güncelle".
  * Yeni model eklerken snapshot.ts BACKUP_SCHEMA_VERSION ile birlikte BURAYI da artır.
  */
-const MAX_SUPPORTED_SCHEMA_VERSION = 5
+const MAX_SUPPORTED_SCHEMA_VERSION = 6
 
 /**
  * Expected shape of a backup JSON file (mirrors backup cron output).
  * schemaVersion 1: v1 (9 arrays). v2: organization, subscription, auditLogs eklendi.
  * v3: authUsers (Supabase parola hash'leri). v4: 27 org modeli daha (aşağıdaki v4 bloğu).
  * v5: İK entegrasyon konfigürasyonu (staffIntegrations + integrationApiKeys).
+ * v6: OrganizationMembership (ortak personel üyelikleri, çok-hastaneli grup).
  */
 interface BackupData {
   users: unknown[]
@@ -79,6 +80,8 @@ interface BackupData {
   // v5+ — İK entegrasyon konfigürasyonu. v4 ve öncesi yedeklerde undefined → restore dokunmaz.
   staffIntegrations?: unknown[]
   integrationApiKeys?: unknown[]
+  // v6+ — ortak personel üyelikleri (çok-hastaneli grup). v5 ve öncesi yedeklerde undefined → dokunma.
+  organizationMemberships?: unknown[]
   schemaVersion?: number
 }
 
@@ -96,6 +99,9 @@ const V4_MODEL_KEYS = [
 
 /** v5 opsiyonel model anahtarları — İK entegrasyon konfigürasyonu (v4 desenini izler). */
 const V5_MODEL_KEYS = ['staffIntegrations', 'integrationApiKeys'] as const
+
+/** v6 opsiyonel model anahtarları — ortak personel üyelikleri (çok-hastaneli grup). */
+const V6_MODEL_KEYS = ['organizationMemberships'] as const
 
 /** Validate that parsed JSON has the expected backup structure */
 function isValidBackupData(data: unknown): data is BackupData {
@@ -124,8 +130,8 @@ function isValidBackupData(data: unknown): data is BackupData {
   // v2+ opsiyonel alanlar — varsa tip kontrol
   if (d.auditLogs !== undefined && !Array.isArray(d.auditLogs)) return false
   if (d.authUsers !== undefined && !Array.isArray(d.authUsers)) return false
-  // v4/v5 opsiyonel modeller — varsa array olmalı
-  for (const key of [...V4_MODEL_KEYS, ...V5_MODEL_KEYS]) {
+  // v4/v5/v6 opsiyonel modeller — varsa array olmalı
+  for (const key of [...V4_MODEL_KEYS, ...V5_MODEL_KEYS, ...V6_MODEL_KEYS]) {
     if (d[key] !== undefined && !Array.isArray(d[key])) return false
   }
 
@@ -232,9 +238,9 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       authUsers: backupData.authUsers?.length ?? 0,
       hasOrganization: backupData.organization ? 1 : 0,
       hasSubscription: backupData.subscription ? 1 : 0,
-      // v4/v5 modelleri (yedekte yoksa 0)
+      // v4/v5/v6 modelleri (yedekte yoksa 0)
       ...Object.fromEntries(
-        [...V4_MODEL_KEYS, ...V5_MODEL_KEYS].map((k) => [k, (backupData[k] as unknown[] | undefined)?.length ?? 0]),
+        [...V4_MODEL_KEYS, ...V5_MODEL_KEYS, ...V6_MODEL_KEYS].map((k) => [k, (backupData[k] as unknown[] | undefined)?.length ?? 0]),
       ),
     }
 
@@ -319,6 +325,10 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
       // yalnız referansları NULL'a düşer; FK ihlali oluşmaz.
       if (backupData.staffIntegrations) await tx.staffIntegration.deleteMany({ where: { organizationId: orgId } })
       if (backupData.integrationApiKeys) await tx.integrationApiKey.deleteMany({ where: { organizationId: orgId } })
+
+      // v6 — Ortak personel üyelikleri. User (Cascade) + Department (SetNull) parent'larından
+      // ÖNCE sil (user/dept silinmeden temiz kaldır; unique [user,org] re-insert çakışmasını önle).
+      if (backupData.organizationMemberships) await tx.organizationMembership.deleteMany({ where: { organizationId: orgId } })
 
       // ── Mevcut çekirdek (child → parent) ──
       await tx.certificate.deleteMany({ where: { training: { organizationId: orgId } } })
@@ -462,6 +472,12 @@ export const POST = withSuperAdminRoute(async ({ request, dbUser, audit }) => {
           create: u as Parameters<typeof tx.user.create>[0]['data'],
           update: u as Parameters<typeof tx.user.update>[0]['data'],
         })
+      }
+
+      // v6 — Ortak personel üyelikleri: User (yukarıda upsert) + Department (yukarıda upsert)
+      // gerektirir → ikisinden SONRA. createMany tek round-trip (unique [user,org] yeniden kurulur).
+      if (backupData.organizationMemberships?.length) {
+        await tx.organizationMembership.createMany({ data: backupData.organizationMemberships as NonNullable<Parameters<typeof tx.organizationMembership.createMany>[0]>['data'] })
       }
 
       // ── v4 Tier-B: User / Tier-A parent gerektiren modeller (Training'den ÖNCE) ──
