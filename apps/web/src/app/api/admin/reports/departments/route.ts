@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS } from '../_shared'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
@@ -22,13 +23,13 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { userDeptFilter, assignmentDateFilter, attemptDateFilter, trainingScope, departmentId, assignmentPeriodFilter, attemptPeriodFilter } = resolved.filters
 
   try {
-    const [departments, deptStaff, assignmentGroups, attemptAggregates] = await Promise.all([
+    const [departments, deptStaff, deptMembers, assignmentGroups, attemptAggregates] = await Promise.all([
       prisma.department.findMany({
         where: { organizationId: orgId, ...(departmentId ? { id: departmentId } : {}) },
         select: { id: true, name: true, color: true },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
-      // Departman başına aktif personel sayısı
+      // Departman başına PRIMARY personel sayısı (User.departmentId = org B'nin asıl kadrosu)
       prisma.user.groupBy({
         by: ['departmentId'],
         where: {
@@ -40,20 +41,30 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
         },
         _count: { _all: true },
       }),
+      // Ortak (üyelik) personel — EK hastanede staff olan doktorların B departmanı ÜYELİKTEN gelir
+      // (org-özel membership.departmentId; primary User.departmentId org A'ya aittir, buraya karışmaz).
+      // Disjoint invariant (üyelik org ≠ primary org) → primary groupBy ile çift saymaz.
+      prisma.organizationMembership.groupBy({
+        by: ['departmentId'],
+        where: {
+          organizationId: orgId,
+          isActive: true,
+          departmentId: { not: null },
+          ...userDeptFilter,
+          user: { role: 'staff' satisfies UserRole, isActive: true },
+        },
+        _count: { _all: true },
+      }),
       // Atama durumları — user.departmentId üzerinden grupla
       // Prisma groupBy ilişkili alana göre gruplama yapamaz, bu yüzden
       // userId+status ile gruplayıp sonra dept'e map edeceğiz.
       prisma.trainingAssignment.groupBy({
         by: ['userId', 'status'],
         where: {
-          training: trainingScope,
-          user: {
-            organizationId: orgId,
-            role: 'staff' satisfies UserRole,
-            isActive: true,
-            departmentId: { not: null },
-            ...userDeptFilter,
-          },
+          training: trainingScope, // org B → ortak doktorun primary(A) atamaları BURAYA giremez (sızıntı yok)
+          // ortak personeli de kapsa; dept filtresi iki dala AYRI eşlenir. departmentId:{not:null} DÜŞÜRÜLDÜ —
+          // dept-siz kullanıcı zaten downstream userToDept null → `if (!deptId) continue` ile atlanır.
+          user: orgStaffWhereByDept(orgId, userDeptFilter, { isActive: true }),
           ...assignmentDateFilter,
           ...assignmentPeriodFilter,
         },
@@ -63,15 +74,9 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       prisma.examAttempt.groupBy({
         by: ['userId'],
         where: {
-          training: trainingScope,
+          training: trainingScope, // org B → ortak doktorun A sınav skorları buraya karışmaz
           postExamScore: { not: null },
-          user: {
-            organizationId: orgId,
-            role: 'staff' satisfies UserRole,
-            isActive: true,
-            departmentId: { not: null },
-            ...userDeptFilter,
-          },
+          user: orgStaffWhereByDept(orgId, userDeptFilter, { isActive: true }),
           ...attemptDateFilter,
           ...attemptPeriodFilter,
         },
@@ -88,10 +93,21 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
     const users = userIds.size > 0
       ? await prisma.user.findMany({
           where: { id: { in: [...userIds] } },
-          select: { id: true, departmentId: true },
+          select: {
+            id: true,
+            organizationId: true,
+            departmentId: true,
+            // ortak doktorun B departmanı üyelikte; primary org A değil
+            memberships: { where: { organizationId: orgId, isActive: true }, select: { departmentId: true }, take: 1 },
+          },
         })
       : []
-    const userToDept = new Map(users.map(u => [u.id, u.departmentId]))
+    // Departman atfı: primary personel (org=B) → User.departmentId; ortak doktor (primary≠B) → ÜYELİĞİN
+    // org-özel departmentId'si (A departmanına ASLA düşme). Dept-siz → null → downstream atlanır.
+    const userToDept = new Map(users.map(u => [
+      u.id,
+      u.organizationId === orgId ? u.departmentId : (u.memberships[0]?.departmentId ?? null),
+    ]))
 
     // Dept başına: passed, failed, total, score sum & count
     type DeptAgg = { passed: number; failed: number; total: number; scoreSum: number; scoreCount: number }
@@ -122,7 +138,11 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       agg.scoreCount += count
     }
 
-    const staffByDept = new Map(deptStaff.map(d => [d.departmentId!, d._count._all]))
+    // Primary kadro + ortak (üyelik) personeli aynı B-departmanında topla. Disjoint invariant
+    // (üyelik org ≠ primary org) sayesinde bir kişi yalnız bir dalda sayılır → çift sayım yok.
+    const staffByDept = new Map<string, number>()
+    for (const d of deptStaff) if (d.departmentId) staffByDept.set(d.departmentId, (staffByDept.get(d.departmentId) ?? 0) + d._count._all)
+    for (const m of deptMembers) if (m.departmentId) staffByDept.set(m.departmentId, (staffByDept.get(m.departmentId) ?? 0) + m._count._all)
 
     const departmentData = departments.map(d => {
       const agg = deptAgg.get(d.id) ?? { passed: 0, failed: 0, total: 0, scoreSum: 0, scoreCount: 0 }
