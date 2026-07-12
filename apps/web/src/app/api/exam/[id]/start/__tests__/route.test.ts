@@ -110,6 +110,7 @@ function mockFlow(activeAttempt: Record<string, unknown> | null) {
     assignment: {
       id: 'assignment-1',
       trainingId: 'training-1',
+      organizationId: 'org-1',
       status: 'in_progress',
       currentAttempt: 1,
       maxAttempts: 3,
