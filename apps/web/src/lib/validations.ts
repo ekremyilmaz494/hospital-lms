@@ -135,6 +135,19 @@ export const groupAttachOrgSchema = z.object({
   organizationId: z.string().uuid('Geçersiz organizasyon kimliği'),
 })
 
+// ── Ortak personel üyeliği (çok-hastaneli grup, Track 2) ──
+// Bir personeli grup içindeki BAŞKA bir hastaneye EK üyelikle ekler (departman/ünvan o
+// hastaneye özel). organizationId = hedef hastane (personelin primary org'undan FARKLI olmalı).
+export const addStaffMembershipSchema = z.object({
+  organizationId: z.string().uuid('Geçersiz hastane kimliği'),
+  departmentId: z.string().uuid('Geçersiz departman kimliği').nullish(),
+  title: z.string().max(100, 'Ünvan en fazla 100 karakter').nullish(),
+})
+
+export const removeStaffMembershipSchema = z.object({
+  organizationId: z.string().uuid('Geçersiz hastane kimliği'),
+})
+
 /** Slug doğrulama şeması — sadece küçük harf, rakam ve tire */
 export const slugSchema = z.string().min(3).max(50).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanılabilir')
 

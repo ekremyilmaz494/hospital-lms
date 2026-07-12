@@ -53,11 +53,21 @@ async function clean() {
   console.log('✅ Demo grup temizlendi.')
 }
 
-async function seedHospital(groupId: string, name: string, code: string, staffCount: number, passedCount: number, overdueCount: number) {
+async function seedHospital(groupId: string, name: string, code: string, staffCount: number, passedCount: number, overdueCount: number, planId: string | null) {
   const org = await prisma.organization.create({
-    data: { name, code, groupId, sector: 'healthcare', setupCompleted: true },
+    data: { name, code, groupId, sector: 'healthcare', setupCompleted: true, maxStaff: 100 },
     select: { id: true },
   })
+  // Aktif abonelik — aksi halde write-guard (checkWritePermission) her yazmayı "abonelik sona erdi"
+  // ile 403'ler (ör. ortak personel provizyonu). Plan yoksa atlanır (yazma testleri için plan seed'le).
+  if (planId) {
+    await prisma.organizationSubscription.create({
+      data: {
+        organizationId: org.id, planId, status: 'active', billingCycle: 'yearly',
+        startedAt: new Date(), expiresAt: new Date(Date.now() + 365 * 86400000),
+      },
+    })
+  }
   const training = await prisma.training.create({
     data: {
       organizationId: org.id,
@@ -113,8 +123,13 @@ async function main() {
   })
   console.log(`📦 Grup: ${group.name}`)
 
-  await seedHospital(group.id, 'Demo Merkez Hastanesi', 'demo-merkez', 10, 7, 2)
-  await seedHospital(group.id, 'Demo Şube Hastanesi', 'demo-sube', 6, 3, 1)
+  // Aktif abonelik için bir plan seç (yoksa null → subscription atlanır; write testleri için plan seed'le).
+  const plan = await prisma.subscriptionPlan.findFirst({ select: { id: true } })
+  if (!plan) console.warn('⚠️  Abonelik planı yok — demo hastaneleri aboneliksiz kurulur (yazma işlemleri write-guard\'a takılır). Önce plan seed\'leyin.')
+  const planId = plan?.id ?? null
+
+  await seedHospital(group.id, 'Demo Merkez Hastanesi', 'demo-merkez', 10, 7, 2, planId)
+  await seedHospital(group.id, 'Demo Şube Hastanesi', 'demo-sube', 6, 3, 1, planId)
 
   // Grup yöneticisi (esas yönetici) — auth + DB.
   const { data: authData, error } = await supabase.auth.admin.createUser({
