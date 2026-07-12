@@ -47,7 +47,8 @@
       "WebFetch(domain:fibr.ai)",
       "WebFetch(domain:swipepages.com)",
       "Bash(gh run *)",
-      "Bash(pnpm tsc *)"
+      "Bash(pnpm tsc *)",
+      "Workflow(deep-research)"
     ]
   }
 }
