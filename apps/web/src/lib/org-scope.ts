@@ -45,3 +45,36 @@ export function withOrgStaffScope(
   }
   return { ...base, ...extra }
 }
+
+/**
+ * DEPARTMAN-farkındalıklı ortak-personel org-kapsamı (Track 2).
+ *
+ * `orgStaffWhere`/`withOrgStaffScope` departman filtresini TOP-LEVEL `User.departmentId`'ye koyar.
+ * Bu, ÜYELİK dalındaki ortak doktoru YANLIŞ eler: ortak doktorun `User.departmentId`'si PRIMARY
+ * hastanesine (A) aittir; EK hastanedeki (B) departmanı `OrganizationMembership.departmentId`'de
+ * durur (org-özel — her hastanede farklı olabilir). Bir sorgu departman ile filtreliyorsa, filtre
+ * HER İKİ dala AYRI eşlenmeli: primary dal `User.departmentId`, üyelik dalı `membership.departmentId`.
+ *
+ * Bu helper aynı `deptFilter`'ı iki dala da spread ederek bunu tek/test-edilebilir noktada yapar →
+ * ~8 rapor/export/atama route'unda elle OR kurup kopya-yapıştır tenant hatası riskini önler.
+ *
+ * @param deptFilter `{ departmentId }` / `{ departmentId: { in: subtree } }` / `{}` (dept yok → inert).
+ *   `_shared.ts` `userDeptFilter`'ı (`Record<string, unknown>`) doğrudan geçirilebilir. Boşken üyelik
+ *   dalı yalnız `organizationId`+`isActive` eşler → tekil-org müşteride 0 satır (davranış korunur).
+ * @param opts.isActive verilirse üst düzey `User.isActive` AND'i (her iki dalı da kapsar).
+ */
+export function orgStaffWhereByDept(
+  orgId: string,
+  deptFilter: Record<string, unknown> = {},
+  opts: { isActive?: boolean } = {},
+): Prisma.UserWhereInput {
+  const where: Prisma.UserWhereInput = {
+    role: 'staff' satisfies UserRole,
+    OR: [
+      { organizationId: orgId, ...deptFilter },
+      { memberships: { some: { organizationId: orgId, isActive: true, ...deptFilter } } },
+    ],
+  }
+  if (opts.isActive !== undefined) where.isActive = opts.isActive
+  return where
+}

@@ -3,7 +3,7 @@ import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 
 /**
  * GET /api/admin/audit-report
@@ -20,9 +20,12 @@ export const GET = withAdminRoute(async ({ organizationId: orgId }) => {
         select: { name: true, code: true, address: true, phone: true, email: true },
       }),
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+        where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: üyelikli doktoru da içerir
         include: {
           assignments: {
+            // ortak doktorun PRIMARY(A) atamaları B denetim sayaçlarına karışmasın — denormalize + indexli
+            // organizationId (schema idx_assignments_organization); tekil-org'da inert (atama org zaten orgId).
+            where: { organizationId: orgId },
             include: {
               training: { select: { title: true, category: true, isCompulsory: true, regulatoryBody: true } },
               examAttempts: { orderBy: { attemptNumber: 'desc' }, take: 1, select: { postExamScore: true, isPassed: true, postExamCompletedAt: true } },

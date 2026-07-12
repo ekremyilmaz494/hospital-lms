@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 import type { ResolvedFilters } from './_shared'
 
 /**
@@ -29,9 +30,9 @@ export async function fetchReportData(filters: ResolvedFilters) {
 
   const [org, staffCount, totalTrainings, totalStaff, trainings, staff, departments, avgScoreResult] = await Promise.all([
     prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, logoUrl: true } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true, ...userDeptFilter } }),
+    prisma.user.count({ where: orgStaffWhereByDept(orgId, userDeptFilter, { isActive: true }) }), // ortak personel: ekranla tutar
     prisma.training.count({ where: trainingScope }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter } }),
+    prisma.user.count({ where: orgStaffWhereByDept(orgId, userDeptFilter) }), // cap göstergesi — staff findMany ile aynı where
     prisma.training.findMany({
       where: trainingScope,
       select: {
@@ -62,12 +63,14 @@ export async function fetchReportData(filters: ResolvedFilters) {
       take: REPORT_TRAINING_CAP,
     }),
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter },
+      where: orgStaffWhereByDept(orgId, userDeptFilter), // ortak personel: export listesi ekran raporuyla tutar
       select: {
         firstName: true,
         lastName: true,
         assignments: {
-          where: { ...assignmentWhere, training: activeTrainingFilter },
+          // TENANT: staff kanalize edildiğinden (ortak doktor primary=A) nested atamalar org-filtreli olmalı —
+          // aksi halde A'nın (veya dışa-üyelikli B kullanıcının başka org) atamaları export'a sızar (denorm+indexli).
+          where: { organizationId: orgId, ...assignmentWhere, training: activeTrainingFilter },
           select: {
             status: true,
             training: { select: { title: true } },
@@ -91,7 +94,9 @@ export async function fetchReportData(filters: ResolvedFilters) {
           where: { role: 'staff' satisfies UserRole, isActive: true, ...userDeptFilter },
           select: {
             assignments: {
-              where: { ...assignmentWhere, training: activeTrainingFilter },
+              // TENANT: dışa-üyelikli (primary=B ama başka org'da da üyelikli) kullanıcının diğer-org
+              // atamaları B departman raporuna sızmasın — org-filtreli (denorm+indexli organizationId).
+              where: { organizationId: orgId, ...assignmentWhere, training: activeTrainingFilter },
               select: {
                 status: true,
                 examAttempts: {

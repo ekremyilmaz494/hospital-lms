@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS } from './_shared'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
@@ -29,7 +29,9 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => 
       availableDepartments,
     ] = await Promise.all([
       prisma.user.count({
-        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true, ...userDeptFilter },
+        // ortak personel: üyelikli doktoru da say; dept filtresi HER İKİ dala AYRI eşlenir
+        // (primary User.departmentId + üyelik membership.departmentId) — orgStaffWhereByDept bunu yapar
+        where: orgStaffWhereByDept(orgId, userDeptFilter, { isActive: true }),
       }),
       prisma.training.count({ where: trainingScope }),
       prisma.trainingAssignment.groupBy({

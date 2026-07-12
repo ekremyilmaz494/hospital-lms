@@ -5,6 +5,7 @@
  * organizasyonun egitim uyumlulugunu hesaplar ve rapor olusturur.
  */
 import { prisma } from '@/lib/prisma'
+import { withOrgStaffScope } from '@/lib/org-scope'
 
 export const VALID_STANDARD_BODIES = ['JCI', 'ISO_9001', 'ISO_15189', 'TJC', 'OSHA', 'SKS'] as const
 export type StandardBody = typeof VALID_STANDARD_BODIES[number]
@@ -72,7 +73,7 @@ export async function calculateAccreditationCompliance(params: {
   })
 
   const totalStaff = await prisma.user.count({
-    where: { organizationId, role: 'staff', isActive: true },
+    where: withOrgStaffScope(organizationId, { isActive: true }), // ortak personel: paydaya üyelikli doktoru da kat
   })
 
   const findings: FindingRecord[] = []
@@ -102,8 +103,8 @@ export async function calculateAccreditationCompliance(params: {
         where: {
           status: 'passed',
           completedAt: { gte: periodStart, lte: periodEnd },
-          user: { organizationId, role: 'staff', isActive: true },
-          training: { organizationId, category },
+          user: withOrgStaffScope(organizationId, { isActive: true }), // pay: üyelikli doktorun B tamamlaması da sayılır
+          training: { organizationId, category }, // payda-eğitim B'ye izole (ortak doktorun A eğitimi karışmaz)
         },
         select: { userId: true },
         distinct: ['userId'],

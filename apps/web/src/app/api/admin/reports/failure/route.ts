@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS, STAFF_CAP } from '../_shared'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
@@ -24,11 +24,9 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId }) => 
       where: {
         status: { in: ['failed', 'locked'] },
         training: trainingScope,
-        user: {
-          organizationId: orgId,
-          role: 'staff' satisfies UserRole,
-          ...userDeptFilter,
-        },
+        // ortak personel: üyelikli doktorun B'deki başarısız ataması da rapora girsin; dept filtresi
+        // iki dala AYRI eşlenir (primary User.departmentId + üyelik membership.departmentId)
+        user: orgStaffWhereByDept(orgId, userDeptFilter),
         ...assignmentDateFilter,
         ...assignmentPeriodFilter,
       },

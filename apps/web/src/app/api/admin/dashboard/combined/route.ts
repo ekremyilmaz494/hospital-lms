@@ -5,7 +5,7 @@ import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { findActivePeriod } from '@/lib/training-periods'
 import { fetchOrgKpis } from '@/lib/dashboard/aggregations'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
 
@@ -133,8 +133,17 @@ async function fetchCharts(orgId: string) {
       select: { status: true, completedAt: true },
     }),
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
-      select: { id: true, departmentRel: { select: { name: true } } },
+      where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: üyelikli doktoru da içerir
+      select: {
+        id: true,
+        organizationId: true,
+        departmentRel: { select: { name: true } },
+        // ortak (üyelik) doktorun B-departmanı membership'te; primary A-departmanı grafikte kullanılMAZ
+        memberships: {
+          where: { organizationId: orgId, isActive: true },
+          select: { department: { select: { name: true } } },
+        },
+      },
     }),
     prisma.trainingAssignment.groupBy({
       by: ['userId', 'status'],
@@ -171,7 +180,15 @@ async function fetchCharts(orgId: string) {
     else if (a.status === 'failed') entry.basarisiz++
   }
 
-  const userDeptMap = new Map(users.map(u => [u.id, u.departmentRel?.name ?? 'Diğer']))
+  // Departman adı: primary personel için User.departmentRel; ortak (üyelik) doktor için ÜYELİĞİN
+  // org-özel departmanı. membership dept NULL ise 'Diğer' — ASLA primary(A) departmanına düşme
+  // (çapraz-tenant etiket sızıntısı olur). Tekil-org'da herkes primary → orijinal davranışla birebir.
+  const userDeptMap = new Map(users.map(u => {
+    const dept = u.organizationId === orgId
+      ? (u.departmentRel?.name ?? 'Diğer')
+      : (u.memberships[0]?.department?.name ?? 'Diğer')
+    return [u.id, dept]
+  }))
   const deptMap = new Map<string, { total: number; completed: number }>()
   for (const row of statusByUser) {
     const dept = userDeptMap.get(row.userId)

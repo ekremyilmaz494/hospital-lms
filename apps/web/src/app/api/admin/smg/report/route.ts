@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { resolveRequiredPointsBulk } from '@/lib/smg-helpers'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
@@ -25,7 +25,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   }
 
   if (!period) {
-    const staffCount = await prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } })
+    const staffCount = await prisma.user.count({ where: withOrgStaffScope(orgId, { isActive: true }) })
     return jsonResponse({
       period: null,
       report: [],
@@ -36,7 +36,7 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
 
   const [staff, allActivities] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+      where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: üyelikli doktoru da içerir
       select: {
         id: true,
         firstName: true,

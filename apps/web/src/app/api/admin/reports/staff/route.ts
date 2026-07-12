@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 import { resolveReportFilters, REPORTS_CACHE_HEADERS, STAFF_CAP } from '../_shared'
 // Cache-Control: private, max-age=30, stale-while-revalidate=60 (REPORTS_CACHE_HEADERS)
 
@@ -21,7 +21,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   try {
     const [staff, totalStaffForCap] = await Promise.all([
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter },
+        // ortak personel: üyelikli doktoru da listele; dept filtresi iki dala AYRI eşlenir
+        where: orgStaffWhereByDept(orgId, userDeptFilter),
         select: {
           id: true,
           firstName: true,
@@ -30,7 +31,9 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
           departmentId: true,
           departmentRel: { select: { id: true, name: true, color: true } },
           assignments: {
-            where: { ...assignmentDateFilter, ...assignmentPeriodFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },
+            // TENANT: ortak doktor (primary=A) kanalize edildiğinden nested atamalar org-filtreli OLMALI —
+            // aksi halde A eğitim performansı B raporuna sızar (denorm+indexli organizationId, audit-report deseni).
+            where: { organizationId: orgId, ...assignmentDateFilter, ...assignmentPeriodFilter, training: { isActive: true, publishStatus: { not: 'archived' } } },
             select: {
               id: true,
               status: true,
@@ -45,7 +48,8 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
         take: STAFF_CAP,
       }),
       prisma.user.count({
-        where: { organizationId: orgId, role: 'staff' satisfies UserRole, ...userDeptFilter },
+        // cap/truncated göstergesi — roster ile AYNI where kullanmalı (tutarlılık); seat sayımı DEĞİL
+        where: orgStaffWhereByDept(orgId, userDeptFilter),
       }),
     ])
 

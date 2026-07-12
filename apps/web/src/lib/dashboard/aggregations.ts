@@ -13,7 +13,7 @@
 import { prisma } from '@/lib/prisma'
 import { findActivePeriod } from '@/lib/training-periods'
 import { complianceAlertStatus } from '@/lib/compliance-alert'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhere, withOrgStaffScope } from '@/lib/org-scope'
 
 export interface OrgComplianceAlert {
   training: string
@@ -71,8 +71,8 @@ export async function fetchOrgKpis(orgId: string): Promise<OrgKpis> {
     compulsoryStatusCounts,
     overdueCount,
   ] = await Promise.all([
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
+    prisma.user.count({ where: orgStaffWhere(orgId) }), // ortak personel: üyelikli doktoru da say
+    prisma.user.count({ where: withOrgStaffScope(orgId, { isActive: true }) }),
     prisma.training.count({ where: { ...trainingScope, publishStatus: 'published' } }),
     prisma.training.count({ where: trainingScope }),
     prisma.trainingAssignment.groupBy({ by: ['status'], where: { training: trainingScope, ...periodFilter }, _count: true }),

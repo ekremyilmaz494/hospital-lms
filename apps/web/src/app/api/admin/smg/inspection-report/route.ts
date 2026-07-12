@@ -3,7 +3,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { inspectionReportQuerySchema } from '@/lib/validations'
 import { resolveRequiredPointsBulk } from '@/lib/smg-helpers'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const { searchParams } = new URL(request.url)
@@ -54,12 +54,9 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
       select: { name: true },
     }),
     prisma.user.findMany({
-      where: {
-        organizationId: orgId,
-        role: 'staff' satisfies UserRole,
-        isActive: true,
-        ...(departmentId && { departmentId }),
-      },
+      // ortak personel: üyelikli doktoru da içer; dept filtresi iki dala AYRI eşlenir
+      // (primary User.departmentId + üyelik membership.departmentId)
+      where: orgStaffWhereByDept(orgId, departmentId ? { departmentId } : {}, { isActive: true }),
       select: {
         id: true,
         firstName: true,

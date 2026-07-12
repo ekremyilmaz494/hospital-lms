@@ -7,7 +7,7 @@ import { isSyntheticEmail } from '@/lib/synthetic-email'
 import { turkishSearchIds } from '@/lib/turkish-search'
 import { buildDepartmentHierarchy, expandDepartmentSubtree } from '@/app/api/admin/reports/_shared'
 import { logger } from '@/lib/logger'
-import type { Prisma } from '@/generated/prisma/client'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 
 /** Toplu "Excel İndir" için id listesi üst sınırı (DoS koruması). */
 const EXPORT_IDS_CAP = 5000
@@ -47,18 +47,23 @@ export const GET = withAdminRoute(async ({ request, organizationId, audit }) => 
   })
 
   // Filtre kapsamını çöz (ids öncelikli; yoksa department/search/isActive).
-  const where: Prisma.UserWhereInput = { organizationId: orgId, role: 'staff' }
+  // Ortak personel: EK hastanede (membership) staff olan doktor da B export'unda görünür. Departman
+  // filtresi orgStaffWhereByDept ile İKİ dala AYRI eşlenir (primary User.departmentId + üyeliğin
+  // org-özel membership.departmentId'si) — düz top-level departmentId üyelik dalını yanlış elerdi.
+  let deptFilter: Record<string, unknown> = {}
+  if (!idsParam && departmentParam) {
+    const hierarchy = buildDepartmentHierarchy(departments.map(d => ({ id: d.id, parentId: d.parentId })))
+    const subtree = expandDepartmentSubtree(hierarchy, [departmentParam])
+    deptFilter = { departmentId: subtree.length > 0 ? { in: subtree } : departmentParam }
+  }
+  const where = orgStaffWhereByDept(orgId, deptFilter) // id/isActive/search top-level AND (her iki dala geçerli)
   if (idsParam) {
     const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, EXPORT_IDS_CAP)
     where.id = { in: ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000'] }
   } else {
     if (isActiveParam === 'true' || isActiveParam === 'false') where.isActive = isActiveParam === 'true'
-    if (departmentParam) {
-      const hierarchy = buildDepartmentHierarchy(departments.map(d => ({ id: d.id, parentId: d.parentId })))
-      const subtree = expandDepartmentSubtree(hierarchy, [departmentParam])
-      where.departmentId = subtree.length > 0 ? { in: subtree } : departmentParam
-    }
     if (searchParam) {
+      // MVP sınırı: turkishSearchIds primary-org-scoped → ortak doktorlar (primary=A) B aramasında görünmeyebilir
       where.id = { in: await turkishSearchIds('users', ['first_name', 'last_name', 'email', 'title'], searchParam, orgId) }
     }
   }

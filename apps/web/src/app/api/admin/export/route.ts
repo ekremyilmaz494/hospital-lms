@@ -3,7 +3,7 @@ import { errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import ExcelJS from 'exceljs'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhere } from '@/lib/org-scope'
 
 const XLSX_MAX_ROWS = 5000
 const CSV_BATCH_SIZE = 500
@@ -19,8 +19,10 @@ export const GET = withAdminRoute(async ({ request, organizationId: orgId, audit
 
   if (type === 'staff') {
     const staff = await prisma.user.findMany({ // perf-check-disable-line — each branch runs only 1 query
-      where: { organizationId: orgId, role: 'staff' satisfies UserRole },
-      include: { _count: { select: { assignments: true } } },
+      where: orgStaffWhere(orgId), // ortak personel: EK hastanede üyelikli doktoru da içerir
+      // "Atanan Eğitim" sayısı BU hastaneye (org) scope'lu olmalı — ortak doktorun primary(A)
+      // atamaları B export'unun sayısını şişirmesin (denorm+indexli organizationId).
+      include: { _count: { select: { assignments: { where: { organizationId: orgId } } } } },
       orderBy: { lastName: 'asc' },
     })
 

@@ -14,7 +14,7 @@ import { checkSubscriptionLimit } from '@/lib/subscription-guard'
 import { getCached, setCached, invalidateByPrefix } from '@/lib/redis'
 import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 import { findActivePeriod } from '@/lib/training-periods'
 
 export const GET = withAdminRoute(async ({ request, organizationId }) => {
@@ -213,13 +213,10 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
         // 3. Departman bazlı personel ataması
         if (selectedDepts && selectedDepts.length > 0) {
+          // ortak personel: EK hastanedeki (membership) doktor da seçilen departmandaysa B'nin bağımsız
+          // sınavına atanır; dept filtresi iki dala AYRI eşlenir (primary + üyelik org-özel departmanı)
           const usersToAssign = await tx.user.findMany({
-            where: {
-              organizationId: organizationId,
-              isActive: true,
-              role: 'staff' satisfies UserRole,
-              departmentId: { in: selectedDepts },
-            },
+            where: orgStaffWhereByDept(organizationId, { departmentId: { in: selectedDepts } }, { isActive: true }),
           })
 
           const excludedSet = new Set(excludedStaff ?? [])
