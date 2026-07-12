@@ -21,6 +21,7 @@ import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import { createClient } from '@supabase/supabase-js'
+import { assertNotProduction } from './_guard'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- duplicate @types/pg versions cause type mismatch (bkz. src/lib/prisma.ts)
@@ -113,6 +114,7 @@ async function seedHospital(groupId: string, name: string, code: string, staffCo
 }
 
 async function main() {
+  assertNotProduction('seed-group-demo') // yıkıcı clean() içerir — prod'da ASLA çalışmasın
   if (process.argv.includes('--clean')) { await clean(); return }
 
   await clean() // idempotent — önce eskiyi temizle
