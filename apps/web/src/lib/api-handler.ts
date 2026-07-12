@@ -62,6 +62,11 @@ export interface HandlerContext<P = unknown, OrgId = string | null> {
     entityId?: string | null
     oldData?: unknown
     newData?: unknown
+    /**
+     * Ortak personel (çok-hastaneli grup, Faz 2.4): audit'i EFEKTİF org'a yaz (ör. doktorun
+     * B hastanesindeki sınav aksiyonu B zincirine düşsün). Verilmezse ctx.organizationId (primary).
+     */
+    organizationId?: string
   }) => Promise<void>
 }
 
@@ -279,9 +284,10 @@ export function withApiHandler<P extends DefaultParams = DefaultParams>(
         organizationId: effectiveOrgId,
         audit: (p) => createAuditLog({
           userId: dbUser.id,
-          organizationId: effectiveOrgId,
           request,
           ...p,
+          // Ortak personel: p.organizationId verilirse EFEKTİF org'a (B) yaz; yoksa context (primary).
+          organizationId: p.organizationId ?? effectiveOrgId,
         }),
       }
 

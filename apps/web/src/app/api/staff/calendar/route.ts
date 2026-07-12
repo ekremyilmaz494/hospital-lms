@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 /**
  * Normalize TrainingAssignment.status → UI status.
@@ -42,12 +43,16 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
   }
 
   try {
+    // Ortak personel: takvim doktorun TÜM hastanelerindeki eğitimleri birleştirir (tekil-org'da [A], inert).
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+    const multi = myOrgs.length > 1
+
     // my-trainings ile aynı görünürlük kuralı: arşivli / pasif eğitim gösterme.
     // Aksi halde staff tıklayamayacağı (404 dönen) eğitim görür.
     const where = {
       userId: dbUser.id,
       training: {
-        organizationId,
+        organizationId: { in: myOrgs },
         isActive: true,
         publishStatus: { not: 'archived' },
         startDate: { lte: rangeEnd },
@@ -68,6 +73,7 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
             startDate: true,
             endDate: true,
             examOnly: true,
+            organization: { select: { name: true } }, // hastane etiketi (ortak personel)
           },
         },
       },
@@ -84,6 +90,7 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
       status: normalizeStatus(a.status),
       trainingId: a.training.id,
       eventType: a.training.examOnly ? ('exam' as const) : ('training' as const),
+      hospitalName: multi ? (a.training.organization?.name ?? null) : null,
     }))
 
     return jsonResponse(

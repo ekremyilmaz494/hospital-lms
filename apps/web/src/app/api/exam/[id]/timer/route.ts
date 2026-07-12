@@ -10,6 +10,7 @@ import {
   type AssignmentStatus,
 } from '@/lib/exam-state-machine'
 import { logger } from '@/lib/logger'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 // Süresi dolmuş attempt'i (pre/post) completed+failed yapar ve assignment durumunu günceller.
 // Hem GET hem POST recovery yolu bunu çağırır — kullanıcı döndüğünde tutarlı sonlanma.
@@ -74,17 +75,20 @@ async function autoCompleteExpiredAttempt(attemptId: string, userId: string) {
 export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id } = params
 
+  // Ortak personel: doktor B hastanesindeki sınav süresini de başlatabilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
   // Search by attempt ID first, then assignmentId.
   // organizationId WHERE'de (pre-filter) — post-query 403 kontrolü ikinci katman kalır.
   let attempt = await prisma.examAttempt.findFirst({
-    where: { id, userId: dbUser.id, organizationId, status: { in: ['pre_exam', 'post_exam'] } },
+    where: { id, userId: dbUser.id, organizationId: { in: myOrgs }, status: { in: ['pre_exam', 'post_exam'] } },
     include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
   })
   if (!attempt) {
     // Tek atamaya scope'lu + status filtreli + attemptNumber desc — N1 riski yok
     // (timer attemptId-first çalışır; bu fallback yalnız aynı atama içindedir).
     attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-      where: { assignmentId: id, userId: dbUser.id, organizationId, status: { in: ['pre_exam', 'post_exam'] } },
+      where: { assignmentId: id, userId: dbUser.id, organizationId: { in: myOrgs }, status: { in: ['pre_exam', 'post_exam'] } },
       include: { training: { select: { examDurationMinutes: true, organizationId: true } } },
       orderBy: { attemptNumber: 'desc' },
     })
@@ -92,8 +96,8 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 
   if (!attempt) return errorResponse('Attempt not found', 404)
 
-  // Verify org isolation
-  if (attempt.training.organizationId !== organizationId) {
+  // Verify org isolation — eğitim doktorun hastanelerinden birine ait olmalı
+  if (!myOrgs.includes(attempt.training.organizationId)) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 
@@ -168,14 +172,17 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: attemptId } = params
 
+  // Ortak personel: doktor B hastanesindeki sınav süresini de sorgulayabilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
   // Ownership + org isolation check before Redis query — organizationId WHERE'de
   // (pre-filter); aşağıdaki kontrol ikinci katman.
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser.id, organizationId },
+    where: { id: attemptId, userId: dbUser.id, organizationId: { in: myOrgs } },
     include: { training: { select: { organizationId: true, examDurationMinutes: true } } },
   })
   if (!attempt) return errorResponse('Attempt not found', 404)
-  if (attempt.training.organizationId !== organizationId) {
+  if (!myOrgs.includes(attempt.training.organizationId)) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 

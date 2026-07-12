@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { getEffectiveExamQuestions } from '@/lib/exam-helpers'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 /**
  * Post-exam soru bazlı sonuç dökümü — transition result ekranı için replay kaynağı.
@@ -15,6 +16,9 @@ import { getEffectiveExamQuestions } from '@/lib/exam-helpers'
 export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id } = params
 
+  // Ortak personel: doktor B hastanesindeki sınav sonucunu da görebilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
   // attemptId veya assignmentId ile dene; her iki durumda da org + ownership zorunlu.
   // attemptNumber + assignment.maxAttempts + training.maxAttempts: attemptsRemaining
   // hesabı için submit/route.ts:243-246 ile aynı mantık.
@@ -22,7 +26,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
     where: {
       id,
       userId: dbUser.id,
-      training: { organizationId },
+      training: { organizationId: { in: myOrgs } },
     },
     select: {
       id: true,
@@ -52,7 +56,7 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
         assignmentId: id,
         userId: dbUser.id,
         status: 'completed',
-        training: { organizationId },
+        training: { organizationId: { in: myOrgs } },
       },
       select: {
         id: true,

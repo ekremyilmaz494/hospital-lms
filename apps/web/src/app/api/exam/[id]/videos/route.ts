@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers';
 import { withStaffRoute } from '@/lib/api-handler';
 import { resolveExamFlowState } from '@/lib/exam-flow-resolver';
+import { getStaffOrgIds } from '@/lib/staff-orgs';
 import { resolveTrainingVideoUrl, resolveTrainingDocumentUrl } from '@/lib/training-video-url';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/redis';
@@ -19,13 +20,16 @@ export const GET = withStaffRoute<{ id: string }>(
     const url = new URL(request.url);
     const isReview = url.searchParams.get('mode') === 'review';
 
+    // Ortak personel: doktor B hastanesindeki sınav videolarına da erişebilsin (tekil-org'da [A] → =A, inert).
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId);
+
     // Tek doğruluk kaynağı: atama + attempt + aşama resolveExamFlowState'ten.
     // Aktif (non-terminal) attempt öncelikli; yoksa son attempt (terminal dahil) —
     // taze attempt eski terminal attempt'in arkasına gizlenmez (2026-05-20
     // Devakent incident). Atamalar-arası attemptNumber sıralaması YOK ("Yeniden
     // Ata" round'larında eski atamanın denemesi yenisini gölgelemez — Haziran
     // 2026 kök neden, N1).
-    const state = await resolveExamFlowState(id, dbUser.id, organizationId);
+    const state = await resolveExamFlowState(id, dbUser.id, myOrgs);
     const attemptStatus = state.attempt?.status ?? null;
     // Videos accessible during watching_videos, post_exam (read-only), and completed phases
     // Only block during pre_exam (hasn't finished pre-exam yet).
@@ -50,13 +54,15 @@ export const GET = withStaffRoute<{ id: string }>(
     const trainingId = state.assignment?.trainingId ?? id;
 
     const training = await prisma.training.findFirst({
-      where: { id: trainingId, organizationId },
-      select: { id: true, title: true },
+      where: { id: trainingId, organizationId: { in: myOrgs } },
+      select: { id: true, title: true, organizationId: true },
     });
 
     if (!training) return errorResponse('Eğitim bulunamadı', 404);
+    // EFEKTİF org = eğitimin org'u (ortak doktorda B). Review-passed kontrolü buna scope'lanır.
+    const effectiveOrgId = training.organizationId;
 
-    // Review mode passed kontrolü — tenant-safe (training yukarıda organizationId ile filtrelendi)
+    // Review mode passed kontrolü — tenant-safe (training yukarıda org ile filtrelendi)
     if (isReview) {
       const [passedAttempt, passedAssignment] = await Promise.all([
         // Review yetki kontrolü: "geçmişte BU EĞİTİMİ geçmiş mi?" — aktif attempt
@@ -65,7 +71,7 @@ export const GET = withStaffRoute<{ id: string }>(
           where: {
             userId: dbUser.id,
             trainingId: training.id,
-            organizationId,
+            organizationId: effectiveOrgId,
             status: 'completed' satisfies AttemptStatus,
             isPassed: true,
           },
@@ -228,12 +234,15 @@ export const POST = withStaffRoute<{ id: string }>(
 
     if (!body?.videoId) return errorResponse('videoId required');
 
+    // Ortak personel: doktor B hastanesindeki video ilerlemesini de yazabilsin (tekil-org'da [A] → =A, inert).
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId);
+
     // Attempt çözümü — GET ve start ile AYNI tek doğruluk kaynağı:
     // resolveExamFlowState. Atama önce kanonikleştirilir, attempt o atamaya
     // scope'lanır; atamalar-arası attemptNumber sıralaması yok ("Yeniden Ata"
     // round'larında progress yanlış attempt'e yazılmaz — Haziran 2026 N1).
     // organizationId resolver'ın her sorgusunda WHERE'de (cross-tenant IDOR önlemi).
-    const flowState = await resolveExamFlowState(id, dbUser.id, organizationId);
+    const flowState = await resolveExamFlowState(id, dbUser.id, myOrgs);
     const resolvedAttempt = flowState.activeAttempt;
     if (!resolvedAttempt || resolvedAttempt.status !== ('watching_videos' satisfies AttemptStatus)) {
       return errorResponse('Aktif video izleme aşaması bulunamadı', 400);

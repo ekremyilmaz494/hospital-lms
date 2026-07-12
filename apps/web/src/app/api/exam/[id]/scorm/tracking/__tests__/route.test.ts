@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// Ortak personel (Faz 2.4): getStaffOrgIds tek-org döndürsün → myOrgs=[A], davranış eski tekil-org ile birebir.
+vi.mock('@/lib/staff-orgs', () => ({ getStaffOrgIds: vi.fn(async (_userId, primaryOrgId) => [primaryOrgId]) }))
 
 /**
  * SCORM tracking route — D1a (assignment durum geçişi) + C2 (rate limit) regresyon guard.
@@ -16,7 +18,7 @@ const { prismaMock, auditMock, rateLimitMock, checkFeatureMock } = vi.hoisted(()
     scormAttempt: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     certificate: { findFirst: vi.fn(), create: vi.fn() },
     examAttempt: { findFirst: vi.fn() },
-    training: { findUnique: vi.fn() },
+    training: { findUnique: vi.fn(), findFirst: vi.fn() },
   },
   auditMock: vi.fn().mockResolvedValue(undefined),
   rateLimitMock: vi.fn().mockResolvedValue(true),
@@ -73,6 +75,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   rateLimitMock.mockResolvedValue(true)
   checkFeatureMock.mockResolvedValue(true)
+  // Ortak personel (Faz 2.4): EFEKTİF org eğitimin org'undan türetilir → tekil-org'da 'org-1'.
+  prismaMock.training.findFirst.mockResolvedValue({ organizationId: 'org-1' })
   prismaMock.scormAttempt.create.mockResolvedValue({ id: 'scorm-1', attemptId: 'att-1' })
   prismaMock.scormAttempt.update.mockResolvedValue({ id: 'scorm-1' })
   prismaMock.trainingAssignment.updateMany.mockResolvedValue({ count: 1 })

@@ -5,6 +5,7 @@ import { updateVideoProgressSchema } from '@/lib/validations'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { attemptNextStatus, type AttemptStatus } from '@/lib/exam-state-machine'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 /** Update video watch progress */
 export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
@@ -12,6 +13,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 
   const allowed = await checkRateLimit(`video-progress:${dbUser.id}`, 60, 60)
   if (!allowed) return errorResponse('Çok fazla istek, lütfen bekleyin', 429)
+
+  // Ortak personel: doktor B hastanesindeki video ilerlemesini de yazabilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
 
   const body = await parseBody<{ videoId: string; watchedSeconds: number; lastPositionSeconds: number }>(request)
   if (!body?.videoId) return errorResponse('videoId required')
@@ -25,14 +29,14 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // organizationId WHERE'de (pre-filter) — sorgu hiç başka tenant satırını getirmesin.
   // Aşağıdaki post-query kontrolü ikinci katman olarak korunur (defense-in-depth).
   const attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-    where: { id: attemptId, userId: dbUser.id, organizationId, status: 'watching_videos' satisfies AttemptStatus },
+    where: { id: attemptId, userId: dbUser.id, organizationId: { in: myOrgs }, status: 'watching_videos' satisfies AttemptStatus },
     include: { training: { select: { organizationId: true } } },
   })
 
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 400)
 
-  // Verify org isolation (ikinci katman — WHERE zaten org'u filtreliyor)
-  if (attempt.training.organizationId !== organizationId) {
+  // Verify org isolation (ikinci katman — eğitim doktorun hastanelerinden birine ait olmalı)
+  if (!myOrgs.includes(attempt.training.organizationId)) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 
@@ -172,14 +176,17 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
 export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: attemptId } = params
 
-  // Verify attempt belongs to user's org — organizationId WHERE'de (pre-filter);
+  // Ortak personel: doktor B hastanesindeki video ilerlemesini de okuyabilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
+  // Verify attempt belongs to user's org(s) — organizationId WHERE'de (pre-filter);
   // aşağıdaki kontrol ikinci katman olarak kalır.
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser.id, organizationId },
+    where: { id: attemptId, userId: dbUser.id, organizationId: { in: myOrgs } },
     include: { training: { select: { organizationId: true } } },
   })
 
-  if (!attempt || attempt.training.organizationId !== organizationId) {
+  if (!attempt || !myOrgs.includes(attempt.training.organizationId)) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 

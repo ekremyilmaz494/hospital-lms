@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 interface SignBody {
   signatureData: string
@@ -32,15 +33,20 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse('Onay imzası "ACKNOWLEDGED" değerinde olmalıdır', 400)
   }
 
-  // Attempt'i bul — userId + organizationId eşleşmeli.
+  // Ortak personel: doktor B hastanesindeki sınavını da imzalayabilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
+  // Attempt'i bul — userId + organizationId (doktorun hastanelerinden biri) eşleşmeli.
   // (CLAUDE.md: her DB sorgusunda organizationId filtresi zorunlu — burada
   // userId zaten sahipliği garantiliyor; organizationId savunma katmanı.)
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: attemptId, userId: dbUser.id, organizationId },
-    select: { id: true, isPassed: true, signedAt: true, trainingId: true },
+    where: { id: attemptId, userId: dbUser.id, organizationId: { in: myOrgs } },
+    select: { id: true, isPassed: true, signedAt: true, trainingId: true, organizationId: true },
   })
 
   if (!attempt) return errorResponse('Sınav denemesi bulunamadı', 404)
+  // EFEKTİF org = attempt'in kendi org'u (B) — yazma/audit primary A'ya değil buraya düşmeli.
+  const effectiveOrgId = attempt.organizationId
 
   // Sadece geçenler imzalayabilir
   if (!attempt.isPassed) return errorResponse('Sadece başarılı sınav denemeleri imzalanabilir', 403)
@@ -54,7 +60,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // Atomik çift-imza koruması — yalnız henüz imzalanmamışken güncelle.
   // findFirst'teki signedAt kontrolü ile update arasındaki yarışı kapatır.
   const signed = await prisma.examAttempt.updateMany({
-    where: { id: attemptId, userId: dbUser.id, organizationId, signedAt: null },
+    where: { id: attemptId, userId: dbUser.id, organizationId: effectiveOrgId, signedAt: null },
     data: { signedAt, signatureData, signatureIp, signatureMethod },
   })
   if (signed.count === 0) return errorResponse('Zaten imzalandı', 409)
@@ -63,6 +69,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     action: 'sign',
     entityType: 'exam_attempt',
     entityId: attemptId,
+    organizationId: effectiveOrgId, // ortak personel: audit efektif hastane (B) zincirine
     newData: { signatureMethod, signatureIp, signedAt },
   })
 

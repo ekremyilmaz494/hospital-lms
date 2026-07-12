@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Ortak personel (Faz 2.4): getStaffOrgIds tek-org döndürsün → myOrgs=[A], davranış eski tekil-org ile birebir.
+vi.mock('@/lib/staff-orgs', () => ({ getStaffOrgIds: vi.fn(async (_userId, primaryOrgId) => [primaryOrgId]) }))
 
 /**
  * Bu test dosyası video ilerleme (lastPositionSeconds / watchedSeconds)
@@ -335,7 +337,7 @@ describe('POST /api/exam/[id]/videos — video progress regression guard', () =>
       );
 
       expect(res.status).toBe(200);
-      expect(resolveExamFlowState).toHaveBeenCalledWith('assignment-1', 'staff-1', 'org-1');
+      expect(resolveExamFlowState).toHaveBeenCalledWith('assignment-1', 'staff-1', ['org-1']); // ortak personel: myOrgs
       // Route kendi başına examAttempt sorgusu ATMAMALI — kopya sorgu drift kaynağı.
       expect(prismaMock.examAttempt.findFirst).not.toHaveBeenCalled();
     });

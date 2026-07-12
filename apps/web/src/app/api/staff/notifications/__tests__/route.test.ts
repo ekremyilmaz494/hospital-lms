@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// Ortak personel (Faz 2.4): getStaffOrgIds tek-org döndürsün → myOrgs=[A], davranış eski tekil-org ile birebir.
+vi.mock('@/lib/staff-orgs', () => ({ getStaffOrgIds: vi.fn(async (_userId, primaryOrgId) => [primaryOrgId]) }))
 import { NextResponse } from 'next/server'
 
 vi.mock('@/lib/api-helpers', async () => {
@@ -126,7 +128,7 @@ describe('GET /api/staff/notifications', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           userId: 'staff-1',
-          organizationId: 'org-1',
+          organizationId: { in: ['org-1'] }, // ortak personel: {in: myOrgs}
         }),
       })
     )
@@ -135,7 +137,7 @@ describe('GET /api/staff/notifications', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           userId: 'staff-1',
-          organizationId: 'org-1',
+          organizationId: { in: ['org-1'] },
           isRead: false,
         }),
       })
@@ -165,7 +167,7 @@ describe('PATCH /api/staff/notifications', () => {
       where: {
         id: validUUID,
         userId: 'staff-1',
-        organizationId: 'org-1',
+        organizationId: { in: ['org-1'] }, // ortak personel: {in: myOrgs}
       },
       data: { isRead: true },
     })
@@ -203,7 +205,7 @@ describe('PATCH /api/staff/notifications', () => {
     expect(mockNotificationFindMany).toHaveBeenCalledWith({
       where: {
         userId: 'staff-1',
-        organizationId: 'org-1',
+        organizationId: { in: ['org-1'] }, // ortak personel: {in: myOrgs}
         isRead: false,
       },
       select: { id: true },

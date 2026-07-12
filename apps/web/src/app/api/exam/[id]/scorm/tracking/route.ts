@@ -8,6 +8,7 @@ import { SCORM_FEATURE_DISABLED_MSG } from '@/lib/scorm/config'
 import { isScormPassed } from '@/lib/scorm/completion'
 import { assignmentNextStatus, ASSIGNMENT_TERMINAL_STATUSES, type AssignmentStatus } from '@/lib/exam-state-machine'
 import { logger } from '@/lib/logger'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 // GÜVENLİK (anti-cheat): SCORM tamamlama tamamen istemci-raporludur (SCORM runtime,
 // cmi.core.lesson_status'u iframe içinden gönderir). İçeriği hiç açmadan tek bir
@@ -21,13 +22,15 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
   const { id: trainingId } = params
 
   try {
+    // Ortak personel: doktor B hastanesindeki SCORM oturumunu da görebilsin (tekil-org'da [A] → =A, inert).
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
     const where: Record<string, unknown> = {
       trainingId,
       userId: dbUser.id,
     }
-    // Org izolasyonu: super_admin haric kullanicilar sadece kendi org'larini gorebilir
+    // Org izolasyonu: super_admin haric kullanicilar sadece kendi org'larini (primary + üyelik) gorebilir
     if (dbUser.role !== 'super_admin') {
-      where.organizationId = organizationId
+      where.organizationId = { in: myOrgs }
     }
 
     const attempt = await prisma.scormAttempt.findFirst({
@@ -46,7 +49,17 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
 export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, organizationId }) => {
   const { id: trainingId } = params
 
-  const enabled = await checkFeature(organizationId, 'scormSupport')
+  // Ortak personel: doktor B hastanesindeki SCORM eğitimine de oturum açabilsin (tekil-org'da [A] → =A, inert).
+  // EFEKTİF org = eğitimin org'u (B) — feature gate + attempt yazması buna bağlanır, primary A'ya değil.
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+  const training = await prisma.training.findFirst({
+    where: { id: trainingId, organizationId: { in: myOrgs } },
+    select: { organizationId: true },
+  })
+  if (!training) return errorResponse('Bu eğitim için atamanız bulunamadı', 403)
+  const effectiveOrgId = training.organizationId
+
+  const enabled = await checkFeature(effectiveOrgId, 'scormSupport')
   if (!enabled) return errorResponse(SCORM_FEATURE_DISABLED_MSG, 403)
 
   // Oturum oluşturma seyrek olmalı — abuse/yanlışlıkla tekrar mount koruması.
@@ -55,9 +68,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 
   try {
     // Verify user has assignment for this training (any period — SCORM legacy)
-    // organizationId filtresi — tenant izolasyonu (Faz 1 ile tutarlı).
+    // organizationId filtresi — tenant izolasyonu (efektif org = eğitimin org'u).
     const assignment = await prisma.trainingAssignment.findFirst({
-      where: { trainingId, userId: dbUser.id, organizationId },
+      where: { trainingId, userId: dbUser.id, organizationId: effectiveOrgId },
       orderBy: { assignedAt: 'desc' },
       select: { id: true, status: true },
     })
@@ -68,7 +81,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 
     const attempt = await prisma.scormAttempt.create({
       data: {
-        organizationId,
+        organizationId: effectiveOrgId,
         userId: dbUser.id,
         trainingId,
       },
@@ -106,7 +119,17 @@ export const POST = withStaffRoute<{ id: string }>(async ({ params, dbUser, orga
 export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId, audit }) => {
   const { id: trainingId } = params
 
-  const enabled = await checkFeature(organizationId, 'scormSupport')
+  // Ortak personel: doktor B hastanesindeki SCORM ilerlemesini de yazabilsin (tekil-org'da [A] → =A, inert).
+  // EFEKTİF org = eğitimin org'u (B) — feature gate + attempt/sertifika yazması + audit buna bağlanır.
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+  const trainingOrg = await prisma.training.findFirst({
+    where: { id: trainingId, organizationId: { in: myOrgs } },
+    select: { organizationId: true },
+  })
+  if (!trainingOrg) return errorResponse('SCORM oturumu bulunamadı', 404)
+  const effectiveOrgId = trainingOrg.organizationId
+
+  const enabled = await checkFeature(effectiveOrgId, 'scormSupport')
   if (!enabled) return errorResponse(SCORM_FEATURE_DISABLED_MSG, 403)
 
   // SCORM commit'leri sık gelir (istemci ~2sn debounce → ~30/dk); burst için tavan 40/dk.
@@ -133,7 +156,7 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
       userId: dbUser.id,
     }
     if (dbUser.role !== 'super_admin') {
-      scormWhere.organizationId = organizationId
+      scormWhere.organizationId = effectiveOrgId
     }
     const existing = await prisma.scormAttempt.findFirst({
       where: scormWhere,
@@ -185,7 +208,7 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
       // in_progress'e (ATTEMPT_STARTED), sonra passed'e (POST_EXAM_PASSED) — bypass YOK.
       // org-filtreli lookup + atomik guard (yalnız non-terminal iken yaz) + audit.
       const assignment = await prisma.trainingAssignment.findFirst({
-        where: { trainingId, userId: dbUser.id, organizationId },
+        where: { trainingId, userId: dbUser.id, organizationId: effectiveOrgId },
         orderBy: { assignedAt: 'desc' },
         select: { id: true, status: true },
       })
@@ -206,6 +229,7 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
               action: 'scorm.assignment_passed',
               entityType: 'training_assignment',
               entityId: assignment.id,
+              organizationId: effectiveOrgId, // ortak personel: audit efektif hastane (B) zincirine
               newData: { trainingId, from: assignment.status, to: t2.next, elapsedSeconds: Math.round(elapsedSeconds) },
             })
           }
@@ -246,7 +270,7 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
           data: {
             userId: dbUser.id,
             trainingId,
-            organizationId,
+            organizationId: effectiveOrgId, // sertifika eğitimin org'unda (B) verilir, primary A'da değil
             ...(examAttempt ? { attemptId: examAttempt.id } : { scormAttemptId: existing.id }),
             certificateCode: certCode,
             expiresAt,
@@ -257,6 +281,7 @@ export const PATCH = withStaffRoute<{ id: string }>(async ({ request, params, db
           action: 'scorm_certificate_created',
           entityType: 'certificate',
           entityId: cert.id,
+          organizationId: effectiveOrgId, // ortak personel: audit efektif hastane (B) zincirine
           newData: { certificateCode: certCode, trainingId, linkedTo: examAttempt ? 'exam_attempt' : 'scorm_attempt' },
         })
 

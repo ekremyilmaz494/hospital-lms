@@ -1,6 +1,7 @@
 import { jsonResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 import type { ExamRoute } from '@/lib/exam-state-machine'
 
 /**
@@ -32,7 +33,9 @@ export const GET = withStaffRoute<{ id: string }>(
     const from = url.searchParams.get('from')
     const currentRoute = VALID_ROUTES.includes(from as ExamRoute) ? (from as ExamRoute) : undefined
 
-    const state = await resolveExamFlowState(id, dbUser.id, organizationId, { currentRoute })
+    // Ortak personel: doktor B hastanesindeki sınav aşamasını da senkronlayabilsin (tekil-org'da inert).
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+    const state = await resolveExamFlowState(id, dbUser.id, myOrgs, { currentRoute })
 
     // Aşama bilgisi bayatlamamalı — bu endpoint'in tek varlık sebebi tazelik.
     return jsonResponse(

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// Ortak personel (Faz 2.4): getStaffOrgIds tek-org döndürsün → myOrgs=[A], davranış eski tekil-org ile birebir.
+vi.mock('@/lib/staff-orgs', () => ({ getStaffOrgIds: vi.fn(async (_userId, primaryOrgId) => [primaryOrgId]) }))
 
 /**
  * sign/route.ts regresyon koruması (Plan: birden-fazla-agentla... Faz 4).
@@ -52,7 +54,7 @@ const ACK = { signatureData: 'ACKNOWLEDGED', signatureMethod: 'acknowledge' }
 beforeEach(() => {
   vi.clearAllMocks()
   prismaMock.examAttempt.findFirst.mockResolvedValue({
-    id: 'att-1', isPassed: true, signedAt: null, trainingId: 'tr-1',
+    id: 'att-1', isPassed: true, signedAt: null, trainingId: 'tr-1', organizationId: 'org-1',
   })
   prismaMock.examAttempt.updateMany.mockResolvedValue({ count: 1 })
 })
@@ -63,11 +65,11 @@ describe('POST /api/exam/[id]/sign', () => {
     expect(res.status).toBe(200)
 
     const findArgs = prismaMock.examAttempt.findFirst.mock.calls[0][0] as { where: Record<string, unknown> }
-    expect(findArgs.where.organizationId).toBe('org-1')
+    expect(findArgs.where.organizationId).toEqual({ in: ['org-1'] }) // ortak personel: {in: myOrgs}
     expect(findArgs.where.userId).toBe('staff-1')
 
     const updArgs = prismaMock.examAttempt.updateMany.mock.calls[0][0] as { where: Record<string, unknown> }
-    expect(updArgs.where.organizationId).toBe('org-1')
+    expect(updArgs.where.organizationId).toBe('org-1') // yazma → EFEKTİF org (attempt'in org'u)
     expect(updArgs.where.signedAt).toBeNull() // atomik çift-imza guard
   })
 

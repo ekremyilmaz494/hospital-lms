@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { resolveTrainingVideoUrl } from '@/lib/training-video-url'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 
 /** Get signed streaming URL for a video */
@@ -12,6 +13,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
   const videoId = searchParams.get('videoId')
   if (!videoId) return errorResponse('videoId required')
 
+  // Ortak personel: doktor B hastanesindeki sınav videosunu da izleyebilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
   // Verify attempt belongs to user and is in video phase
   const attempt = await prisma.examAttempt.findFirst({
     where: { id: attemptId, userId: dbUser.id, status: 'watching_videos' satisfies AttemptStatus },
@@ -19,8 +23,8 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
   })
   if (!attempt) return errorResponse('Invalid attempt or not in video phase', 403)
 
-  // Verify org isolation
-  if (attempt.training.organizationId !== organizationId) {
+  // Verify org isolation — eğitim doktorun hastanelerinden (primary/üyelik) birine ait olmalı
+  if (!myOrgs.includes(attempt.training.organizationId)) {
     return errorResponse('Yetkisiz erişim', 403)
   }
 

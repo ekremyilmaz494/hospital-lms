@@ -4,7 +4,8 @@ import { withStaffRoute } from '@/lib/api-handler'
 import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
 import { getCached, setCached } from '@/lib/redis'
-import { findActivePeriod, getEffectiveStartDate } from '@/lib/training-periods'
+import { getEffectiveStartDate } from '@/lib/training-periods'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 const CACHE_TTL = 60
 
@@ -19,9 +20,17 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
       return jsonResponse(cached, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
     }
 
-    // Aktif period scope — yoksa boş dashboard döner (defansif)
-    const activePeriod = await findActivePeriod(organizationId)
-    if (!activePeriod) {
+    // Ortak personel (Faz 2.4): doktorun TÜM hastanelerindeki (primary + aktif üyelik) aktif dönem
+    // atamalarını birleştir. Tekil-org'da myOrgs=[A] → tek aktif dönem, davranış BİREBİR korunur.
+    const myOrgs = await getStaffOrgIds(userId, organizationId)
+    const multi = myOrgs.length > 1
+
+    // Her hastanenin KENDİ aktif dönemi olabilir — hepsini topla (scope + eligibility için)
+    const activePeriods = await prisma.trainingPeriod.findMany({
+      where: { organizationId: { in: myOrgs }, status: 'active' },
+      select: { id: true, startDate: true },
+    })
+    if (activePeriods.length === 0) {
       const empty = {
         stats: { assigned: 0, inProgress: 0, completed: 0, failed: 0, overallProgress: 0 },
         upcomingTrainings: [],
@@ -31,6 +40,8 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
       }
       return jsonResponse(empty, 200, { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' })
     }
+    const activePeriodIds = activePeriods.map(p => p.id)
+    const periodStartById = new Map(activePeriods.map(p => [p.id, p.startDate]))
 
     // 1) Assignments + attempts + notifications + recent activity — tümü paralel
     // Arşivlenmiş/pasif eğitimleri filtrele — my-trainings ile aynı görünürlük
@@ -39,9 +50,9 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
       prisma.trainingAssignment.findMany({
         where: {
           userId,
-          periodId: activePeriod.id,
+          periodId: { in: activePeriodIds },
           training: {
-            organizationId,
+            organizationId: { in: myOrgs },
             isActive: true,
             publishStatus: { not: 'archived' },
           },
@@ -51,6 +62,7 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
             select: {
               id: true, title: true, category: true, examOnly: true,
               passingScore: true, startDate: true, endDate: true,
+              organization: { select: { name: true } }, // hastane etiketi (ortak personel)
             },
           },
           examAttempts: {
@@ -89,17 +101,19 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
       }),
     ])
 
-    // Effective start: yıl içi gelen personel için işe başlama tarihinden say
-    const effectiveStart = currentUser
-      ? getEffectiveStartDate(
-          { hireDate: currentUser.hireDate, createdAt: currentUser.createdAt },
-          { startDate: activePeriod.startDate },
-        )
-      : activePeriod.startDate
-
-    const eligibleAssignments = assignments.filter(
-      a => new Date(a.assignedAt) >= effectiveStart,
-    )
+    // Effective start: yıl içi gelen personel için işe başlama tarihinden say. Ortak personelde
+    // her atama KENDİ hastanesinin dönem başına göre elenir (hastanelerin dönem başları farklı olabilir).
+    const eligibleAssignments = assignments.filter(a => {
+      const pStart = periodStartById.get(a.periodId ?? '')
+      if (!pStart) return false // defansif — query zaten periodId'yi aktif dönemlerle sınırlıyor
+      const effStart = currentUser
+        ? getEffectiveStartDate(
+            { hireDate: currentUser.hireDate, createdAt: currentUser.createdAt },
+            { startDate: pStart },
+          )
+        : pStart
+      return new Date(a.assignedAt) >= effStart
+    })
 
     // 2) Assignment stats — effectiveStart sonrası atamalar üzerinden
     const assigned = eligibleAssignments.length
@@ -137,6 +151,7 @@ export const GET = withStaffRoute(async ({ dbUser, organizationId }) => {
           status: a.status,
           daysLeft,
           progress,
+          hospitalName: multi ? (a.training.organization?.name ?? null) : null,
         }
       })
       .sort((a, b) => a.daysLeft - b.daysLeft)

@@ -10,6 +10,7 @@ import { isAttemptFeedbackTriggered } from '@/lib/feedback-helpers'
 import { issueCertificateForAttempt } from '@/lib/certificate-helpers'
 import { getEffectiveExamQuestions, advancePastVideosIfNoneRequired } from '@/lib/exam-helpers'
 import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 import {
   attemptNextStatus,
   assignmentNextStatus,
@@ -42,9 +43,12 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     return errorResponse(parsed.error.message)
   }
 
-  // B7.3/G7.3 — Explicit organizationId cross-check: training.organizationId === dbUser.organizationId
+  // Ortak personel: doktor B hastanesindeki sınavını da gönderebilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
+  // B7.3/G7.3 — Explicit organizationId cross-check: training.organizationId doktorun hastanelerinden biri
   let attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-    where: { id: attemptId, userId: dbUser.id, training: { organizationId: organizationId } },
+    where: { id: attemptId, userId: dbUser.id, training: { organizationId: { in: myOrgs } } },
     include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
   })
   if (!attempt) {
@@ -53,16 +57,19 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     // öncelikli; yoksa son attempt: completed çift-submit idempotent replay'e
     // girer, expired faz guard'ında 400 alır. Eski `status: { not: 'completed' }`
     // filtresi expired'i aktif sayıyordu (N3) — artık saymaz.
-    const flow = await resolveExamFlowState(attemptId, dbUser.id, organizationId)
+    const flow = await resolveExamFlowState(attemptId, dbUser.id, myOrgs)
     if (flow.attempt) {
       attempt = await prisma.examAttempt.findFirst({ // perf-check-disable-line
-        where: { id: flow.attempt.id, userId: dbUser.id, training: { organizationId: organizationId } },
+        where: { id: flow.attempt.id, userId: dbUser.id, training: { organizationId: { in: myOrgs } } },
         include: { training: { include: { organization: { select: { name: true } } } }, assignment: true },
       })
     }
   }
 
   if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı. Sınavı yeniden başlatın.', 404)
+  // EFEKTİF org = attempt'in eğitiminin org'u (ortak doktorda B). Sertifika + org-config okuması buna
+  // bağlanır; primary A'ya bağlanırsa B-eğitiminin sertifikası A'ya yazılır = tenant bozulması. Tekil-org'da =A.
+  const effectiveOrgId = attempt.training.organizationId
 
   // ── Idempotent replay ────────────────────────────────────────────────────
   // Çift submit (çift tıklama, retry, ağ tekrarı) 400 yerine KAYITLI sonucu
@@ -356,7 +363,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
           attemptId: attempt.id,
           userId: dbUser.id,
           trainingId: attempt.trainingId,
-          organizationId,
+          organizationId: effectiveOrgId, // sertifika eğitimin org'unda (B) verilir, primary A'da değil
           periodId: attempt.assignment.periodId ?? null,
           trainingTitle: attempt.training.title,
           renewalPeriodMonths: attempt.training.renewalPeriodMonths,
@@ -426,7 +433,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   if (phase === 'post') {
     try {
       const activeFormExists = !!(await prisma.trainingFeedbackForm.findFirst({
-        where: { organizationId, isActive: true, isArchived: false },
+        where: { organizationId: effectiveOrgId, isActive: true, isArchived: false },
         select: { id: true },
       }))
       feedbackRequired =
