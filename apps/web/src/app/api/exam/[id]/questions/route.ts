@@ -7,6 +7,7 @@ import {
   shuffle,
   stringToSeed,
 } from '@/lib/exam-helpers'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUser, organizationId }) => {
   const { id } = params
@@ -18,13 +19,15 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
     return errorResponse('phase parametresi zorunludur (pre veya post)', 400)
   }
   const requiredStatus = phase === 'pre' ? 'pre_exam' : 'post_exam'
-  const { attempt, error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser.id, [requiredStatus], organizationId)
+  // Ortak personel: doktor B hastanesindeki sınav sorularına da erişebilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+  const { attempt, error: phaseError } = await getAttemptWithPhaseCheck(id, dbUser.id, [requiredStatus], myOrgs)
   if (phaseError) return phaseError
 
   // id can be trainingId or assignmentId — find the training
-  // Always enforce organizationId to prevent cross-tenant data access
+  // Always enforce organizationId to prevent cross-tenant data access (ortak personelde tüm org'ları)
   const assignment = await prisma.trainingAssignment.findFirst({
-    where: { id, userId: dbUser.id, training: { organizationId } },
+    where: { id, userId: dbUser.id, training: { organizationId: { in: myOrgs } } },
     include: { training: true },
   })
 
@@ -32,9 +35,9 @@ export const GET = withStaffRoute<{ id: string }>(async ({ request, params, dbUs
 
   // If not found by assignment ID, try as training ID — still enforce org isolation
   if (!training) {
-    // Verify the user actually has an assignment for this training in their org
+    // Verify the user actually has an assignment for this training in their org(s)
     const assignmentByTraining = await prisma.trainingAssignment.findFirst({
-      where: { trainingId: id, userId: dbUser.id, training: { organizationId } },
+      where: { trainingId: id, userId: dbUser.id, training: { organizationId: { in: myOrgs } } },
       include: { training: true },
     })
     training = assignmentByTraining?.training ?? null

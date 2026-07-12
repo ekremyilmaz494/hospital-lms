@@ -17,6 +17,7 @@ import { isOnPrem } from '@/lib/deployment'
 import { getLicenseState } from '@/lib/license/cache'
 import { LICENSE_STATE_COOKIE } from '@/lib/license/enforcement'
 import { verifyAccessToken } from '@/lib/supabase/verify-jwt'
+import { extractGroupClaims } from '@/lib/auth/group-authority'
 
 /**
  * "SMS MFA pending" sentinel cookie.
@@ -237,6 +238,7 @@ export async function POST(request: NextRequest) {
         isActive: true,
         role: true,
         organizationId: true,
+        groupId: true,
         phone: true,
         phoneVerifiedAt: true,
         organization: { select: { slug: true, isActive: true, isSuspended: true, smsMfaEnabled: true, setupCompleted: true, ipAllowlistEnabled: true, ipAllowlist: true } },
@@ -259,9 +261,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Org pasif/askıya alınmışsa (örn. demo iptali) giriş ekranında temiz ret — super_admin muaf.
-    // checkOrgActive (api-helpers.ts) ile birebir aynı kural/mesaj; aksi halde kullanıcı girip
-    // her API'den 403 alırdı.
-    if ((!dbUser.organization?.isActive || dbUser.organization?.isSuspended) && dbUser.role !== 'super_admin') {
+    // checkOrgActive (api-helpers.ts) ile birebir aynı kural/mesaj: org'u OLMAYAN kullanıcı
+    // (super_admin VEYA grup yöneticisi, organizationId=null) muaf — aksi halde `organization`
+    // relation null olduğu için grup yöneticisi (esas yönetici) girişte yanlışlıkla "askıya
+    // alındı" 403'ü alırdı (checkOrgActive `!organizationId` ile short-circuit ediyor, burası etmiyordu).
+    if (dbUser.organizationId && (!dbUser.organization?.isActive || dbUser.organization?.isSuspended) && dbUser.role !== 'super_admin') {
       return jsonResponse(
         { error: 'Kurumunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.' },
         403
@@ -300,7 +304,19 @@ export async function POST(request: NextRequest) {
     const expectedRole = dbUser.role
     const expectedOrgId = dbUser.organizationId ?? undefined
 
-    if (authRole !== expectedRole || (expectedRole !== 'super_admin' && authOrgId !== expectedOrgId)) {
+    // Grup yöneticisi (esas yönetici) claim'leri: User.groupId set ⟺ grup yöneticisi (invariant).
+    // JWT app_metadata.group_owner/group_id DB'den drift ederse role/org ile aynı şekilde re-mint edilir.
+    const authGroupClaims = extractGroupClaims(authAppMetadata)
+    const expectedGroupId: string | null = dbUser.groupId ?? null
+    const expectedGroupOwner = expectedGroupId !== null
+    const groupDrift =
+      authGroupClaims.groupOwner !== expectedGroupOwner || authGroupClaims.groupId !== expectedGroupId
+
+    if (
+      authRole !== expectedRole ||
+      (expectedRole !== 'super_admin' && authOrgId !== expectedOrgId) ||
+      groupDrift
+    ) {
       try {
         const adminClient = await createServiceClient()
         const nextAppMetadata: Record<string, unknown> = {
@@ -311,6 +327,13 @@ export async function POST(request: NextRequest) {
           nextAppMetadata.organization_id = expectedOrgId
         } else {
           delete nextAppMetadata.organization_id
+        }
+        if (expectedGroupId) {
+          nextAppMetadata.group_owner = true
+          nextAppMetadata.group_id = expectedGroupId
+        } else {
+          delete nextAppMetadata.group_owner
+          delete nextAppMetadata.group_id
         }
 
         const { error: metadataError } = await adminClient.auth.admin.updateUserById(signedInUser.id, {
@@ -344,13 +367,17 @@ export async function POST(request: NextRequest) {
       : null
     const verifiedOrgId = (verifiedSession?.payload.app_metadata as Record<string, unknown> | undefined)?.organization_id
     const jwtOrgOk = role === 'super_admin' || verifiedOrgId === expectedOrgId
-    if (!verifiedSession || verifiedSession.role !== role || !jwtOrgOk) {
+    const verifiedGroup = extractGroupClaims(verifiedSession?.payload.app_metadata as Record<string, unknown> | undefined)
+    const jwtGroupOk = verifiedGroup.groupId === expectedGroupId && verifiedGroup.groupOwner === expectedGroupOwner
+    if (!verifiedSession || verifiedSession.role !== role || !jwtOrgOk || !jwtGroupOk) {
       logger.warn('auth:login', 'JWT metadata DB rolüyle eşleşmiyor', {
         userId: dbUser.id,
         role,
         jwtRole: verifiedSession?.role ?? null,
         organizationId: expectedOrgId ?? null,
         jwtOrganizationId: typeof verifiedOrgId === 'string' ? verifiedOrgId : null,
+        groupOwner: expectedGroupOwner,
+        jwtGroupOk,
       })
       await supabase.auth.signOut().catch(() => {})
       return errorResponse('Oturum bilgileriniz güncellenemedi. Lütfen tekrar deneyin.', 500)
@@ -497,6 +524,9 @@ export async function POST(request: NextRequest) {
         role: role ?? 'staff',
       },
       mustChangePassword: dbUser.mustChangePassword,
+      // Grup yöneticisi (esas yönetici) ise client'ı /group/dashboard'a yönlendirir.
+      // Grup yöneticisi role='admin' + org=null olduğundan ROLE_ROUTES onu yanlış /admin'e atardı.
+      groupOwner: expectedGroupOwner,
       // Admin layout setup-wizard guard'ı için: ilk login'de ekstra /api/admin/setup
       // fetch'ini atlayabilsin. dbUser.organization.setupCompleted gerçek kaynak.
       setupCompleted: dbUser.organization?.setupCompleted ?? null,

@@ -4,8 +4,8 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { getCached, setCached } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import { findActivePeriod } from '@/lib/training-periods'
-import { complianceAlertStatus } from '@/lib/compliance-alert'
-import type { UserRole } from '@/types/database'
+import { fetchOrgKpis } from '@/lib/dashboard/aggregations'
+import { withOrgStaffScope } from '@/lib/org-scope'
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
 
@@ -79,116 +79,20 @@ async function fetchStats(orgId: string) {
   const cached = await getCached<object>(cacheKey)
   if (cached) return cached
 
-  const trainingScope = { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } }
-
-  const activePeriod = await findActivePeriod(orgId)
-  const periodFilter: Record<string, unknown> = activePeriod ? { periodId: activePeriod.id } : {}
-
-  // P2 §2.14 — compulsoryTrainings için tüm assignment satırlarını çekmek yerine
-  // groupBy(['trainingId', 'status']) ile sayım yap; memory'de N×M scan'i sıfıra indirir.
-  const [
-    staffCount,
-    activeStaffCount,
-    publishedTrainingCount,
-    activeTrainingCount,
-    statusCounts,
-    compulsoryTrainings,
-    compulsoryStatusCounts,
-    overdueCount,
-  ] = await Promise.all([
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
-    prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
-    prisma.training.count({ where: { ...trainingScope, publishStatus: 'published' } }),
-    prisma.training.count({ where: trainingScope }),
-    prisma.trainingAssignment.groupBy({ by: ['status'], where: { training: trainingScope, ...periodFilter }, _count: true }),
-    prisma.training.findMany({
-      where: { ...trainingScope, isCompulsory: true },
-      select: { id: true, title: true, complianceDeadline: true, regulatoryBody: true },
-    }),
-    prisma.trainingAssignment.groupBy({
-      by: ['trainingId', 'status'],
-      where: { training: { ...trainingScope, isCompulsory: true }, ...periodFilter },
-      _count: true,
-    }),
-    // Geciken eğitim: süresi dolmuş, henüz tamamlanmamış. Failed = tamamlandı (kaldı), overdue değil.
-    // Atamanın kendi dueDate override'ı ÖNCELİKLİ (örn. 2. tur yeni teslim tarihi);
-    // dueDate yoksa eğitimin endDate'ine düşer. Sadece endDate bakmak yeni turları yanlış geciken sayardı.
-    prisma.trainingAssignment.count({
-      where: {
-        ...periodFilter,
-        status: { notIn: ['passed', 'failed'] },
-        OR: [
-          { dueDate: { lt: new Date() }, training: trainingScope },
-          { dueDate: null, training: { ...trainingScope, endDate: { lt: new Date() } } },
-        ],
-      },
-    }),
-  ])
-
-  const now = new Date()
-  const statusMap = new Map(statusCounts.map(s => [s.status, s._count]))
-  const completedCount = statusMap.get('passed') ?? 0
-  const failedCount = statusMap.get('failed') ?? 0
-  const inProgressCount = statusMap.get('in_progress') ?? 0
-  // P2 §2.13 — "Bekleyen" explicit (assigned status); implicit "geri kalan" yerine.
-  const assignedPendingCount = statusMap.get('assigned') ?? 0
-  const totalAssignments = statusCounts.reduce((sum, s) => sum + s._count, 0)
-  const completionRate = totalAssignments > 0 ? Math.round((completedCount / totalAssignments) * 100) : 0
-
-  // Compulsory aggregate via groupBy — N×M memory scan'i yok.
-  const compulsoryTotalsByTraining = new Map<string, { total: number; passed: number }>()
-  for (const row of compulsoryStatusCounts) {
-    const entry = compulsoryTotalsByTraining.get(row.trainingId) ?? { total: 0, passed: 0 }
-    entry.total += row._count
-    if (row.status === 'passed') entry.passed += row._count
-    compulsoryTotalsByTraining.set(row.trainingId, entry)
-  }
-  let compulsoryAssignmentCount = 0
-  let compulsoryCompletedCount = 0
-  for (const t of compulsoryTotalsByTraining.values()) {
-    compulsoryAssignmentCount += t.total
-    compulsoryCompletedCount += t.passed
-  }
-  const hasCompliance = compulsoryAssignmentCount > 0
-  const complianceRate = hasCompliance ? Math.round((compulsoryCompletedCount / compulsoryAssignmentCount) * 100) : 0
-  const complianceValue: number | string = hasCompliance ? `%${complianceRate}` : '—'
-
-  // Süresi GEÇMİŞ zorunlu eğitimleri de göster — eskiden `> now` ile eleniyordu, bu da
-  // tam tehlikeli (deadline geçmiş, uyum düşük) eğitimleri admin'den gizliyordu.
-  // daysLeft <= 0 → status 'overdue' (frontend "Süre Doldu!" olarak kırmızı render eder).
-  const complianceAlerts = compulsoryTrainings
-    .filter(t => t.complianceDeadline)
-    .map(t => {
-      const daysLeft = Math.ceil((new Date(t.complianceDeadline!).getTime() - now.getTime()) / 86400000)
-      const totals = compulsoryTotalsByTraining.get(t.id) ?? { total: 0, passed: 0 }
-      return {
-        training: t.title,
-        regulatoryBody: t.regulatoryBody ?? '',
-        daysLeft,
-        complianceRate: totals.total > 0 ? Math.round((totals.passed / totals.total) * 100) : 0,
-        status: complianceAlertStatus(daysLeft),
-      }
-    })
-    .sort((a, b) => a.daysLeft - b.daysLeft)
-    .slice(0, 5)
-
-  const statusDistribution = [
-    { name: 'Tamamlanan', value: completedCount, color: 'var(--color-success)' },
-    { name: 'Devam Eden', value: inProgressCount, color: 'var(--color-info)' },
-    { name: 'Başarısız', value: failedCount, color: 'var(--color-error)' },
-    { name: 'Bekleyen', value: assignedPendingCount, color: 'var(--color-warning)' },
-  ]
+  // Çekirdek KPI'lar TEK kaynaktan (lib/dashboard/aggregations) — grup konsolide paneli
+  // aynı fonksiyonu hastaneler arası kullanır, rakamlar birebir tutarlı kalır.
+  const k = await fetchOrgKpis(orgId)
 
   const data = {
     stats: [
-      { title: 'Toplam Personel', value: staffCount, icon: 'Users', accentColor: 'var(--color-primary)', trend: { value: activeStaffCount, label: 'aktif', isPositive: true, suffix: '' } },
-      { title: 'Aktif Eğitim', value: activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: publishedTrainingCount, label: 'yayında', isPositive: true, suffix: '' } },
-      { title: 'Tamamlanma Oranı', value: `%${completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: completedCount, label: 'tamamlanan', isPositive: true, suffix: '' } },
-      { title: 'Geciken Eğitim', value: overdueCount, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: failedCount, label: 'başarısız', isPositive: false, suffix: '' } },
-      { title: 'Uyum Oranı', value: complianceValue, icon: 'ShieldCheck', accentColor: !hasCompliance ? 'var(--color-text-muted)' : complianceRate >= 80 ? 'var(--color-success)' : complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: compulsoryTrainings.length, label: 'zorunlu eğitim', isPositive: complianceRate >= 80, suffix: '' } },
+      { title: 'Toplam Personel', value: k.staffCount, icon: 'Users', accentColor: 'var(--color-primary)', trend: { value: k.activeStaffCount, label: 'aktif', isPositive: true, suffix: '' } },
+      { title: 'Aktif Eğitim', value: k.activeTrainingCount, icon: 'GraduationCap', accentColor: 'var(--color-info)', trend: { value: k.publishedTrainingCount, label: 'yayında', isPositive: true, suffix: '' } },
+      { title: 'Tamamlanma Oranı', value: `%${k.completionRate}`, icon: 'TrendingUp', accentColor: 'var(--color-success)', trend: { value: k.completedCount, label: 'tamamlanan', isPositive: true, suffix: '' } },
+      { title: 'Geciken Eğitim', value: k.overdueCount, icon: 'AlertTriangle', accentColor: 'var(--color-error)', trend: { value: k.failedCount, label: 'başarısız', isPositive: false, suffix: '' } },
+      { title: 'Uyum Oranı', value: k.hasCompliance ? `%${k.complianceRate}` : '—', icon: 'ShieldCheck', accentColor: !k.hasCompliance ? 'var(--color-text-muted)' : k.complianceRate >= 80 ? 'var(--color-success)' : k.complianceRate >= 60 ? 'var(--color-warning)' : 'var(--color-error)', trend: { value: k.compulsoryTrainingCount, label: 'zorunlu eğitim', isPositive: k.complianceRate >= 80, suffix: '' } },
     ],
-    complianceAlerts,
-    statusDistribution,
+    complianceAlerts: k.complianceAlerts,
+    statusDistribution: k.statusDistribution,
   }
 
   await setCached(cacheKey, data, 300)
@@ -229,8 +133,17 @@ async function fetchCharts(orgId: string) {
       select: { status: true, completedAt: true },
     }),
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
-      select: { id: true, departmentRel: { select: { name: true } } },
+      where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: üyelikli doktoru da içerir
+      select: {
+        id: true,
+        organizationId: true,
+        departmentRel: { select: { name: true } },
+        // ortak (üyelik) doktorun B-departmanı membership'te; primary A-departmanı grafikte kullanılMAZ
+        memberships: {
+          where: { organizationId: orgId, isActive: true },
+          select: { department: { select: { name: true } } },
+        },
+      },
     }),
     prisma.trainingAssignment.groupBy({
       by: ['userId', 'status'],
@@ -267,7 +180,15 @@ async function fetchCharts(orgId: string) {
     else if (a.status === 'failed') entry.basarisiz++
   }
 
-  const userDeptMap = new Map(users.map(u => [u.id, u.departmentRel?.name ?? 'Diğer']))
+  // Departman adı: primary personel için User.departmentRel; ortak (üyelik) doktor için ÜYELİĞİN
+  // org-özel departmanı. membership dept NULL ise 'Diğer' — ASLA primary(A) departmanına düşme
+  // (çapraz-tenant etiket sızıntısı olur). Tekil-org'da herkes primary → orijinal davranışla birebir.
+  const userDeptMap = new Map(users.map(u => {
+    const dept = u.organizationId === orgId
+      ? (u.departmentRel?.name ?? 'Diğer')
+      : (u.memberships[0]?.department?.name ?? 'Diğer')
+    return [u.id, dept]
+  }))
   const deptMap = new Map<string, { total: number; completed: number }>()
   for (const row of statusByUser) {
     const dept = userDeptMap.get(row.userId)

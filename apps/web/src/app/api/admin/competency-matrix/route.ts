@@ -4,6 +4,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { turkishSearchIds } from '@/lib/turkish-search'
 import { checkRateLimit, withCache } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 
 /**
  * GET /api/admin/competency-matrix
@@ -22,10 +23,11 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const departmentId = searchParams.get('departmentId')
   const skip = (page - 1) * limit
 
-  const staffWhere: Record<string, unknown> = { organizationId: orgId, role: 'staff', isActive: true }
-  if (departmentId) staffWhere.departmentId = departmentId
+  // ortak personel: üyelikli doktoru da matrise al; dept filtresi iki dala AYRI eşlenir
+  // (primary User.departmentId + üyelik membership.departmentId — orgStaffWhereByDept)
+  const staffWhere = orgStaffWhereByDept(orgId, departmentId ? { departmentId } : {}, { isActive: true })
   if (search) {
-    // Türkçe-duyarlı arama (bkz. turkishSearchIds)
+    // Türkçe-duyarlı arama primary-org-scoped → ortak doktorlar ada göre aranamaz (MVP sınırı)
     staffWhere.id = { in: await turkishSearchIds('users', ['first_name', 'last_name'], search, orgId) }
   }
 

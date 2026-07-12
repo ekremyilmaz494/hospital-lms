@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// Ortak personel (Faz 2.4): getStaffOrgIds tek-org döndürsün → myOrgs=[A], davranış eski tekil-org ile birebir.
+vi.mock('@/lib/staff-orgs', () => ({ getStaffOrgIds: vi.fn(async (_userId, primaryOrgId) => [primaryOrgId]) }))
 
 /**
  * Bu test dosyası şu regresyonları kilitler:
@@ -110,6 +112,7 @@ function mockFlow(activeAttempt: Record<string, unknown> | null) {
     assignment: {
       id: 'assignment-1',
       trainingId: 'training-1',
+      organizationId: 'org-1',
       status: 'in_progress',
       currentAttempt: 1,
       maxAttempts: 3,

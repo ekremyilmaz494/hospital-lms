@@ -13,10 +13,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLayoutBranding } from '@/hooks/use-layout-branding';
 import { useMobile } from '@/hooks/use-mobile';
 import { ActingOrgBanner } from '@/components/shared/acting-org-banner';
+import { GroupActingBanner } from '@/components/shared/group-acting-banner';
 import { LicenseBanner } from '@/components/shared/license-banner';
 import { LayoutSkeleton } from '@/components/shared/layout-skeleton';
 import { performLogout } from '@/lib/auth/logout';
 import { hasAdminAuthority } from '@/lib/auth/admin-authority';
+import { hasGroupAuthority } from '@/lib/auth/group-authority';
 import { UploadManagerProvider } from '@/components/admin/upload-manager';
 import { UploadManagerWidget } from '@/components/admin/upload-manager-widget';
 
@@ -82,6 +84,9 @@ export default function AdminLayout({
   const isOrgOwner = user.role === 'super_admin'
     ? true
     : !!(branding?.ownerUserId && branding.ownerUserId === user.id);
+  // Grup yöneticisi (esas yönetici) bir hastaneye drill-in ile girdiğinde /admin panelini
+  // görür; düzenleme banner'ı + "grup paneline dön" için ayrı bayrak (org-owner'dan farklı).
+  const isGroupOwner = hasGroupAuthority({ groupOwner: user.groupOwner, groupId: user.groupId });
 
   const sidebarWidth = sidebarCollapsed ? 72 : 252;
 
@@ -137,6 +142,7 @@ export default function AdminLayout({
           }}
         >
           {isOrgOwner && <ActingOrgBanner />}
+          {isGroupOwner && <GroupActingBanner />}
           <AdminTopbar
             onToggleSidebar={toggleSidebar}
             userName={fullName}

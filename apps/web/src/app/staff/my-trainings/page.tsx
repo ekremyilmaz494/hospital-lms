@@ -14,7 +14,7 @@ import {
   BookOpen, Clock, CheckCircle2, Lock, Play, ArrowRight, ClipboardCheck,
   AlertOctagon, Stethoscope, HeartPulse, Activity, ShieldCheck, Microscope,
   FlaskConical, Syringe, Scale, Award, BookOpenText, TrendingUp,
-  Flame, Hash,
+  Flame, Hash, Building2,
 } from 'lucide-react';
 import { useFetch } from '@/hooks/use-fetch';
 import { MandatoryFeedbackBanner } from '@/components/shared/mandatory-feedback-banner';
@@ -38,6 +38,8 @@ interface Training {
   questionCount?: number;
   examDurationMinutes?: number;
   passingScore?: number;
+  /** Çok-hastaneli grup ortak personeli: eğitimin hangi hastaneden olduğu (tek-hastanede null). */
+  hospitalName?: string | null;
 }
 
 /* ─── Domain mappings ─── */
@@ -55,6 +57,23 @@ const categoryIcon = (category: string): LucideIcon => {
   if (k.includes('tıbbi') || k.includes('klinik')) return Stethoscope;
   return BookOpenText;
 };
+
+/**
+ * Çok-hastaneli grup: ortak personel iki hastanenin eğitimlerini tek listede görür.
+ * Her karta "hangi hastane" rozetini basar. Tek-hastane personelinde hospitalName null → hiç render edilmez.
+ */
+function HospitalBadge({ name }: { name: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
+      style={{ color: OLIVE, fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace' }}
+      title={`Hastane: ${name}`}
+    >
+      <Building2 className="h-3 w-3" strokeWidth={2.2} />
+      {name}
+    </span>
+  );
+}
 
 type StatusKey = 'assigned' | 'in_progress' | 'passed' | 'failed' | 'locked';
 const STATUS: Record<StatusKey, { label: string; ink: string; bg: string; dot: string }> = {
@@ -558,6 +577,7 @@ function ActiveRow({ t, index }: { t: Training; index: number }) {
             >
               {t.category || 'GENEL'}
             </span>
+            {t.hospitalName && <HospitalBadge name={t.hospitalName} />}
             {isUrgent && (
               <span
                 className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
@@ -692,6 +712,7 @@ function CompletedRow({ t, index }: { t: Training; index: number }) {
             >
               {t.category || 'GENEL'}{t.deadline && ` · ${t.deadline}`}
             </p>
+            {t.hospitalName && <div className="mt-0.5"><HospitalBadge name={t.hospitalName} /></div>}
           </div>
         </div>
 
@@ -788,6 +809,7 @@ function ArchiveRow({
             >
               {t.category || 'GENEL'}
             </span>
+            {t.hospitalName && <HospitalBadge name={t.hospitalName} />}
           </div>
 
           <div className="mt-2 flex items-center gap-2">

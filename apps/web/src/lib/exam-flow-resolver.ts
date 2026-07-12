@@ -58,6 +58,7 @@ const ATTEMPT_SELECT = {
 const ASSIGNMENT_SELECT = {
   id: true,
   trainingId: true,
+  organizationId: true, // çözülen atamanın EFEKTİF org'u — ortak personel yollarında yazma hedefi
   status: true,
   currentAttempt: true,
   maxAttempts: true,
@@ -112,19 +113,24 @@ export interface ResolveExamFlowOptions {
  *
  * @param id assignmentId VEYA trainingId (içeride kanonikleştirilir)
  * @param userId personelin user id'si
- * @param organizationId tenant guard — her sorguda zorunlu
+ * @param organizationId tenant guard — her sorguda zorunlu. Tek `string` (klasik tek-org) VEYA
+ *   `string[]` (çok-hastaneli grup ortak personeli: primary + aktif üyelik org'ları, `getStaffOrgIds`).
+ *   Dizi verildiğinde `{ in: orgIds }` ile filtrelenir → doktor B-atamasını B org'unda çözebilir.
+ *   Tek-org (`[A]` veya `'A'`) davranışı BİREBİR aynı. Çözülen `assignment.organizationId` efektif org'u verir.
  */
 export async function resolveExamFlowState(
   id: string,
   userId: string,
-  organizationId: string,
+  organizationId: string | string[],
   opts?: ResolveExamFlowOptions,
 ): Promise<ExamFlowState> {
   const db = opts?.tx ?? prisma
+  // Tek org → eşitlik (klasik davranış); org dizisi → { in: [...] } (ortak personel).
+  const orgFilter = Array.isArray(organizationId) ? { in: organizationId } : organizationId
 
   // 1) Atamayı kanonikleştir: önce assignmentId olarak dene.
   let assignment = await db.trainingAssignment.findFirst({
-    where: { id, userId, organizationId },
+    where: { id, userId, organizationId: orgFilter },
     select: ASSIGNMENT_SELECT,
   })
 
@@ -133,14 +139,14 @@ export async function resolveExamFlowState(
   //    olarak EN YENİ turu seçer ("Yeniden Ata" senaryosunun doğru cevabı).
   if (!assignment) {
     assignment = await db.trainingAssignment.findFirst({
-      where: { trainingId: id, userId, organizationId, status: { notIn: ASSIGNMENT_TERMINAL } },
+      where: { trainingId: id, userId, organizationId: orgFilter, status: { notIn: ASSIGNMENT_TERMINAL } },
       orderBy: [{ round: 'desc' }, { assignedAt: 'desc' }],
       select: ASSIGNMENT_SELECT,
     })
   }
   if (!assignment) {
     assignment = await db.trainingAssignment.findFirst({
-      where: { trainingId: id, userId, organizationId },
+      where: { trainingId: id, userId, organizationId: orgFilter },
       orderBy: [{ round: 'desc' }, { assignedAt: 'desc' }],
       select: ASSIGNMENT_SELECT,
     })
@@ -162,7 +168,7 @@ export async function resolveExamFlowState(
   //    güvenli (@@unique[assignmentId, attemptNumber]). Aktif öncelikli.
   const [activeAttempt, requiredVideoCount] = await Promise.all([
     db.examAttempt.findFirst({
-      where: { assignmentId: assignment.id, userId, organizationId, ...ATTEMPT_ACTIVE_FILTER },
+      where: { assignmentId: assignment.id, userId, organizationId: orgFilter, ...ATTEMPT_ACTIVE_FILTER },
       orderBy: { attemptNumber: 'desc' },
       select: ATTEMPT_SELECT,
     }),
@@ -176,7 +182,7 @@ export async function resolveExamFlowState(
   const attempt =
     activeAttempt ??
     (await db.examAttempt.findFirst({
-      where: { assignmentId: assignment.id, userId, organizationId },
+      where: { assignmentId: assignment.id, userId, organizationId: orgFilter },
       orderBy: { attemptNumber: 'desc' },
       select: ATTEMPT_SELECT,
     }))

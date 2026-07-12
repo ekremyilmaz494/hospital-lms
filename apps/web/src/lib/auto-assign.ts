@@ -13,11 +13,20 @@ export async function autoAssignByDepartment(
   organizationId: string,
   assignedById?: string
 ): Promise<number> {
-  // Cross-tenant koruma: userId verilen organizasyona ait olmalı.
-  // Çağrı yapan helper'lar (members/route.ts, training-rules/route.ts, vb.)
-  // bazen userId'yi sorgulamadan iletiyor — bu kontrol son kapı.
+  // Cross-tenant koruma: userId verilen organizasyona bağlı OLMALI — bağlılık PRIMARY
+  // (User.organizationId) VEYA aktif ÜYELİK (OrganizationMembership) ile olur (çok-hastaneli grup:
+  // ortak doktor tek hesapla EK hastanede de staff'tır). Çağrı yapan helper'lar bazen userId'yi
+  // sorgulamadan iletiyor — bu son kapı. Aşağıdaki rules/atama HER İKİSİNDE de `organizationId`
+  // ile scope'lu → gerçek cross-tenant (ne primary ne üye) HÂLÂ bloklanır; tekil-org'da üyelik
+  // dalı 0 satır (inert). Bu değişiklik yalnız ORTAK personel yolunu açar, izolasyonu gevşetmez.
   const user = await prisma.user.findFirst({
-    where: { id: userId, organizationId },
+    where: {
+      id: userId,
+      OR: [
+        { organizationId },
+        { memberships: { some: { organizationId, isActive: true } } },
+      ],
+    },
     select: { id: true },
   })
   if (!user) {

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { logger } from '@/lib/logger'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 /**
  * GET /api/exam/[id]/info — SCORM player'ının ihtiyaç duyduğu eğitim özeti.
@@ -27,8 +28,10 @@ export const GET = withStaffRoute<{ id: string }>(async ({ params, dbUser, organ
 
     if (!training) return errorResponse('Eğitim bulunamadı', 404)
 
-    // Org izolasyonu (super_admin muaf — önizleme).
-    if (dbUser.role !== 'super_admin' && training.organizationId !== organizationId) {
+    // Org izolasyonu (super_admin muaf — önizleme). Ortak personel: eğitim doktorun hastanelerinden
+    // (primary VEYA aktif üyelik) birine ait olmalı. Tekil-org'da myOrgs=[A] → =A ile birebir.
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+    if (dbUser.role !== 'super_admin' && !myOrgs.includes(training.organizationId)) {
       return errorResponse('Bu eğitimi görüntüleme yetkiniz yok', 403)
     }
 

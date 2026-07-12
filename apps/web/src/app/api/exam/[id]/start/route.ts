@@ -8,6 +8,7 @@ import { getPendingMandatoryFeedback } from '@/lib/feedback-helpers'
 import { isTrainingAccessible } from '@/lib/training-helpers'
 import { advancePastVideosIfNoneRequired } from '@/lib/exam-helpers'
 import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 import { isEndDatePassed } from '@/lib/date-helpers'
 import {
   attemptNextStatus,
@@ -21,15 +22,19 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   const startedAt = Date.now()
   const { id: assignmentId } = params
 
+  // Ortak personel: doktor B hastanesindeki sınavını da başlatabilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
   const assignment = await prisma.trainingAssignment.findFirst({
     where: {
       id: assignmentId,
       userId: dbUser.id,
-      training: { organizationId },
+      training: { organizationId: { in: myOrgs } },
     },
     select: {
       id: true,
       trainingId: true,
+      organizationId: true, // EFEKTİF org (B) — attempt/audit/activity yazma hedefi (primary A değil)
       status: true,
       currentAttempt: true,
       maxAttempts: true,
@@ -49,6 +54,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   })
 
   if (!assignment) return errorResponse('Eğitim atanması bulunamadı', 404)
+  // EFEKTİF org = atamanın kendi org'u (ortak doktorda B). Attempt/audit/activity buna yazılır;
+  // primary A'ya yazılırsa B-atamasına A-org'lu attempt düşer = tenant invariantı kırılır. Tekil-org'da =A.
+  const effectiveOrgId = assignment.organizationId
 
   // Arşivli eğitim: yeni sınav başlatılamaz (in-progress attempt'ler resume'a izin verilir)
   if (!isTrainingAccessible(assignment.training)) {
@@ -97,7 +105,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // (2026-05-20 Devakent, commit 2fa15b1). Dışarıda sadece "rate limit gerekli
   // mi?" okuması kalır — resolver aktif attempt görüyorsa resume olacağı için
   // rate limit atlanır (resume rate limit'e takılmamalı).
-  const preState = await resolveExamFlowState(assignmentId, dbUser.id, organizationId)
+  const preState = await resolveExamFlowState(assignmentId, dbUser.id, myOrgs)
 
   if (!preState.activeAttempt) {
     // Rate limit SADECE yeni attempt olusturma icin — resume islemleri haric
@@ -233,7 +241,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
         assignmentId,
         userId: dbUser.id,
         trainingId: assignment.trainingId,
-        organizationId,
+        organizationId: effectiveOrgId, // atamanın org'u (B) — primary A DEĞİL (tenant invariantı)
         attemptNumber: newAttemptNumber,
         status: initialStatus,
         ...timestampFields,
@@ -267,7 +275,7 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
     logger.error('Exam Start', 'Sınav başlatma hatası', {
       assignmentId,
       userId: dbUser.id,
-      organizationId,
+      organizationId: effectiveOrgId,
       errName,
       errMsg,
       prismaCode,
@@ -306,12 +314,13 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
       action: 'exam.started',
       entityType: 'exam_attempt',
       entityId: attempt.id,
+      organizationId: effectiveOrgId, // ortak personel: audit efektif hastane (B) zincirine
       newData: { trainingId: assignment.trainingId, attemptNumber: attempt.attemptNumber },
     })
 
     void logActivity({
       userId: dbUser.id,
-      organizationId,
+      organizationId: effectiveOrgId,
       action: 'exam_start',
       resourceType: 'exam_attempt',
       resourceId: attempt.id,

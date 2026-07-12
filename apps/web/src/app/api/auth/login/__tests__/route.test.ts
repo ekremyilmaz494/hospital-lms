@@ -33,6 +33,10 @@ vi.mock('@/lib/supabase/verify-jwt', () => ({
     if (token === 'admin-token') {
       return { sub: 'user-1', role: 'admin', payload: { app_metadata: { organization_id: 'org-1' } } }
     }
+    if (token === 'group-owner-token') {
+      // Grup yöneticisi: role=admin, org yok, group claim'leri set (JWT ↔ DB drift YOK).
+      return { sub: 'user-1', role: 'admin', payload: { app_metadata: { group_owner: true, group_id: 'grp-1' } } }
+    }
     return null
   }),
 }))
@@ -95,6 +99,48 @@ function mockSuccessfulAuth(role: string) {
   }
   mockCreateLoginClient.mockResolvedValue(supabase as never)
   return supabase
+}
+
+/** Grup yöneticisi (esas yönetici) — role=admin, organizationId=null, group claim'leri set. */
+function mockGroupOwnerAuth() {
+  const supabase = {
+    auth: {
+      signInWithPassword: vi.fn().mockResolvedValue({
+        data: {
+          user: {
+            id: 'user-1',
+            email: 'grup.yonetici@demo-grup.local',
+            app_metadata: { role: 'admin', group_owner: true, group_id: 'grp-1' },
+          },
+          session: {
+            access_token: 'group-owner-token',
+            refresh_token: 'rt',
+            expires_at: 0,
+            user: { factors: [] },
+          },
+        },
+        error: null,
+      }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+    },
+  }
+  mockCreateLoginClient.mockResolvedValue(supabase as never)
+  return supabase
+}
+
+/** Grup yöneticisi dbUser kaydı — organizationId=null, groupId set, organization relation YOK. */
+function groupOwnerDbUser() {
+  return {
+    id: 'user-1',
+    mustChangePassword: false,
+    isActive: true,
+    role: 'admin',
+    organizationId: null,
+    groupId: 'grp-1',
+    phone: null,
+    phoneVerifiedAt: null,
+    organization: null,
+  }
 }
 
 /** dbUser kaydı — org.isSuspended / org.isActive ve role ayarlanabilir. */
@@ -176,5 +222,22 @@ describe('POST /api/auth/login — org suspend guard', () => {
     expect(res.status).toBe(200)
     expect(data.error).toBeUndefined()
     expect(data.organizationSlug).toBe('deneme-org')
+  })
+
+  // Canlı smoke'ta yakalanan bug (2026-07-11): grup yöneticisinin organizationId'si null
+  // olduğu için `organization` relation da null → org-askı guard'ı yanlışlıkla 403 veriyordu.
+  // Fix: guard'ı `dbUser.organizationId &&` ile kapıla (checkOrgActive `!organizationId`
+  // short-circuit paritesi). super_admin gibi org'u olmayan grup yöneticisi de muaf.
+  it('grup yöneticisi (organizationId=null) org-askı guard\'ından muaftır → giriş 200', async () => {
+    mockGroupOwnerAuth()
+    mockUserFindUnique.mockResolvedValue(groupOwnerDbUser() as never)
+
+    const res = await POST(loginRequest() as never)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.error).toBeUndefined()
+    expect(data.groupOwner).toBe(true)
+    expect(data.organizationId).toBeNull()
   })
 })

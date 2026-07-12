@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 import { findActivePeriod } from '@/lib/training-periods'
 import { VALID_STANDARD_BODIES } from '@/lib/accreditation'
 
@@ -47,7 +47,7 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
         select: { id: true, category: true },
       }),
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+        where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: üyelikli doktoru da içerir
         select: { id: true },
       }),
       findActivePeriod(orgId),

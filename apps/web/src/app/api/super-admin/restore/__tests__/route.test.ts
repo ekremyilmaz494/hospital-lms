@@ -572,12 +572,96 @@ describe('POST /api/super-admin/restore', () => {
       expect(data.counts.integrationApiKeys).toBe(0)
     })
 
-    it('400: schemaVersion 6 (v5 kodundan yeni) reddedilir', async () => {
-      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({ ...validBackupData, schemaVersion: 6 }))
+    it('400: schemaVersion 7 (v6 kodundan yeni) reddedilir', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({ ...validBackupData, schemaVersion: 7 }))
       const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
       expect(res.status).toBe(400)
       const data = await res.json()
       expect(data.error).toMatch(/daha yeni|güncelleyin/i)
+    })
+
+    it('200: schemaVersion 6 (organizationMemberships) desteklenir + count döner', async () => {
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 6,
+        organizationMemberships: [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }],
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: false }))
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.counts.organizationMemberships).toBe(3)
+    })
+  })
+
+  // ─── İnceleme fix: DR sağlamlaştırma (F2 cross-org üyelik + F3 dangling group_id) ───
+  describe('DR sağlamlaştırma — çok-org üyelik + silinmiş grup FK', () => {
+    // tx recorder: user.findMany (var olan üyeler) + organizationGroup.findUnique (grup var mı) kontrollü;
+    // organization.update ve organizationMembership.createMany argümanlarını yakalar.
+    function drTx(opts: { existingUserIds?: string[]; groupExists?: boolean; capture: Record<string, unknown> }) {
+      const { existingUserIds = [], groupExists = true, capture } = opts
+      return async (fn: (tx: unknown) => Promise<void>) => {
+        const tx = new Proxy({}, {
+          get: (_t, prop) => {
+            if (prop === '$executeRaw') return vi.fn().mockResolvedValue(1)
+            return new Proxy({}, {
+              get: (__t, method) => {
+                const p = String(prop), m = String(method)
+                if (p === 'user' && m === 'findMany') return () => Promise.resolve(existingUserIds.map((id) => ({ id })))
+                if (p === 'organizationGroup' && m === 'findUnique') return () => Promise.resolve(groupExists ? { id: 'grp' } : null)
+                if (p === 'organization' && m === 'update') return (arg: { data?: unknown }) => { capture.orgUpdate = arg?.data; return Promise.resolve({}) }
+                if (p === 'organizationMembership' && m === 'createMany') return (arg: { data?: unknown[] }) => { capture.membershipData = arg?.data; return Promise.resolve({ count: arg?.data?.length ?? 0 }) }
+                if (m === 'findMany') return () => Promise.resolve([])
+                if (m === 'findUnique' || m === 'findFirst') return () => Promise.resolve(null)
+                return vi.fn().mockResolvedValue({ count: 0 })
+              },
+            })
+          },
+        })
+        await fn(tx)
+      }
+    }
+
+    it('F2: kullanıcısı bu restore\'da OLMAYAN üyelik ATLANIR (FK hard-fail YOK, restore 200)', async () => {
+      const capture: Record<string, unknown> = {}
+      prismaMock.$transaction.mockImplementation(drTx({ existingUserIds: ['uPresent'], capture }))
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 6,
+        users: [{ id: 'uPresent', organizationId: 'org-1' }],
+        organizationMemberships: [
+          { id: 'm1', userId: 'uPresent', organizationId: 'org-1' },  // kullanıcı var → eklenir
+          { id: 'm2', userId: 'uMissing', organizationId: 'org-1' },  // kullanıcı yok (cross-org) → atlanır
+        ],
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect(capture.membershipData).toEqual([{ id: 'm1', userId: 'uPresent', organizationId: 'org-1' }])
+    })
+
+    it('F3: yedekteki grup artık yoksa org group_id NULL\'lanır (dangling FK → tüm-restore rollback YOK)', async () => {
+      const capture: Record<string, unknown> = {}
+      prismaMock.$transaction.mockImplementation(drTx({ groupExists: false, capture }))
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 6,
+        organization: { id: 'org-1', name: 'X', groupId: 'grpGone' },
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect((capture.orgUpdate as { groupId?: unknown }).groupId).toBeNull()
+    })
+
+    it('F3: grup HÂLÂ varsa group_id korunur (regresyon — geçerli bağ silinmez)', async () => {
+      const capture: Record<string, unknown> = {}
+      prismaMock.$transaction.mockImplementation(drTx({ groupExists: true, capture }))
+      cryptoMock.decryptBackup.mockReturnValue(JSON.stringify({
+        ...validBackupData,
+        schemaVersion: 6,
+        organization: { id: 'org-1', name: 'X', groupId: 'grpAlive' },
+      }))
+      const res = await POST(makeRequest({ backupId: 'backup-1', confirm: true }))
+      expect(res.status).toBe(200)
+      expect((capture.orgUpdate as { groupId?: unknown }).groupId).toBe('grpAlive')
     })
   })
 })

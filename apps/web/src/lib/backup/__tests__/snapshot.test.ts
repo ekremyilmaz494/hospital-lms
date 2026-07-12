@@ -61,6 +61,8 @@ const prismaMock = vi.hoisted(() => ({
   // v5 — İK entegrasyon konfigürasyonu
   staffIntegration: { findMany: vi.fn().mockResolvedValue([]) },
   integrationApiKey: { findMany: vi.fn().mockResolvedValue([]) },
+  // v6 — ortak personel üyelikleri
+  organizationMembership: { findMany: vi.fn().mockResolvedValue([]) },
   // auth.users raw sorgusu (includeAuthUsers=true iken)
   $queryRaw: vi.fn().mockResolvedValue([]),
 }))
@@ -119,12 +121,19 @@ const INCLUDED_MODELS = new Set([
   // IntegrationApiKey yalnız SHA-256 hash taşır, düz anahtar yok. ──
   'StaffIntegration',
   'IntegrationApiKey',
+  // ── v6: ortak personel üyelikleri (çok-hastaneli grup). Per-org (org silinince cascade);
+  // restore'da yoksa ortak personelin bu hastanedeki üyeliği/eğitim görünürlüğü kaybolurdu. ──
+  'OrganizationMembership',
 ])
 
 const INTENTIONALLY_EXCLUDED = new Set([
   // Global / platform (org-bağımsız) — per-org yedek scope'unda değil
   'SubscriptionPlan',
   'Badge', // global rozet kataloğu (migration seed'i, org-bağımsız)
+  // Hastane grubu — birden çok org'u KAPSAYAN üst-katman entity (çok-hastaneli müşteri).
+  // Tek bir org'un yedeğine ait değil (super_admin yönetir). Organization.groupId kolonu
+  // zaten Organization satırıyla (INCLUDED) yedeklenir → restore'da grup varsa bağ korunur.
+  'OrganizationGroup',
   // On-prem platform lisansı — kuruluma (instance) bağlıdır, org verisi DEĞİL;
   // yedeğe girse başka kuruluma restore'da lisans/instanceId taşınırdı (kötüye
   // kullanım + SaaS anomali takibinin kirlenmesi). Kayıpta yeniden aktivasyon yeterli.
@@ -254,7 +263,7 @@ describe('Backup Snapshot — Schema Drift Guard', () => {
     }
   })
 
-  it('v5 payload İK entegrasyon konfigürasyonunu içerir + schemaVersion=5', async () => {
+  it('v5 payload İK entegrasyon konfigürasyonunu içerir', async () => {
     const result = await buildBackupSnapshot('org-1') as Record<string, unknown>
     for (const k of ['staffIntegrations', 'integrationApiKeys']) {
       expect(result[k], `v5 model ${k} snapshot payload'ında eksik`).toBeDefined()
@@ -262,7 +271,13 @@ describe('Backup Snapshot — Schema Drift Guard', () => {
     // Org-scope: her iki sorgu da organizationId filtresiyle çağrılmalı (multi-tenant izolasyon)
     expect(prismaMock.staffIntegration.findMany).toHaveBeenCalledWith({ where: { organizationId: 'org-1' } })
     expect(prismaMock.integrationApiKey.findMany).toHaveBeenCalledWith({ where: { organizationId: 'org-1' } })
-    expect(result.schemaVersion).toBe(5)
+  })
+
+  it('v6 payload ortak personel üyeliklerini içerir (org-scope) + schemaVersion=6', async () => {
+    const result = await buildBackupSnapshot('org-1') as Record<string, unknown>
+    expect(result.organizationMemberships, 'v6 organizationMemberships snapshot payload\'ında eksik').toBeDefined()
+    expect(prismaMock.organizationMembership.findMany).toHaveBeenCalledWith({ where: { organizationId: 'org-1' } })
+    expect(result.schemaVersion).toBe(6)
   })
 
   it('training.findMany nested videos/questions/options include eder (nested drift\'i de yakala)', async () => {

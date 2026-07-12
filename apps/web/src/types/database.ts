@@ -65,6 +65,10 @@ export interface User {
   /** Esas Yönetici'nin verdiği ek yönetici (hastane-admin) yetkisi (dual-capability).
    *  role='staff' kalır ama /admin paneline erişir. Karar: lib/auth/admin-authority.ts */
   adminAccessGranted: boolean;
+  /** Çok-hastaneli grup yöneticisi (esas yönetici) bayrağı — JWT app_metadata.group_owner. */
+  groupOwner?: boolean;
+  /** Bağlı olduğu hastane grubu (grup yöneticisiyse) — JWT app_metadata.group_id. */
+  groupId?: string | null;
   avatarUrl: string | null;
   isActive: boolean;
   kvkkNoticeAcknowledgedAt: string | null;

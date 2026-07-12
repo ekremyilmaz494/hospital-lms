@@ -3,7 +3,7 @@ import { jsonResponse, errorResponse, safePagination } from '@/lib/api-helpers'
 import { withStaffRoute } from '@/lib/api-handler'
 import { calculateTrainingProgress } from '@/lib/training-progress'
 import { logger } from '@/lib/logger'
-import { findActivePeriod } from '@/lib/training-periods'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 import { toEndOfDayUTC } from '@/lib/date-helpers'
 
 export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) => {
@@ -16,10 +16,14 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
     // periodId param varsa o dönemi kullan; yoksa aktif döneme düş.
     // Boş liste senaryosunda UI'ın doğru mesaj gösterebilmesi için `meta.reason`
     // ekleniyor — "atama yok" ile "aktif dönem yok" durumlarını karıştırma.
-    let periodId: string
+    // Ortak personel (Faz 2.4 birleşik gelen kutusu): doktor TÜM hastanelerindeki (primary +
+    // aktif üyelik) atamalarını tek listede görür. Tekil-org'da myOrgs=[A] → {in:[A]}=A (INERT).
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+
+    let periodFilter: string | { in: string[] }
     if (periodIdParam) {
       const period = await prisma.trainingPeriod.findFirst({
-        where: { id: periodIdParam, organizationId },
+        where: { id: periodIdParam, organizationId: { in: myOrgs } },
         select: { id: true },
       })
       if (!period) {
@@ -28,25 +32,29 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
           meta: { reason: 'period_not_found' as const },
         }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
       }
-      periodId = period.id
+      periodFilter = period.id
     } else {
-      const activePeriod = await findActivePeriod(organizationId)
-      if (!activePeriod) {
+      // Her hastanenin KENDİ aktif dönemi var → ortak doktorun A+B aktif dönemlerini birlikte topla.
+      const activePeriods = await prisma.trainingPeriod.findMany({
+        where: { organizationId: { in: myOrgs }, status: 'active' },
+        select: { id: true },
+      })
+      if (activePeriods.length === 0) {
         return jsonResponse({
           data: [], page, limit, totalCount: 0, totalPages: 0,
           meta: { reason: 'no_active_period' as const },
         }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' })
       }
-      periodId = activePeriod.id
+      periodFilter = { in: activePeriods.map(p => p.id) }
     }
 
     // Arşivlenmiş veya soft-delete edilmiş eğitimler personel listesinde gözükmemeli;
     // aksi halde personel "asla bitiremeyeceği" eğitim görür (bkz. PDF-only edge case).
     const where: Record<string, unknown> = {
       userId: dbUser.id,
-      periodId,
+      periodId: periodFilter,
       training: {
-        organizationId,
+        organizationId: { in: myOrgs },
         isActive: true,
         publishStatus: { not: 'archived' },
       },
@@ -68,6 +76,7 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
               examDurationMinutes: true,
               passingScore: true,
               scormEntryPoint: true,
+              organization: { select: { name: true } }, // hastane etiketi (ortak personel)
               _count: { select: { questions: true, videos: true } },
             },
           },
@@ -150,6 +159,9 @@ export const GET = withStaffRoute(async ({ request, dbUser, organizationId }) =>
         // Mobil, SCORM eğitimini tespit edip indir-ve-oynat akışına yönlendirmek
         // ve listede "SCORM" rozeti göstermek için kullanır (web kullanmaz, additive).
         isScorm: t.scormEntryPoint != null,
+        // Ortak personel: eğitimin hangi hastaneden olduğu. Tekil-org'da null (UI etiket göstermez);
+        // çok-hastaneli doktorda hastane adı → UI "hangi hastane" rozetini basar.
+        hospitalName: myOrgs.length > 1 ? (t.organization?.name ?? null) : null,
       }
     })
 

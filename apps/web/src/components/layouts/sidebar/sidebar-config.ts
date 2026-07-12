@@ -27,6 +27,7 @@ import {
   FlaskConical,
   KeyRound,
   Cable,
+  Boxes,
   type LucideIcon,
 } from 'lucide-react';
 import type { Sector } from '@/generated/prisma/enums';
@@ -108,6 +109,15 @@ export const superAdminNav: NavGroup[] = [
           { title: 'Yeni Organizasyon', href: '/super-admin/organizations/new' },
         ],
       },
+      {
+        title: 'Hastane Grupları',
+        href: '/super-admin/groups',
+        icon: Boxes,
+        children: [
+          { title: 'Grup Listesi', href: '/super-admin/groups' },
+          { title: 'Yeni Grup', href: '/super-admin/groups/new' },
+        ],
+      },
       { title: 'Abonelikler', href: '/super-admin/subscriptions', icon: CreditCard },
       { title: 'İletişim Mesajları', href: '/super-admin/messages', icon: Inbox },
       { title: 'Lisanslar', href: '/super-admin/licenses', icon: KeyRound },
@@ -132,6 +142,19 @@ export const superAdminNav: NavGroup[] = [
       { title: 'Sistem Sağlığı', href: '/super-admin/system-health', icon: Activity },
       { title: 'Yedekler', href: '/super-admin/backups', icon: Database },
       { title: 'Ayarlar', href: '/super-admin/settings', icon: Settings },
+    ],
+  },
+];
+
+// ─────────────────────────────────────────────────────────
+// GRUP YÖNETİCİSİ (esas yönetici) — çok-hastaneli müşterinin konsolide paneli
+// ─────────────────────────────────────────────────────────
+export const groupNav: NavGroup[] = [
+  {
+    items: [
+      { title: 'Genel Bakış', href: '/group/dashboard', icon: LayoutDashboard },
+      { title: 'Hastaneler', href: '/group/organizations', icon: Building2 },
+      { title: 'Konsolide Raporlar', href: '/group/reports', icon: BarChart3 },
     ],
   },
 ];

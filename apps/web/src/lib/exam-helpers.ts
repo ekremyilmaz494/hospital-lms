@@ -17,9 +17,11 @@ export async function getAttemptWithPhaseCheck(
   id: string,
   userId: string,
   requiredPhase: string | string[],
-  userOrgId: string,
+  userOrgId: string | string[], // tek org (klasik) VEYA ortak personel org seti (getStaffOrgIds)
 ) {
   const flow = await resolveExamFlowState(id, userId, userOrgId)
+  // Tek org → eşitlik (birebir eski davranış); dizi → { in: [...] } (ortak personel, çok-hastaneli grup).
+  const orgFilter = Array.isArray(userOrgId) ? { in: userOrgId } : userOrgId
 
   if (!flow.activeAttempt) {
     return { attempt: null, error: errorResponse('Aktif sınav denemesi bulunamadı', 404) }
@@ -28,7 +30,7 @@ export async function getAttemptWithPhaseCheck(
   // Faz kontrolünden geçecek tam kayıt (training + videoProgress include'ları
   // çağıranların ihtiyacı) — id ile nokta atışı, tenant guard korunur.
   const attempt = await prisma.examAttempt.findFirst({
-    where: { id: flow.activeAttempt.id, userId, training: { organizationId: userOrgId } },
+    where: { id: flow.activeAttempt.id, userId, training: { organizationId: orgFilter } },
     include: {
       training: { select: { id: true, passingScore: true, examDurationMinutes: true } },
       videoProgress: true,

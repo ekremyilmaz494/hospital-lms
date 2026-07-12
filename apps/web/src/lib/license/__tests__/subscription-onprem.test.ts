@@ -10,6 +10,7 @@ vi.mock('@/lib/license/cache', () => ({ getLicenseState: getLicenseStateMock }))
 const prismaMock = vi.hoisted(() => ({
   user: { count: vi.fn() },
   invitation: { count: vi.fn() },
+  organizationMembership: { count: vi.fn() },
   organization: { count: vi.fn(), findUnique: vi.fn() },
   organizationSubscription: { findUnique: vi.fn() },
 }))
@@ -29,6 +30,7 @@ beforeEach(() => {
   // Varsayılanlar: staff limiti checkStaffLimit'e delege eder → bekleyen davet 0,
   // org-bazlı ek limit yok (yalnız global lisans limiti test edilir).
   prismaMock.invitation.count.mockResolvedValue(0)
+  prismaMock.organizationMembership.count.mockResolvedValue(0)
   prismaMock.organization.findUnique.mockResolvedValue({ maxStaff: null })
   prismaMock.organizationSubscription.findUnique.mockResolvedValue(null)
 })

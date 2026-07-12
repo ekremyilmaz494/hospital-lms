@@ -4,7 +4,7 @@ import { withAdminRoute } from '@/lib/api-handler'
 import { z } from 'zod/v4'
 import { logger } from '@/lib/logger'
 import { sendEmail, trainingAssignedEmail } from '@/lib/email'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 import { getOrCreateActivePeriodForAssignment, getPeriodById } from '@/lib/training-periods'
 
 const bulkAssignSchema = z.object({
@@ -69,7 +69,8 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId, aud
 
     // Kullanıcılar bu organizasyona ait mi?
     const users = await prisma.user.findMany({
-      where: { id: { in: userIds }, organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+      // ortak personel: EK hastanede (membership) staff olan doktor da atanabilir/aday olmalı
+      where: withOrgStaffScope(orgId, { id: { in: userIds }, isActive: true }),
       select: { id: true },
     })
     if (users.length !== userIds.length) {
@@ -176,7 +177,8 @@ async function sendBulkAssignmentEmails(params: {
 
     const userIds = Array.from(new Set(params.newAssignments.map(a => a.userId)))
     const users = await prisma.user.findMany({
-      where: { id: { in: userIds }, organizationId: params.organizationId },
+      // ortak personel: atama e-postası fan-out'u üyelikli doktoru da bulmalı (primary org=A, atama org=B)
+      where: withOrgStaffScope(params.organizationId, { id: { in: userIds } }),
       select: { id: true, email: true, firstName: true, lastName: true },
     })
     const usersById = new Map(users.map(u => [u.id, u]))

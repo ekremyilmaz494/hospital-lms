@@ -3,7 +3,7 @@ import { jsonResponse, errorResponse } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { checkRateLimit } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 
 /**
  * GET /api/admin/compliance
@@ -50,7 +50,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     // Hiç zorunlu eğitim tanımlı değilse erken dön
     if (trainingIds.length === 0) {
       const allStaffCount = await prisma.user.count({
-        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+        where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: üyelikli doktoru da say
       })
       return jsonResponse({
         summary: {
@@ -72,7 +72,7 @@ export const GET = withAdminRoute(async ({ organizationId }) => {
     // 2) Paralel: staff listesi (dept ile), status sayımı, non-compliant detayı
     const [staffList, statusAgg, nonCompliantRaw] = await Promise.all([
       prisma.user.findMany({
-        where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+        where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: uyum paydasına üyelikli doktoru da kat
         select: { id: true, departmentRel: { select: { name: true } } },
       }),
       prisma.trainingAssignment.groupBy({

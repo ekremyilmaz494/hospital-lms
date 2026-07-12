@@ -12,7 +12,7 @@ import { applyTurkishFont } from '@/lib/pdf/helpers/font'
 import { resolveOrgLogoDataUrl } from '@/lib/pdf/cert-logo'
 import type { AttemptStatus } from '@/lib/exam-state-machine'
 import { BRAND } from '@/lib/brand'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhere, withOrgStaffScope } from '@/lib/org-scope'
 
 const BRAND_RGB: [number, number, number] = [13, 150, 104]
 
@@ -60,8 +60,8 @@ export const GET = withAdminRoute(async ({ request, dbUser, organizationId: orgI
 
   if (type === 'staff-report') {
     const [staffCount, activeStaff, departments] = await Promise.all([
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole } }),
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
+      prisma.user.count({ where: orgStaffWhere(orgId) }), // ortak personel: üyelikli doktoru da say
+      prisma.user.count({ where: withOrgStaffScope(orgId, { isActive: true }) }),
       prisma.department.findMany({
         where: { organizationId: orgId },
         include: { _count: { select: { users: true } } },

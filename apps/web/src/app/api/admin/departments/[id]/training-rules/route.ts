@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
-import type { UserRole } from '@/types/database'
+import { orgStaffWhereByDept } from '@/lib/org-scope'
 
 /** GET /api/admin/departments/[id]/training-rules — Departman eğitim kurallarını listele */
 export const GET = withAdminRoute<{ id: string }>(async ({ params, organizationId }) => {
@@ -45,9 +45,12 @@ export const POST = withAdminRoute<{ id: string }>(async ({ request, params, dbU
     include: { training: { select: { id: true, title: true, category: true, isActive: true } } },
   })
 
-  // Mevcut departman üyelerine otomatik ata
+  // Mevcut departman üyelerine otomatik ata. Ortak personel: EK hastanede (membership) bu departmana
+  // bağlı doktor da kuralı almalı; dept filtresi iki dala AYRI eşlenir (primary User.departmentId +
+  // üyeliğin org-özel membership.departmentId'si). Downstream autoAssignByDepartment guard'ı da
+  // membership-aware yapıldı (aksi halde primary-only guard ortak doktoru bloklardı → sessiz no-op).
   const deptUsers = await prisma.user.findMany({ // perf-check-disable-line
-    where: { departmentId, organizationId, role: 'staff' satisfies UserRole, isActive: true },
+    where: orgStaffWhereByDept(organizationId, { departmentId }, { isActive: true }),
     select: { id: true },
   })
 

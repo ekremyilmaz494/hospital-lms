@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, parseBody } from '@/lib/api-helpers'
 import { checkRateLimit } from '@/lib/redis'
 import { withStaffRoute } from '@/lib/api-handler'
 import { resolveExamFlowState } from '@/lib/exam-flow-resolver'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 import { logger } from '@/lib/logger'
 
 /** Auto-save a single exam answer (called on each answer selection) */
@@ -25,7 +26,9 @@ export const POST = withStaffRoute<{ id: string }>(async ({ request, params, dbU
   // kanonikleştirilir, attempt atamaya scope'lanır; atamalar-arası attemptNumber
   // sıralaması yok — N1). organizationId resolver'ın her sorgusunda WHERE'de.
   const requiredStatus = body.examPhase === 'pre' ? 'pre_exam' : 'post_exam'
-  const flow = await resolveExamFlowState(id, dbUser.id, organizationId)
+  // Ortak personel: doktor B hastanesindeki sınavını da çözebilsin (tekil-org'da [A] → =A, inert).
+  const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+  const flow = await resolveExamFlowState(id, dbUser.id, myOrgs)
   const attempt =
     flow.activeAttempt && flow.activeAttempt.status === requiredStatus ? flow.activeAttempt : null
   if (!attempt) return errorResponse('Aktif sınav denemesi bulunamadı', 404)

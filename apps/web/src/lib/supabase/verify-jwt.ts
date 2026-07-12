@@ -2,6 +2,7 @@ import * as jose from 'jose'
 import { logger } from '@/lib/logger'
 import { isOnPrem } from '@/lib/deployment'
 import { extractAdminAccess } from '@/lib/auth/admin-authority'
+import { extractGroupClaims } from '@/lib/auth/group-authority'
 
 /**
  * Supabase access_token (JWT) kriptografik doğrulaması.
@@ -49,6 +50,10 @@ export interface VerifiedToken {
   role: string | null
   /** app_metadata.admin_access — personele verilmiş ek yönetici yetkisi (dual-capability). */
   adminAccess: boolean
+  /** app_metadata.group_owner — çok-hastaneli grup yöneticisi (esas yönetici) bayrağı. */
+  groupOwner: boolean
+  /** app_metadata.group_id — bağlı olduğu hastane grubu (grup yöneticisiyse). */
+  groupId: string | null
   payload: jose.JWTPayload
 }
 
@@ -96,10 +101,14 @@ export async function verifyAccessToken(token: string): Promise<VerifiedToken | 
     }
 
     if (!payload.sub) return null
+    const appMeta = payload.app_metadata as Record<string, unknown> | undefined
+    const groupClaims = extractGroupClaims(appMeta)
     return {
       sub: payload.sub,
       role: extractRole(payload),
-      adminAccess: extractAdminAccess(payload.app_metadata as Record<string, unknown> | undefined),
+      adminAccess: extractAdminAccess(appMeta),
+      groupOwner: groupClaims.groupOwner,
+      groupId: groupClaims.groupId,
       payload,
     }
   } catch {

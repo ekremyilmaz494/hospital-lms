@@ -257,6 +257,30 @@ describe('autoAssignByDepartment', () => {
     expect(mockCreateMany).toHaveBeenCalledTimes(1)
   })
 
+  // Çok-hastaneli grup: cross-tenant guard PRIMARY veya aktif ÜYELİK bağlılığını kabul etmeli.
+  it('cross-tenant guard PRIMARY-org VEYA aktif ÜYELİK ile bağlılığı kabul eder (ortak personel)', async () => {
+    mockRuleFindMany.mockResolvedValue([]) // kural yok → erken 0; ama guard sorgusu yine de çalışır
+    await autoAssignByDepartment(userId, departmentId, organizationId)
+    expect(mockUserFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: userId,
+        OR: [
+          { organizationId },
+          { memberships: { some: { organizationId, isActive: true } } },
+        ],
+      },
+      select: { id: true },
+    })
+  })
+
+  it('GÜVENLİK: ne primary ne aktif üyelik → guard bloklar (0 döner, rules\'a gitmez, cross-tenant warn)', async () => {
+    mockUserFindFirst.mockResolvedValue(null) // gerçek yabancı: her iki OR dalı da eşleşmedi
+    const result = await autoAssignByDepartment(userId, departmentId, organizationId)
+    expect(result).toBe(0)
+    expect(mockRuleFindMany).not.toHaveBeenCalled() // son kapı guard'da durdu
+    expect(logger.warn).toHaveBeenCalledWith('AutoAssign', expect.stringContaining('Cross-tenant attempt blocked'))
+  })
+
   it('atama hatalarını loglar ve devam eder', async () => {
     mockRuleFindMany.mockResolvedValue([
       {

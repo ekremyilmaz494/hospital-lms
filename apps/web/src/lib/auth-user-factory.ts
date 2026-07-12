@@ -215,6 +215,89 @@ export async function createAuthUser(params: CreateAuthUserParams): Promise<Crea
   }
 }
 
+// ── Grup yöneticisi (esas yönetici) hesabi olusturma ──
+
+/**
+ * Grup yöneticisi (esas yönetici) hesabı oluşturur (auth + DB, DB hatasında rollback).
+ * `createAuthUser`'ın grup-varyantı: `role='admin'`, `organizationId=null`, `groupId` set,
+ * JWT `app_metadata.group_owner=true` + `group_id` yazılır. Belirli bir hastaneye bağlı
+ * DEĞİLDİR — grubun tüm hastanelerini konsolide görür + drill-in ile yönetir. Provizyon
+ * Klinovax-only: yalnız super_admin grup oluşturma akışından çağrılır.
+ */
+export async function createGroupOwnerUser(params: {
+  email: string
+  password?: string
+  firstName: string
+  lastName: string
+  groupId: string
+  mustChangePassword?: boolean
+  emailConfirm?: boolean
+}): Promise<CreateUserResult> {
+  const supabase = await createServiceClient()
+
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    email: params.email,
+    ...(params.password && { password: params.password }),
+    email_confirm: params.emailConfirm ?? true,
+    user_metadata: {
+      first_name: params.firstName,
+      last_name: params.lastName,
+    },
+    app_metadata: {
+      role: 'admin',
+      group_owner: true,
+      group_id: params.groupId,
+    },
+  })
+
+  if (authError || !authData.user) {
+    throw new AuthUserError(authError?.message ?? 'Bilinmeyen auth hatası')
+  }
+
+  const authUserId = authData.user.id
+
+  try {
+    const dbUser = await prisma.user.create({
+      data: {
+        id: authUserId,
+        email: params.email,
+        firstName: params.firstName,
+        lastName: params.lastName,
+        role: 'admin',
+        organizationId: null,
+        groupId: params.groupId,
+        mustChangePassword: params.mustChangePassword ?? true,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        organizationId: true,
+      },
+    })
+
+    return { authUser: { id: authUserId, email: params.email }, dbUser }
+  } catch (dbError) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await supabase.auth.admin.deleteUser(authUserId)
+        break
+      } catch (rollbackErr) {
+        if (attempt === 1) {
+          logger.error('auth-user-factory', 'Grup yöneticisi rollback BASARISIZ — orphan auth user', {
+            userId: authUserId,
+            email: params.email,
+            rollbackErr,
+          })
+        }
+      }
+    }
+    throw new DbUserError(dbError)
+  }
+}
+
 // ── Yardimci: app_metadata guncelleme (organization olusturma icin) ──
 
 /**
@@ -239,6 +322,65 @@ export async function updateAuthUserOrgId(userId: string, organizationId: string
         logger.error('auth-user-factory', 'app_metadata org_id guncelleme BASARISIZ — manuel duzeltme gerekli', {
           userId,
           organizationId,
+          error: (err as Error).message,
+        })
+        throw err
+      }
+    }
+  }
+}
+
+// ── Yardimci: grup yöneticisi (esas yönetici) claim'leri ──
+
+/**
+ * Grup yöneticisi claim'lerini auth user'ın app_metadata'sine yazar (retry ile).
+ * `group_owner=true` + `group_id=<id>` — middleware + verify-jwt buradan okur. GoTrue
+ * app_metadata'yı MERGE eder (mevcut `role` korunur — updateAuthUserOrgId ile aynı varsayım).
+ * Grup atama/devir sonrası çağıran ayrıca `invalidateAuthCache(userId)` çalıştırmalı.
+ */
+export async function updateAuthUserGroupClaims(userId: string, groupId: string): Promise<void> {
+  const supabase = await createServiceClient()
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await supabase.auth.admin.updateUserById(userId, {
+        app_metadata: { group_owner: true, group_id: groupId },
+      })
+      return
+    } catch (err) {
+      if (attempt === 0) {
+        logger.warn('auth-user-factory', 'app_metadata group claim guncelleme ilk deneme basarisiz, tekrar deneniyor', (err as Error).message)
+      } else {
+        logger.error('auth-user-factory', 'app_metadata group claim guncelleme BASARISIZ — manuel duzeltme gerekli', {
+          userId,
+          groupId,
+          error: (err as Error).message,
+        })
+        throw err
+      }
+    }
+  }
+}
+
+/**
+ * Grup yöneticisi claim'lerini kaldırır (yetki devri/iptal). `group_owner=false` +
+ * `group_id=null`. Çağıran ayrıca `invalidateAuthCache(userId)` çalıştırmalı.
+ */
+export async function clearAuthUserGroupClaims(userId: string): Promise<void> {
+  const supabase = await createServiceClient()
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await supabase.auth.admin.updateUserById(userId, {
+        app_metadata: { group_owner: false, group_id: null },
+      })
+      return
+    } catch (err) {
+      if (attempt === 0) {
+        logger.warn('auth-user-factory', 'app_metadata group claim temizleme ilk deneme basarisiz, tekrar deneniyor', (err as Error).message)
+      } else {
+        logger.error('auth-user-factory', 'app_metadata group claim temizleme BASARISIZ — manuel duzeltme gerekli', {
+          userId,
           error: (err as Error).message,
         })
         throw err

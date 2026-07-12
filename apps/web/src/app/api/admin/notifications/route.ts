@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseBody, safePagination } from '@/lib/api-helpers'
 import { withAdminRoute } from '@/lib/api-handler'
 import { createNotificationSchema } from '@/lib/validations'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 
 // perf-check: no-cache-invalidation — Bildirimler Redis'te cache'lenmiyor;
 // tazeleme HTTP Cache-Control (max-age=10) + revalidatePath ile yapılıyor.
@@ -114,7 +114,12 @@ export const POST = withAdminRoute(async ({ request, dbUser, organizationId }) =
   // bağlı Notification satırı yaratılmasına izin veriyordu. (notifications/send rotasındaki
   // recipient doğrulamasının aynısı.)
   const [recipient, relatedTraining] = await Promise.all([
-    prisma.user.findFirst({ where: { id: userId, organizationId, isActive: true }, select: { id: true } }),
+    // Alıcı bu org'a bağlı (primary VEYA aktif üyelik) + aktif olmalı. role filtresi YOK — hedefli
+    // bildirim alıcısı admin de olabilir; ortak (üyelik) doktor da B'de bildirim alabilmeli.
+    prisma.user.findFirst({
+      where: { id: userId, isActive: true, OR: [{ organizationId }, { memberships: { some: { organizationId, isActive: true } } }] },
+      select: { id: true },
+    }),
     relatedTrainingId
       ? prisma.training.findFirst({ where: { id: relatedTrainingId, organizationId }, select: { id: true } })
       : Promise.resolve(null),
@@ -151,7 +156,7 @@ export const PUT = withAdminRoute(async ({ request, dbUser, organizationId }) =>
   if (body.message.length > 5000) return errorResponse('Mesaj en fazla 5000 karakter olabilir', 400)
 
   const staffUsers = await prisma.user.findMany({
-    where: { organizationId, role: 'staff' satisfies UserRole, isActive: true },
+    where: withOrgStaffScope(organizationId, { isActive: true }), // ortak personel: üyelikli doktor da B duyurusunu alır
     select: { id: true },
   })
 

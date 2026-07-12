@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Ortak personel (Faz 2.4): getStaffOrgIds tek-org döndürsün → myOrgs=[A], davranış eski tekil-org ile birebir.
+vi.mock('@/lib/staff-orgs', () => ({ getStaffOrgIds: vi.fn(async (_userId, primaryOrgId) => [primaryOrgId]) }))
 
 /**
  * SCORM player'ının okuduğu eğitim özeti route'u — org izolasyonu + atama sahipliği.

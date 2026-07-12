@@ -131,6 +131,56 @@ export async function resolveReportFilters(
   }
 }
 
+/**
+ * Grup konsolide export'u için tek bir hastanenin filtrelerini kurar: aktif dönem +
+ * (opsiyonel) grup-geneli tarih aralığı, departman filtresi YOK (departmanlar org-özel,
+ * grup seviyesinde anlamsız). Her hastane kendi aktif dönemine scope'lanır → per-hastane
+ * sheet sayıları o hastanenin kendi admin export'uyla eşleşir.
+ */
+export async function buildOrgReportFilters(
+  orgId: string,
+  opts?: { dateFrom?: Date; dateTo?: Date },
+): Promise<ResolvedFilters> {
+  const dateFrom = opts?.dateFrom
+  const dateTo = opts?.dateTo
+
+  const targetPeriod = await findActivePeriod(orgId)
+
+  const assignmentDateFilter: Record<string, unknown> = dateFrom || dateTo ? {
+    assignedAt: {
+      ...(dateFrom ? { gte: dateFrom } : {}),
+      ...(dateTo ? { lte: dateTo } : {}),
+    },
+  } : {}
+
+  const attemptDateFilter: Record<string, unknown> = dateFrom || dateTo ? {
+    createdAt: {
+      ...(dateFrom ? { gte: dateFrom } : {}),
+      ...(dateTo ? { lte: dateTo } : {}),
+    },
+  } : {}
+
+  const resolvedPeriodId = targetPeriod?.id ?? null
+  const assignmentPeriodFilter: Record<string, unknown> = resolvedPeriodId ? { periodId: resolvedPeriodId } : {}
+  const attemptPeriodFilter: Record<string, unknown> = resolvedPeriodId ? { assignment: { periodId: resolvedPeriodId } } : {}
+
+  return {
+    orgId,
+    dateFrom,
+    dateTo,
+    departmentId: undefined,
+    periodId: undefined,
+    assignmentDateFilter,
+    attemptDateFilter,
+    userDeptFilter: {},
+    trainingScope: { organizationId: orgId, isActive: true, publishStatus: { not: 'archived' } },
+    resolvedPeriodId,
+    targetPeriod: targetPeriod ? { id: targetPeriod.id, startDate: targetPeriod.startDate, label: targetPeriod.label } : null,
+    assignmentPeriodFilter,
+    attemptPeriodFilter,
+  }
+}
+
 // Cache-Control: private, max-age=30, stale-while-revalidate=60
 export const REPORTS_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',

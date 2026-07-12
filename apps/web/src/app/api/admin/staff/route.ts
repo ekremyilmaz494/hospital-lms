@@ -16,6 +16,7 @@ import { invalidateDashboardCache } from '@/lib/dashboard-cache'
 import type { AssignmentStatus } from '@/lib/exam-state-machine'
 import type { UserRole } from '@/types/database'
 import { UUID_RE, buildStaffOrderBy } from './_query-helpers'
+import { orgStaffWhere } from '@/lib/org-scope'
 import { getPeriodById, getEffectiveStartDate } from '@/lib/training-periods'
 import { autoAssignByDepartment } from '@/lib/auto-assign'
 import { checkStaffLimit } from '@/lib/subscription-guard'
@@ -44,10 +45,12 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
   const cacheKey = `cache:${orgId}:staff:${page}:${limit}:${search}:${department || ''}:${isActive || ''}:${requestedPeriodId || 'all'}:${sortParam || ''}:${orderParam}`
 
   const data = await withCache(cacheKey, 120, async () => {
-    const where: Record<string, unknown> = {
-      organizationId: orgId,
-      role: 'staff',
-    }
+    // Ortak personel (çok-hastaneli grup): primary org staff'ı + bu hastaneye AKTİF üyelikle
+    // bağlı paylaşılan staff. Üyelik boşken (tekil-org / provizyon öncesi) OR'ın 2. dalı sıfır
+    // eşler → davranış birebir aynı. Ek filtreler (arama id, isActive, departmentId) AND'lenir.
+    // NOT: departmentId filtresi personelin PRIMARY departmanına bakar; paylaşılan doktorun bu
+    // hastanedeki (üyelik) departmanı ayrıdır → dept-filtreli listede görünmeyebilir (MVP sınırı).
+    const where: Record<string, unknown> = { ...orgStaffWhere(orgId) }
 
     if (search) {
       // Türkçe-duyarlı arama (Postgres lower('İ') → 'i̇' sorunu; bkz. turkishSearchIds)
@@ -119,11 +122,12 @@ export const GET = withAdminRoute(async ({ request, organizationId }) => {
         take: limit,
       }),
       prisma.user.count({ where }),
-      prisma.user.count({ where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true } }),
+      // Aktif personel KPI'sı da paylaşılan staff'ı kapsar (roster ile tutarlı).
+      prisma.user.count({ where: { ...orgStaffWhere(orgId), isActive: true } }),
       // Tüm org için tek sayı — groupBy yerine aggregate (tek satır döner, ucuz).
       // Seçili dönem varsa KPI ortalaması da o döneme scope'lanır (satır/KPI tutarlılığı).
       prisma.examAttempt.aggregate({
-        where: { user: { organizationId: orgId, role: 'staff' satisfies UserRole }, isPassed: true, ...attemptPeriodFilter },
+        where: { user: orgStaffWhere(orgId), isPassed: true, ...attemptPeriodFilter },
         _avg: { postExamScore: true },
       }),
     ])

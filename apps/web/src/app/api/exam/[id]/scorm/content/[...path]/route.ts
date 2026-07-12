@@ -8,6 +8,7 @@ import { scormContentType } from '@/lib/scorm/mime'
 import { sanitizeEntryPath } from '@/lib/scorm/extract'
 import { checkFeature } from '@/lib/feature-gate'
 import { SCORM_FEATURE_DISABLED_MSG } from '@/lib/scorm/config'
+import { getStaffOrgIds } from '@/lib/staff-orgs'
 
 const BUCKET = process.env.AWS_S3_BUCKET!
 
@@ -25,8 +26,10 @@ export const GET = withStaffRoute<{ id: string; path: string[] }>(async ({ reque
       return errorResponse('SCORM içeriği bulunamadı', 404)
     }
 
-    // Org izolasyonu (super_admin muaf — önizleme).
-    if (dbUser.role !== 'super_admin' && training.organizationId !== organizationId) {
+    // Org izolasyonu (super_admin muaf — önizleme). Ortak personel: eğitim doktorun hastanelerinden
+    // (primary/üyelik) birine ait olmalı (tekil-org'da myOrgs=[A] → =A ile birebir).
+    const myOrgs = await getStaffOrgIds(dbUser.id, organizationId)
+    if (dbUser.role !== 'super_admin' && !myOrgs.includes(training.organizationId)) {
       return errorResponse('Bu içeriği görüntüleme yetkiniz yok', 403)
     }
 

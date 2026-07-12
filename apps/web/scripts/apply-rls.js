@@ -12,7 +12,7 @@ async function run() {
 
   // Enable RLS on all tables
   const tables = [
-    'users','organizations','organization_subscriptions','subscription_plans',
+    'users','organizations','organization_subscriptions','organization_groups','organization_memberships','subscription_plans',
     'trainings','training_videos','questions','question_options',
     'training_assignments','exam_attempts','exam_answers','video_progress',
     'notifications','audit_logs','db_backups',
@@ -63,6 +63,14 @@ async function run() {
   `);
   console.log('Created get_user_org_id() [app_metadata]');
 
+  await client.query(`
+    CREATE OR REPLACE FUNCTION public.get_user_group_id()
+    RETURNS UUID AS $$
+      SELECT (raw_app_meta_data->>'group_id')::uuid FROM auth.users WHERE id = auth.uid();
+    $$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = ''
+  `);
+  console.log('Created get_user_group_id() [app_metadata]');
+
   // Policies
   const policies = [
     // USERS
@@ -75,6 +83,13 @@ async function run() {
     // ORGANIZATIONS
     [`CREATE POLICY "super_admin_orgs_all" ON organizations FOR ALL USING (public.get_user_role() = 'super_admin')`],
     [`CREATE POLICY "member_orgs_select" ON organizations FOR SELECT USING (id = public.get_user_org_id())`],
+    // ORGANIZATION GROUPS (çok-hastaneli müşteri)
+    [`CREATE POLICY "super_admin_groups_all" ON organization_groups FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "group_owner_groups_select" ON organization_groups FOR SELECT USING (id = public.get_user_group_id())`],
+    // ORGANIZATION MEMBERSHIPS (ortak personel, Track 2) — admin org-scoped (role='admin' ŞART), staff yalnız kendi.
+    [`CREATE POLICY "super_admin_memberships_all" ON organization_memberships FOR ALL USING (public.get_user_role() = 'super_admin')`],
+    [`CREATE POLICY "admin_memberships_all" ON organization_memberships FOR ALL USING (public.get_user_role() = 'admin' AND organization_id = public.get_user_org_id())`],
+    [`CREATE POLICY "staff_memberships_own" ON organization_memberships FOR SELECT USING (user_id = auth.uid())`],
     // SUBSCRIPTION PLANS
     [`CREATE POLICY "super_admin_plans_all" ON subscription_plans FOR ALL USING (public.get_user_role() = 'super_admin')`],
     [`CREATE POLICY "anyone_plans_select" ON subscription_plans FOR SELECT USING (is_active = true)`],

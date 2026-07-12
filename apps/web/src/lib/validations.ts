@@ -96,6 +96,58 @@ export const updateOrganizationSchema = createOrganizationSchema.omit({ planId: 
   maxStaff: z.number().int().positive().max(1_000_000).nullable().optional(),
 })
 
+// ── Hastane Grupları (çok-hastaneli müşteri) ──
+const groupLogoField = z
+  .string()
+  .refine(v => v === '' || /^https?:\/\//i.test(v) || v.startsWith('/'),
+    'Logo, tam bir URL (https://...) veya /logos/dosya.png biçiminde bir yol olmalı')
+  .optional()
+
+/**
+ * Super Admin grup + grup yöneticisi (esas yönetici) oluşturma (provizyon Klinovax-only).
+ * Grup yöneticisi DIRECT modda açılır: sistem geçici şifre üretir, super-admin elden teslim
+ * eder; yönetici ilk girişte şifresini değiştirir (mustChangePassword). Hastaneler ayrı bir
+ * adımda gruba bağlanır (/api/super-admin/groups/[id]/organizations, maxOrganizations guard'lı).
+ */
+export const createGroupWithOwnerSchema = z.object({
+  name: z.string().min(2, 'Grup adı en az 2 karakter olmalı').max(255),
+  code: z.string().min(2).max(50).optional(),
+  maxOrganizations: z.number().int().positive().max(10_000).nullable().optional(),
+  logoUrl: groupLogoField,
+  brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Geçerli bir renk kodu girin (#RRGGBB)').optional(),
+  ownerFirstName: z.string().min(1, 'Yönetici adı zorunludur').max(100),
+  ownerLastName: z.string().min(1, 'Yönetici soyadı zorunludur').max(100),
+  ownerEmail: z.string().max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Geçerli bir e-posta adresi girin'),
+  ownerPassword: z.string().min(8, 'Şifre en az 8 karakter olmalıdır').max(128).optional(),
+})
+
+/** Grup güncelleme (super-admin). */
+export const updateGroupSchema = z.object({
+  name: z.string().min(2).max(255).optional(),
+  maxOrganizations: z.number().int().positive().max(10_000).nullable().optional(),
+  logoUrl: groupLogoField,
+  brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  isActive: z.boolean().optional(),
+})
+
+/** Gruba hastane bağla/çöz — tek org id. */
+export const groupAttachOrgSchema = z.object({
+  organizationId: z.string().uuid('Geçersiz organizasyon kimliği'),
+})
+
+// ── Ortak personel üyeliği (çok-hastaneli grup, Track 2) ──
+// Bir personeli grup içindeki BAŞKA bir hastaneye EK üyelikle ekler (departman/ünvan o
+// hastaneye özel). organizationId = hedef hastane (personelin primary org'undan FARKLI olmalı).
+export const addStaffMembershipSchema = z.object({
+  organizationId: z.string().uuid('Geçersiz hastane kimliği'),
+  departmentId: z.string().uuid('Geçersiz departman kimliği').nullish(),
+  title: z.string().max(100, 'Ünvan en fazla 100 karakter').nullish(),
+})
+
+export const removeStaffMembershipSchema = z.object({
+  organizationId: z.string().uuid('Geçersiz hastane kimliği'),
+})
+
 /** Slug doğrulama şeması — sadece küçük harf, rakam ve tire */
 export const slugSchema = z.string().min(3).max(50).regex(/^[a-z0-9-]+$/, 'Sadece küçük harf, rakam ve tire kullanılabilir')
 

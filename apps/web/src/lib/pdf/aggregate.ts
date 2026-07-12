@@ -7,7 +7,7 @@
 
 import { prisma } from '@/lib/prisma'
 import type { FindingRecord } from '@/lib/accreditation'
-import type { UserRole } from '@/types/database'
+import { withOrgStaffScope } from '@/lib/org-scope'
 import type {
   ReportContext,
   DepartmentComplianceRow,
@@ -74,7 +74,7 @@ export async function buildReportContext(
 
   const [staffRows, overdueAssignments, logoDataUrl] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: orgId, role: 'staff' satisfies UserRole, isActive: true },
+      where: withOrgStaffScope(orgId, { isActive: true }), // ortak personel: üyelikli doktoru da içerir
       select: {
         id: true,
         departmentRel: { select: { name: true } },
