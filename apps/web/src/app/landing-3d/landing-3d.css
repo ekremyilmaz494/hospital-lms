@@ -845,6 +845,113 @@
   color: var(--landing-brand);
 }
 
+/* ── App Store / Google Play indirme rozetleri ──────────────────────
+   Resmî düzen: siyah hap + logo + iki satır metin. Logolar satır-içi SVG
+   (store-badges.tsx) — dış görsel yok, CSP-güvenli, retina-keskin. */
+.l3d-store-badges {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.l3d-store-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  min-height: 54px;
+  border-radius: 12px;
+  background: #000;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  text-decoration: none;
+  font-family: var(--font-body);
+  line-height: 1;
+  transition: transform 0.3s var(--landing-ease), box-shadow 0.3s var(--landing-ease),
+    border-color 0.3s var(--landing-ease);
+}
+.l3d-store-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--landing-shadow-card);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.l3d-store-badge-ico {
+  flex: none;
+  display: block;
+  width: auto;
+}
+.l3d-store-ico-apple {
+  height: 27px;
+  color: #fff;
+}
+.l3d-store-ico-gplay {
+  height: 23px;
+}
+.l3d-store-badge-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.l3d-store-badge-sm {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  opacity: 0.9;
+}
+.l3d-store-badge-sm-wide {
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.l3d-store-badge-lg {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Kompakt varyant (footer) */
+.l3d-store-badges-compact .l3d-store-badge {
+  min-height: 42px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  gap: 8px;
+}
+.l3d-store-badges-compact .l3d-store-ico-apple {
+  height: 21px;
+}
+.l3d-store-badges-compact .l3d-store-ico-gplay {
+  height: 18px;
+}
+.l3d-store-badges-compact .l3d-store-badge-sm {
+  font-size: 8px;
+}
+.l3d-store-badges-compact .l3d-store-badge-lg {
+  font-size: 14px;
+}
+
+/* Hero rozet bloğu + §5 bölüm rozetleri */
+.l3d-hero-stores {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.l3d-hero-stores-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(26, 58, 40, 0.5);
+}
+.l3d-store-badges-section {
+  margin-top: 22px;
+}
+.l3d-footer-stores {
+  margin-top: 4px;
+}
+
 /* ── Loading screen ─────────────────────────────────────────────── */
 .l3d-loading {
   position: fixed;
@@ -1355,6 +1462,19 @@
   .l3d-footer-links {
     gap: 12px 20px;
   }
+  .l3d-store-badge {
+    min-height: 48px;
+    padding: 7px 14px;
+  }
+  .l3d-store-badge-lg {
+    font-size: 16px;
+  }
+  /* Hero rozetleri mobilde GİZLİ: hero kopyası (başlık+lead+CTA) statik telefonun
+     üstündeki ~448px'e sığacak şekilde ayarlı; rozet bloğu bu sınırı aşıp telefona
+     binerdi. Mobilde rozetler §5 MOBİL ERİŞİM (tam-genişlik kart) + footer'da görünür. */
+  .l3d-hero-stores {
+    display: none;
+  }
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────── */
@@ -1377,7 +1497,8 @@
   .l3d-link,
   .l3d-nav a,
   .l3d-login,
-  .l3d-footer-links a {
+  .l3d-footer-links a,
+  .l3d-store-badge {
     transition: none;
   }
 }

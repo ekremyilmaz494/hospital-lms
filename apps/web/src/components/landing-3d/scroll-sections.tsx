@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { FeatureStat } from './feature-stat';
 import { Footer } from './footer';
+import { StoreBadges } from './store-badges';
 
 type Module = { title: string; desc: string };
 
@@ -155,6 +156,10 @@ export function ScrollSections() {
                 Modülleri keşfet →
               </a>
             </div>
+            <div className="l3d-hero-stores" data-hero-text>
+              <span className="l3d-hero-stores-label">Mobil uygulamayı indirin</span>
+              <StoreBadges />
+            </div>
           </div>
           <div className="l3d-scroll-cue" aria-hidden="true">
             <span>Keşfetmek için kaydırın</span>
@@ -260,6 +265,7 @@ export function ScrollSections() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing-3d/sec-erisim.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_ERISIM} />
+            <StoreBadges className="l3d-store-badges-section" />
           </div>
           {/* Sağ alan — projeyi diğerlerinden ayıran 3 fark, küçük illüstrasyonlarla */}
           <aside className="l3d-diff l3d-reveal" aria-label="KlinoVax farkı">
