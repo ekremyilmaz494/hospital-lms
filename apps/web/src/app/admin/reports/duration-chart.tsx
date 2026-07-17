@@ -22,8 +22,13 @@ const tooltipStyle = {
 };
 
 /**
- * Kategori başına ayrılan dikey alan. Kategori başına 2 çubuk × barSize 18 = 36px + nefes payı.
- * Bu değerin altına inilirse eksen etiketleri üst üste biner — grafik sabit yükseklikle çizilmemeli.
+ * Kategori başına ayrılan dikey alan: 2 çubuk × barSize 18 = 36px + nefes payı.
+ *
+ * DİKKAT — grafiğin okunabilirliğini TEK BAŞINA bu sayı taşıyor. Y ekseninde `interval={0}`
+ * veriyoruz, yani recharts'ın "çakışan etiketi atla" davranışını (default: `preserveEnd`)
+ * bilinçli kapattık: eğitimlerin bir kısmının etiketsiz kalmasındansa hepsinin görünmesini
+ * istiyoruz. Bedeli, güvenlik ağının olmaması — bu değer düşürülür ya da yükseklik tekrar
+ * sabitlenirse etiketler doğrudan üst üste biner. Bug'ın kendisi tam olarak buydu.
  */
 const ROW_HEIGHT = 52;
 /** Taban yükseklik — az kategoride grafik ezilmesin. */
@@ -40,6 +45,17 @@ export interface DurationDatum {
 }
 
 /**
+ * Grafiğin piksel yüksekliği — kategori sayısıyla DOĞRUSAL büyür.
+ *
+ * Sabit yükseklik bu grafikte bir bug'dı: 15 eğitim 320px'e sıkışınca satır başına ~21px
+ * düşüyordu ve çubuklar (36px) ile etiketler üst üste biniyordu. Yükseklik kategori
+ * sayısından bağımsız hale getirilirse bug geri gelir — bu yüzden ayrı fonksiyon + test.
+ */
+export function durationChartHeight(count: number): number {
+  return Math.max(MIN_HEIGHT, count * ROW_HEIGHT);
+}
+
+/**
  * Eğitim başına ortalama video/sınav süresini karşılaştıran yatay bar grafiği.
  *
  * Yükseklik kategori sayısıyla büyür (`ROW_HEIGHT` × n): sabit yükseklikte, eğitim sayısı
@@ -48,7 +64,7 @@ export interface DurationDatum {
  * koruduğu için tooltip'te başlığın tamamı görünür.
  */
 export function DurationChart({ data }: { data: DurationDatum[] }) {
-  const height = Math.max(MIN_HEIGHT, data.length * ROW_HEIGHT);
+  const height = durationChartHeight(data.length);
 
   return (
     <div style={{ height }}>
