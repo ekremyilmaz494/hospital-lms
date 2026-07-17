@@ -17,7 +17,6 @@ import {
   TrendingUp,
   Library,
   Package,
-  ClipboardCheck,
   ClipboardList,
   Activity,
   MessageSquare,
@@ -216,7 +215,10 @@ export const adminNav: NavGroup[] = [
     label: 'UYUM & RAPORLAMA',
     items: [
       { title: 'Uyum Raporu', href: '/admin/compliance', icon: ShieldCheck, sectors: ['healthcare'] },
-      { title: 'Denetim Hazırlık', href: '/admin/accreditation', icon: ClipboardCheck },
+      // Denetim Hazırlık (/admin/accreditation) menüden GİZLENDİ (2026-07-17, kullanıcı isteği).
+      // Sayfa/route/API silinmedi — yalnız sidebar'dan kaldırıldı, URL ile hâlâ erişilebilir.
+      // Geri açmak için: aşağıdaki satırı yorumdan çıkar + ClipboardCheck'i lucide-react import'una geri ekle.
+      // { title: 'Denetim Hazırlık', href: '/admin/accreditation', icon: ClipboardCheck },
       { title: 'Etkinlik Analizi', href: '/admin/effectiveness', icon: TrendingUp },
       {
         title: 'Geri Bildirim',
