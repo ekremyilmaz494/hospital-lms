@@ -19,6 +19,7 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { useFetch } from '@/hooks/use-fetch';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useToast } from '@/components/shared/toast';
+import { DurationChart } from './duration-chart';
 
 const K = {
   PRIMARY: '#0d9668', PRIMARY_HOVER: '#087a54', PRIMARY_LIGHT: '#d1fae5',
@@ -769,19 +770,7 @@ export default function ReportsPage() {
           ) : durationData.length > 0 ? (
             <BlurFade delay={0.05}>
               <KChartCard title="Ortalama Süre Karşılaştırması (dakika)" icon={<Clock size={14} />}>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <BarChart data={durationData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke={K.BORDER_LIGHT} horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 12, fill: K.TEXT_MUTED }} axisLine={false} tickLine={false} unit=" dk" />
-                      <YAxis dataKey="training" type="category" tick={{ fontSize: 11, fill: K.TEXT_MUTED }} axisLine={false} tickLine={false} width={100} />
-                      <Tooltip contentStyle={chartTooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="video" name="Video Süresi" fill={K.PRIMARY} radius={[0, 6, 6, 0]} barSize={18} />
-                      <Bar dataKey="sinav" name="Sınav Süresi" fill={K.WARNING} radius={[0, 6, 6, 0]} barSize={18} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <DurationChart data={durationData} />
               </KChartCard>
             </BlurFade>
           ) : <p className="text-sm text-center py-8" style={{ color: K.TEXT_MUTED }}>Eğitim süre verileri sınavlar tamamlandıkça burada görünecek.</p>}
