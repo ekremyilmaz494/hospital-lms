@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = [
   '/demo',
   '/sectors/',
   '/contact',
+  '/hakkimizda',
   '/auth/login',
   '/auth/callback',
   '/auth/forgot-password',
@@ -40,9 +41,15 @@ const PUBLIC_ROUTES = [
   '/api/license/', // durum + aktivasyon uçları (kilitliyken erişilebilir)
 ];
 
-function isPublicRoute(pathname: string): boolean {
+/** Tam eşleşmeli public route'lar — prefix eşleşmesi /enrollments gibi yolları açmasın. */
+const EXACT_PUBLIC_ROUTES = ['/', '/en'];
+
+/** Oturum gerektirmeyen (pazarlama, auth, public API) yol mu? */
+export function isPublicRoute(pathname: string): boolean {
   return (
-    pathname === '/' || PUBLIC_ROUTES.some((route) => route !== '/' && pathname.startsWith(route))
+    EXACT_PUBLIC_ROUTES.includes(pathname) ||
+    pathname.startsWith('/en/') ||
+    PUBLIC_ROUTES.some((route) => route !== '/' && pathname.startsWith(route))
   );
 }
 
