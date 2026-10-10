@@ -20,8 +20,9 @@ describe('landing Footer — işletme künyesi', () => {
     expect(html).not.toContain('Kuruluş');
   });
 
-  it('kişisel kimlik/vergi numarası gibi uzun rakam dizisi içermez', () => {
-    const html = renderToStaticMarkup(<Footer />);
-    expect(html).not.toMatch(/\d{10,}/);
+  it('görünen metinde kimlik/vergi numarası gibi uzun rakam dizisi yok', () => {
+    // Yalnız görünen metin — mağaza linklerindeki uygulama ID'leri (href) kapsam dışı.
+    const text = renderToStaticMarkup(<Footer />).replace(/<[^>]+>/g, ' ');
+    expect(text).not.toMatch(/\d{10,}/);
   });
 });
