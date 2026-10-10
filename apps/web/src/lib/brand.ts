@@ -8,7 +8,7 @@ const fromEnv = (key: string): string | undefined => {
   return value && value.length > 0 ? value : undefined
 }
 
-const supportEmail = fromEnv('SUPPORT_EMAIL') ?? 'ekremyilmaz@klinovax.info'
+const supportEmail = fromEnv('SUPPORT_EMAIL') ?? 'ekrem@klinovax.com'
 
 export const BRAND = {
   name: fromEnv('NEXT_PUBLIC_BRAND_NAME') ?? 'KlinoVax',
@@ -36,6 +36,17 @@ export const BRAND = {
   },
   legal: {
     copyrightYear: new Date().getFullYear(),
+    /** Vergi levhasındaki işe başlama yılı — site, LinkedIn ve başvurularda aynı olmalı. */
+    foundedYear: 2026,
+    businessName: 'Ekrem Yılmaz – KlinoVax Yazılım',
+  },
+  founder: {
+    name: 'Ekrem Yılmaz',
+    initials: 'EY',
+    photo: '/about/founder-ekrem-yilmaz.webp',
+    linkedin:
+      fromEnv('NEXT_PUBLIC_FOUNDER_LINKEDIN') ??
+      'https://www.linkedin.com/in/ekrem-y%C4%B1lmaz-240b83240/',
   },
 } as const
 

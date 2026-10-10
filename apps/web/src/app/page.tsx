@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { BRAND } from '@/lib/brand';
+import { organizationJsonLd } from '@/lib/organization-jsonld';
 import { Header } from '@/components/landing-3d/header';
 import { LoadingScreen } from '@/components/landing-3d/loading-screen';
 import { SceneClient } from '@/components/landing-3d/scene-client';
@@ -18,6 +19,7 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'tr_TR',
   },
+  alternates: { canonical: '/', languages: { tr: '/', en: '/en' } },
 };
 
 export default function LandingPage() {
@@ -32,6 +34,11 @@ export default function LandingPage() {
             "history.scrollRestoration='manual';window.scrollTo(0,0);" +
             "try{if(window.matchMedia('(max-width:768px)').matches&&!window.matchMedia('(prefers-reduced-motion:reduce)').matches){document.documentElement.classList.add('l3d-anim-ready')}}catch(e){}",
         }}
+      />
+      {/* Statik künye (kullanıcı girdisi yok) — şirket doğrulaması için makine-okunur */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: organizationJsonLd('tr') }}
       />
       <div className="l3d-page">
         <Header />
