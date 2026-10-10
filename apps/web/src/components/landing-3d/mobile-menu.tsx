@@ -2,14 +2,32 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { GraduationCap, ShieldCheck, Mail, LogIn, ArrowRight, X, ChevronRight } from 'lucide-react';
+import {
+  GraduationCap,
+  ShieldCheck,
+  Users,
+  Mail,
+  LogIn,
+  ArrowRight,
+  X,
+  ChevronRight,
+} from 'lucide-react';
+import { LangSwitch } from './lang-switch';
+import {
+  LANDING_COPY,
+  LANDING_HOME,
+  LANDING_NAV,
+  type LandingLocale,
+  type LandingNavItem,
+} from './locale';
 
-/** Nav bölümleri — ikon + kısa açıklama ile zengin satırlar. */
-const NAV = [
-  { href: '/#egitim', label: 'Eğitim', desc: 'Eğitim & sınav yönetimi', Icon: GraduationCap },
-  { href: '/#kanit', label: 'Kanıt', desc: 'Sertifika & denetim raporu', Icon: ShieldCheck },
-  { href: '/contact', label: 'İletişim', desc: 'Bize ulaşın', Icon: Mail },
-];
+/** Nav satır ikonları — metinler locale.ts'te. */
+const NAV_ICONS: Record<LandingNavItem['icon'], typeof Mail> = {
+  training: GraduationCap,
+  proof: ShieldCheck,
+  about: Users,
+  contact: Mail,
+};
 
 const ANIM_MS = 420;
 
@@ -21,7 +39,14 @@ const ANIM_MS = 420;
  * ekran dışına taşıp masaüstünde yatay scroll yaratırdı (position:fixed öğe
  * .l3d-page overflow-x'ten kaçar). Mount + rAF ile slide-in, unmount gecikmeli.
  */
-export function MobileMenu() {
+export function MobileMenu({
+  locale = 'tr',
+  alternateHref,
+}: {
+  locale?: LandingLocale;
+  alternateHref?: string;
+}) {
+  const copy = LANDING_COPY[locale];
   const [open, setOpen] = useState(false); // butonun mantıksal durumu
   const [mounted, setMounted] = useState(false); // drawer DOM'da mı
   const [shown, setShown] = useState(false); // is-open class (geçiş)
@@ -62,7 +87,7 @@ export function MobileMenu() {
       <button
         type="button"
         className="l3d-menu-btn"
-        aria-label={open ? 'Menüyü kapat' : 'Menüyü aç'}
+        aria-label={open ? copy.closeMenu : copy.openMenu}
         aria-expanded={open}
         onClick={() => (open ? closeMenu() : openMenu())}
       >
@@ -78,25 +103,30 @@ export function MobileMenu() {
             onClick={closeMenu}
             aria-hidden="true"
           />
-          <nav className={`l3d-drawer${shown ? ' is-open' : ''}`} aria-label="Mobil menü">
+          <nav className={`l3d-drawer${shown ? ' is-open' : ''}`} aria-label={copy.mobileMenu}>
             <div className="l3d-drawer-head">
-              <Link href="/" className="l3d-drawer-logo" onClick={closeMenu}>
+              <Link href={LANDING_HOME[locale]} className="l3d-drawer-logo" onClick={closeMenu}>
                 KlinoVax
               </Link>
               <button
                 type="button"
                 className="l3d-drawer-close"
-                aria-label="Menüyü kapat"
+                aria-label={copy.closeMenu}
                 onClick={closeMenu}
               >
                 <X size={20} aria-hidden="true" />
               </button>
             </div>
 
-            <span className="l3d-drawer-eyebrow">MENÜ</span>
+            <div className="l3d-drawer-meta">
+              <span className="l3d-drawer-eyebrow">{copy.menu}</span>
+              <LangSwitch locale={locale} alternateHref={alternateHref} onNavigate={closeMenu} />
+            </div>
 
             <ul className="l3d-drawer-list">
-              {NAV.map(({ href, label, desc, Icon }) => (
+              {LANDING_NAV[locale].map(({ href, label, desc, icon }) => {
+                const Icon = NAV_ICONS[icon];
+                return (
                 <li key={href}>
                   <Link href={href} onClick={closeMenu}>
                     <span className="l3d-drawer-ico" aria-hidden="true">
@@ -109,16 +139,17 @@ export function MobileMenu() {
                     <ChevronRight size={18} className="l3d-drawer-chev" aria-hidden="true" />
                   </Link>
                 </li>
-              ))}
+                );
+              })}
             </ul>
 
             <div className="l3d-drawer-actions">
               <Link href="/auth/login" className="l3d-drawer-login" onClick={closeMenu}>
                 <LogIn size={17} aria-hidden="true" />
-                Giriş Yap
+                {copy.login}
               </Link>
               <Link href="/demo" className="l3d-drawer-cta" onClick={closeMenu}>
-                Demo Talep Et
+                {copy.demo}
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
             </div>
@@ -140,7 +171,7 @@ export function MobileMenu() {
               </svg>
             </div>
 
-            <p className="l3d-drawer-foot">Hastaneler için eğitim &amp; sınav platformu</p>
+            <p className="l3d-drawer-foot">{copy.drawerFoot}</p>
           </nav>
         </>
       )}

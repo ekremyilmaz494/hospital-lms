@@ -34,6 +34,8 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Canonical/hreflang/OG göreli URL'leri kanonik alan adına çözülsün.
+  metadataBase: new URL(`https://${BRAND.domain}`),
   title: `${BRAND.fullName} - Personel Eğitim Sistemi`,
   description: BRAND.shortDesc,
   icons: {
