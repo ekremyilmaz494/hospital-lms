@@ -46,7 +46,7 @@ export const BRAND = {
     photo: '/about/founder-ekrem-yilmaz.webp',
     linkedin:
       fromEnv('NEXT_PUBLIC_FOUNDER_LINKEDIN') ??
-      'https://www.linkedin.com/in/ekrem-y%C4%B1lmaz-240b83240/',
+      'https://www.linkedin.com/in/ekremyilmaz-klinovax/',
   },
 } as const
 
