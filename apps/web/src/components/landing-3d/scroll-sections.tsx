@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { FeatureStat } from './feature-stat';
 import { Footer } from './footer';
 import { StoreBadges } from './store-badges';
 
@@ -15,11 +14,11 @@ const MODULES_EGITIM: Module[] = [
   { title: 'Eğitim Dönemleri', desc: 'Periyodik eğitimi takvime bağla, tekrarlat.' },
 ];
 const MODULES_UYUM: Module[] = [
-  { title: 'KVKK Uyum Raporu', desc: 'Denetime hazır çıktı, anında dışa aktar.' },
-  { title: 'SMG / SKS Takibi', desc: 'Hizmet içi eğitim ve denetim uyumu.' },
+  { title: 'Uyum Raporu', desc: 'Zorunlu eğitimde kim eksik, tek ekranda; hatırlatma gönder.' },
+  { title: 'Denetim Formları', desc: 'Duyuru, Katılım ve İmza, Kayıt Sicil formları PDF olarak.' },
   { title: 'Etkinlik Analizi', desc: 'Eğitimin gerçek etkisini ölç, zayıfı gör.' },
-  { title: 'Sertifikalar', desc: 'Otomatik üretim, geçerlilik takibi, PDF.' },
-  { title: 'İşlem Geçmişi (Audit)', desc: 'Değiştirilemez kayıt, tam izlenebilirlik.' },
+  { title: 'Sertifikalar', desc: 'Otomatik üretim, geçerlilik takibi, QR ile doğrulama.' },
+  { title: 'İşlem Geçmişi (Audit)', desc: 'Değişikliği tespit edilebilen kayıt, tam izlenebilirlik.' },
 ];
 const MODULES_KURUM: Module[] = [
   { title: 'Personel Yönetimi', desc: 'Toplu içe aktarma; birim ve role göre düzenleme.' },
@@ -61,7 +60,7 @@ const DIFFERENTIATORS: { img: string; title: string; desc: string }[] = [
   {
     img: '/landing-3d/diff-rapor.svg',
     title: 'Denetime hazır uyum',
-    desc: 'KVKK, SKS ve hizmet içi eğitim raporları tek tıkla.',
+    desc: 'Uyum raporu ve hizmet içi eğitim denetim formları tek tıkla.',
   },
   {
     img: '/landing-3d/diff-saglik.svg',
@@ -81,8 +80,8 @@ const FAQ: { q: string; a: string }[] = [
     a: 'Kurulum için sunucu yönetimi gerekmez; bulut tabanlıdır. Personeli Excel ile toplu içe aktarabilir, birim ve rollere göre dakikalar içinde eğitim atamaya başlayabilirsiniz.',
   },
   {
-    q: 'Verilerimiz güvende mi? KVKK uyumlu mu?',
-    a: 'Evet. Her kurumun verisi tamamen izole edilir; veriler şifreli saklanır ve tüm kritik işlemler değiştirilemez şekilde kayda alınır. KVKK ve hizmet içi eğitim denetimlerine hazır raporlar üretilir.',
+    q: 'Verilerimiz güvende mi? KVKK süreçlerini destekliyor mu?',
+    a: 'Her kurumun verisi veritabanı seviyesinde diğer kurumlardan izole edilir, TC kimlik numaraları şifreli saklanır ve kritik işlemler değişikliği tespit edilebilen bir işlem geçmişine yazılır. Personelin KVKK kapsamındaki başvuruları sistem içinden alınıp yanıtlanır.',
   },
   {
     q: 'Mevcut eğitim içeriklerimizi yükleyebilir miyiz?',
@@ -90,7 +89,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'Personel eğitimleri telefondan tamamlayabilir mi?',
-    a: 'Evet. Personel eğitimi mobil cihazından izleyip sınavını olur, sertifikasını anında indirir. Videolarda ileri sarma kapalıdır; gerçek izleme süresi ölçülür.',
+    a: 'Evet. Personel eğitimi mobil cihazından izleyip sınavını tamamlar, sertifikasını anında indirir. Videolarda ileri sarma kapalıdır; gerçek izleme süresi ölçülür.',
   },
   {
     q: 'Birden fazla hastane/şube yönetebilir miyiz?',
@@ -199,17 +198,12 @@ export function ScrollSections() {
               her an hazır.
             </h2>
             <p className="l3d-lead">
-              Tamamlanma oranları, sertifika geçerlilikleri ve KVKK uyum raporları tek tıkla.
-              Değiştirilemez işlem kayıtlarıyla tam izlenebilirlik.
+              Tamamlanma oranları, sertifika geçerlilikleri ve denetim formları tek tıkla.
+              Değişikliği tespit edilebilen işlem kayıtlarıyla tam izlenebilirlik.
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing-3d/sec-uyum.svg" alt="" aria-hidden="true" className="l3d-section-art" />
             <ModuleList items={MODULES_UYUM} />
-          </div>
-          <div className="l3d-stats l3d-reveal">
-            <FeatureStat label="TAMAMLANAN EĞİTİM" value="12.480" unit="+" />
-            <FeatureStat label="BAŞARI ORANI" value="94" unit="%" />
-            <FeatureStat label="AKTİF KURUM" value="40" unit="+" />
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

@@ -8,50 +8,11 @@ import { isKvkkNoticeCurrent } from '@/lib/kvkk/notice-version';
 import { hasAdminAuthority } from '@/lib/auth/admin-authority';
 import { hasGroupAuthority } from '@/lib/auth/group-authority';
 
-const PUBLIC_ROUTES = [
-  '/',
-  '/kvkk',
-  '/pricing', // route silindi; public kalsın ki login'e değil temiz 404'e düşsün
-  '/demo',
-  '/sectors/',
-  '/contact',
-  '/hakkimizda',
-  '/auth/login',
-  '/auth/callback',
-  '/auth/forgot-password',
-  '/auth/reset-password',
-  '/auth/mfa-verify',
-  '/auth/mfa-setup',
-  '/davet/',
-  '/api/auth/invitations/',
-  '/api/health',
-  '/api/docs',
-  '/docs',
-  '/api/cron/',
-  '/api/payments/callback',
-  '/terms',
-  '/privacy',
-  '/help',
-  '/register',
-  '/certificates/verify',
-  '/api/public/',
-  '/dev-reset',
-  '/clear-cache',
-  '/license', // on-prem lisans aktivasyon/yenileme ekranı (kilitliyken erişilebilir)
-  '/api/license/', // durum + aktivasyon uçları (kilitliyken erişilebilir)
-];
+import { isPublicRoute } from '@/lib/site-routes';
 
-/** Tam eşleşmeli public route'lar — prefix eşleşmesi /enrollments gibi yolları açmasın. */
-const EXACT_PUBLIC_ROUTES = ['/', '/en'];
-
-/** Oturum gerektirmeyen (pazarlama, auth, public API) yol mu? */
-export function isPublicRoute(pathname: string): boolean {
-  return (
-    EXACT_PUBLIC_ROUTES.includes(pathname) ||
-    pathname.startsWith('/en/') ||
-    PUBLIC_ROUTES.some((route) => route !== '/' && pathname.startsWith(route))
-  );
-}
+// Public rota listesi TEK kaynaktan (proxy + sitemap + testler). Eşleşme segment
+// sınırında — eski `startsWith(route)` /demox, /helpers, /licenses gibi yolları da açıyordu.
+export { isPublicRoute };
 
 const VALID_ROLES = ['super_admin', 'admin', 'staff'] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
