@@ -1,0 +1,75 @@
+/* ══ Pazarlama sitesi v2 ("klinik sakinlik") ══
+   Yalnız `src/components/site/**` kabuğu tarafından import edilir. Renkler --site-*
+   token'larından (tokens.css). Animasyon yalnız transform/opacity/stroke-dashoffset. */
+
+/* ── İllüstrasyon renk rolleri ──────────────────────────────────────────
+   Sahneler ham renk taşımaz; rol sınıfı + bu değişkenler. Koyu bantta (.s-band)
+   değişkenler yeniden tanımlanır, sahneler kendiliğinden tersine döner. */
+.s-illo {
+  --illo-ink: var(--site-ink);
+  --illo-brand: var(--site-brand);
+  --illo-line: var(--site-rule-strong);
+  --illo-paper: var(--site-surface);
+  --illo-tint: var(--site-brand-tint);
+  --illo-sunken: var(--site-surface-sunken);
+  --illo-attn: var(--site-attn);
+  color: var(--illo-ink);
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.s-band .s-illo {
+  --illo-ink: var(--site-band-ink);
+  --illo-brand: var(--site-band-brand);
+  --illo-line: var(--site-band-rule);
+  --illo-paper: var(--site-band-surface);
+  --illo-tint: var(--site-band-tint);
+  --illo-sunken: var(--site-band-sunken);
+}
+
+.s-illo .s-ink { stroke: var(--illo-ink); }
+.s-illo .s-brand { stroke: var(--illo-brand); }
+.s-illo .s-line { stroke: var(--illo-line); }
+.s-illo .s-paper { stroke: var(--illo-paper); }
+.s-illo .s-fill-paper { fill: var(--illo-paper); }
+.s-illo .s-fill-tint { fill: var(--illo-tint); }
+.s-illo .s-fill-sunken { fill: var(--illo-sunken); }
+.s-illo .s-fill-brand { fill: var(--illo-brand); }
+.s-illo .s-fill-ink { fill: var(--illo-ink); }
+.s-illo .s-attn { fill: var(--illo-attn); stroke: none; }
+
+/* ── Görünür olunca çizim ───────────────────────────────────────────────
+   İçerik VARSAYILAN görünür. Gizleme yalnız <SiteReveal/> istemci yaprağı
+   html'e `s-reveal-on` ekleyince ve hareket tercih ediliyorsa devreye girer;
+   JS yoksa, gözlemci çalışmazsa veya reduced-motion'da son hâl statik kalır. */
+@media (prefers-reduced-motion: no-preference) {
+  .s-reveal-on [data-reveal] .s-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 1.1s var(--site-ease) var(--d, 0ms);
+  }
+  .s-reveal-on [data-reveal]:not([data-in]) .s-draw {
+    stroke-dashoffset: 1;
+  }
+  .s-reveal-on [data-reveal] .s-pop {
+    transition:
+      opacity 0.5s var(--site-ease) var(--d, 0ms),
+      transform 0.6s var(--site-ease) var(--d, 0ms);
+  }
+  .s-reveal-on [data-reveal]:not([data-in]) .s-pop {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  .s-reveal-on [data-reveal]:not([data-in]).s-fade,
+  .s-reveal-on [data-reveal]:not([data-in]) .s-fade {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  .s-reveal-on .s-fade {
+    transition:
+      opacity 0.6s var(--site-ease) var(--d, 0ms),
+      transform 0.7s var(--site-ease) var(--d, 0ms);
+  }
+}

@@ -219,6 +219,8 @@
   --site-band-ink-soft: #94a3b8;
   --site-band-rule: rgba(226, 232, 240, 0.12);
   --site-band-brand: var(--brand-400);    /* #34d399: koyu zeminde 9.3 */
+  --site-band-tint: rgba(52, 211, 153, 0.14);
+  --site-band-sunken: rgba(226, 232, 240, 0.06);
   --site-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
   --site-shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 18px 36px -16px rgba(15, 23, 42, 0.18);
   --site-focus: 0 0 0 2px var(--site-surface), 0 0 0 4px var(--site-brand-ink);
