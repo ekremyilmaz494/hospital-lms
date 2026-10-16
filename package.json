@@ -49,7 +49,7 @@
     "apps/web/src/app/**/page.{ts,tsx}": [
       "node apps/web/scripts/perf-check.js"
     ],
-    "apps/web/src/app/{staff,admin,super-admin,help}/**/*.{ts,tsx}": [
+    "apps/web/src/app/{\\(app\\)/staff,\\(app\\)/admin,\\(app\\)/super-admin,help}/**/*.{ts,tsx}": [
       "bash apps/web/scripts/editorial-palette-guard.sh"
     ]
   }

@@ -68,6 +68,8 @@ Atama → Ön sınav → Video (ileri sarma yok) → Son sınav → Geçti/Kald�
 `@/*` → `./src/*`
 
 ### Proje yapısı
+- `src/app/(app)/` — oturumlu paneller (`admin`, `staff`, `super-admin`, `group`, `exam`) + `auth` akışı. Route group: URL'de görünmez. Session okuması (`getInitialUser` + `AuthProvider`) `(app)/layout.tsx`'tedir; **kök layout `cookies()`/`headers()` ÇAĞIRMAZ** — çağırırsa pazarlama sayfaları statik olmaktan çıkar. On-prem'de kök layout `connection()` ile dinamiğe geçer (runtime `window.__ONPREM_CONFIG__`)
+- Pazarlama sayfaları (`/`, `/en`, `/hakkimizda`, `(marketing)`, hukuki sayfalar) `src/app/` kökünde, statik prerender. Public rota listesi TEK kaynak: `src/lib/site-routes.ts` (proxy + sitemap)
 - `src/app/api/` — API route'lar (auth, super-admin, admin, staff, exam, cron)
 - `src/components/shared/` — stat-card, page-header, data-table, notification-bell
 - `src/components/layouts/` — Sidebar (role-aware `sidebar-config.ts`), topbar

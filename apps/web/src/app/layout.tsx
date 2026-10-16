@@ -1,17 +1,13 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import { Plus_Jakarta_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { AuthProvider } from "@/components/providers/auth-provider";
-import { createClient } from "@/lib/supabase/server";
 import { getBrowserRuntimeConfig, serializeBrowserConfigScript } from "@/lib/supabase/onprem-config";
-import type { User } from "@/types/database";
-import { extractAdminAccess } from "@/lib/auth/admin-authority";
+import { isOnPrem } from "@/lib/deployment";
 import { ToastProvider } from "@/components/shared/toast";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
-import { CrispWidget } from "@/components/providers/crisp-widget";
-import { SessionTimeoutManager } from "@/components/providers/session-timeout-provider";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -59,46 +55,18 @@ export const viewport: Viewport = {
   themeColor: "#0d9668",
 };
 
-// Supabase session → User shape. Client'taki AuthProvider'ın `setUser` ile ürettiği objeyle
-// birebir aynı şema — SSR hydration'da uyumsuzluk olmaması için paralel tutuldu.
-async function getInitialUser(): Promise<User | null> {
-  try {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const u = session?.user;
-    if (!u) return null;
-    return {
-      id: u.id,
-      email: u.email ?? '',
-      firstName: u.user_metadata?.first_name ?? '',
-      lastName: u.user_metadata?.last_name ?? '',
-      role: u.app_metadata?.role ?? u.user_metadata?.role ?? 'staff',
-      adminAccessGranted: extractAdminAccess(u.app_metadata),
-      organizationId: u.app_metadata?.organization_id ?? u.user_metadata?.organization_id ?? null,
-      phone: u.user_metadata?.phone ?? null,
-      departmentId: u.user_metadata?.department_id ?? null,
-      department: u.user_metadata?.department ?? null,
-      title: u.user_metadata?.title ?? null,
-      avatarUrl: u.user_metadata?.avatar_url ?? null,
-      isActive: u.user_metadata?.is_active !== false,
-      kvkkNoticeAcknowledgedAt: u.user_metadata?.kvkk_notice_acknowledged_at ?? null,
-      createdAt: u.created_at,
-      updatedAt: u.updated_at ?? u.created_at,
-    };
-  } catch {
-    // Session parse edilemedi — client fallback devreye girsin
-    return null;
-  }
-}
-
+// Kök layout request-time API (cookies/headers) ÇAĞIRMAZ → bulutta pazarlama sayfaları
+// statik prerender edilir. Session okuması `(app)/layout.tsx`'te.
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialUser = await getInitialUser();
   // On-prem: tarayıcı-yüzlü config RUNTIME'da enjekte edilir (NEXT_PUBLIC_* build-time
-  // gömülü olduğundan tek generic imaj için gerekli). Bulutta null → hiç basılmaz.
+  // gömülü olduğundan tek generic imaj için gerekli). Statik prerender bu değeri build
+  // anında null'a dondururdu → imaj localhost Supabase'e kilitlenirdi. connection() on-prem'de
+  // her sayfayı istek-başı render'a zorlar; bulutta isOnPrem()=false → sayfalar statik kalır.
+  if (isOnPrem()) await connection();
   const onpremConfig = getBrowserRuntimeConfig();
   return (
     <html
@@ -131,17 +99,13 @@ export default async function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <AuthProvider initialUser={initialUser}>
-            <ToastProvider>
-              <ErrorBoundary>
-                {children}
-                {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
-                <CookieConsent />
-                <CrispWidget />
-                <SessionTimeoutManager />
-              </ErrorBoundary>
-            </ToastProvider>
-          </AuthProvider>
+          <ToastProvider>
+            <ErrorBoundary>
+              {children}
+              {process.env.NODE_ENV === 'development' && <DevSWCleaner />}
+              <CookieConsent />
+            </ErrorBoundary>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>
