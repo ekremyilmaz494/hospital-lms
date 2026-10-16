@@ -1,11 +1,13 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import type { Metadata } from "next";
-import { BRAND } from "@/lib/brand";
 import { DemoClient } from "./demo-client";
 
-export const metadata: Metadata = {
-  title: `Demo Talep Et - ${BRAND.fullName}`,
-  description: `${BRAND.fullName} demo talebi. Ucretsiz demo ile platformu deneyimleyin.`,
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Demo Talep Edin',
+  description:
+    'KlinoVax\'ı hastanenizin eğitim senaryosuyla birlikte inceleyelim: atama, video, sınav, sertifika ve raporlama akışını canlı demoda görün.',
+  path: '/demo',
+});
 
 export default function DemoPage() {
   return <DemoClient />;

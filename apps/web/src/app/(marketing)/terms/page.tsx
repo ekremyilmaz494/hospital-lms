@@ -1,10 +1,13 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import type { Metadata } from "next";
 import { BRAND } from "@/lib/brand";
 
-export const metadata: Metadata = {
-  title: `Kullanim Sartlari | ${BRAND.fullName}`,
-  description: `${BRAND.fullName} platformu kullanim sartlari ve kosullari.`,
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Kullanım Şartları',
+  description:
+    'KlinoVax personel eğitim platformunun kurumlar ve kullanıcılar için kullanım şartları ve koşulları.',
+  path: '/terms',
+});
 
 const LAST_UPDATED = "Temmuz 2026";
 

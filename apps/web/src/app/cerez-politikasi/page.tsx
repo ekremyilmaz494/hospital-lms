@@ -1,11 +1,15 @@
+import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-metadata'
 import Link from 'next/link'
 import { ArrowLeft, Cookie, Layers, Database, Settings, Share2, RefreshCw, Mail } from 'lucide-react'
 import { BlurFade } from '@/components/ui/blur-fade'
 
-export const metadata = {
-  title: 'Çerez Politikası — KlinoVax',
-  description: 'KlinoVax web sitesinde kullanılan çerezler ve benzeri teknolojiler hakkında bilgilendirme.',
-}
+export const metadata: Metadata = pageMetadata({
+  title: 'Çerez Politikası',
+  description:
+    'KlinoVax web sitesinde kullanılan çerezler ve benzeri teknolojiler hakkında bilgilendirme.',
+  path: '/cerez-politikasi',
+})
 
 // KlinoVax palette (admin chrome tokens) — kvkk sayfasıyla birebir aynı
 const INK = '#1c1917'        // --k-text-primary (warm dark)

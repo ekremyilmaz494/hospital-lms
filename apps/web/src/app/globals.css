@@ -67,6 +67,28 @@
     }
   }
   --animate-ripple: ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite;
+
+  /* Site paleti → Tailwind utility'leri (text-site-ink, bg-site-surface, border-site-rule...) */
+  --color-site-bg: var(--site-bg);
+  --color-site-surface: var(--site-surface);
+  --color-site-surface-sunken: var(--site-surface-sunken);
+  --color-site-ink: var(--site-ink);
+  --color-site-ink-soft: var(--site-ink-soft);
+  --color-site-ink-muted: var(--site-ink-muted);
+  --color-site-rule: var(--site-rule);
+  --color-site-rule-strong: var(--site-rule-strong);
+  --color-site-brand: var(--site-brand);
+  --color-site-brand-ink: var(--site-brand-ink);
+  --color-site-brand-ink-hover: var(--site-brand-ink-hover);
+  --color-site-brand-tint: var(--site-brand-tint);
+  --color-site-attn: var(--site-attn);
+  --color-site-attn-ink: var(--site-attn-ink);
+  --color-site-band: var(--site-band);
+  --color-site-band-surface: var(--site-band-surface);
+  --color-site-band-ink: var(--site-band-ink);
+  --color-site-band-ink-soft: var(--site-band-ink-soft);
+  --color-site-band-rule: var(--site-band-rule);
+  --color-site-band-brand: var(--site-band-brand);
 }
 
 /* ──────────────────────────────────────────────────────────────────

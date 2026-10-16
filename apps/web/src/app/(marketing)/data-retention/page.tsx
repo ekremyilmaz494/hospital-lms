@@ -1,12 +1,15 @@
+import { pageMetadata } from '@/lib/site-metadata'
 import type { Metadata } from 'next'
 import { BRAND } from '@/lib/brand'
 
 const KVKK_EMAIL = 'kvkk@klinovax.info'
 
-export const metadata: Metadata = {
-  title: `Kisisel Veri Saklama ve Imha Politikasi — ${BRAND.fullName}`,
-  description: '6698 sayili KVKK kapsaminda kisisel veri saklama sureleri ve imha yontemleri.',
-}
+export const metadata: Metadata = pageMetadata({
+  title: 'Kişisel Veri Saklama ve İmha Politikası',
+  description:
+    '6698 sayılı KVKK kapsamında KlinoVax\'ta işlenen kişisel verilerin saklama süreleri ve imha yöntemleri.',
+  path: '/data-retention',
+});
 
 const sections = [
   {

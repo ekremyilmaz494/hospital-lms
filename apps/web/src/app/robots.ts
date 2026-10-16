@@ -1,17 +1,28 @@
-import type { MetadataRoute } from 'next';
-import { BRAND } from '@/lib/brand';
+import type { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/site-metadata'
 
+// `disallow` yalnız HİÇ indekslenmemesi gereken, taranması boşa olan alanlar içindir.
+// Login/kayıt/davet gibi sayfalar `noindex` ile düşürülür: engellenen URL'deki
+// noindex'i Google göremez. Kurum alt alan adları proxy'de `X-Robots-Tag: noindex` alır.
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `https://${BRAND.domain}`;
-
   return {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/en', '/hakkimizda', '/demo', '/contact', '/kvkk'],
-        disallow: ['/admin/', '/super-admin/', '/staff/', '/exam/', '/auth/', '/api/'],
+        allow: '/',
+        disallow: [
+          '/api/',
+          '/admin/',
+          '/super-admin/',
+          '/staff/',
+          '/group/',
+          '/exam/',
+          '/dev-reset',
+          '/clear-cache',
+          '/monitoring',
+        ],
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
-  };
+    sitemap: `${SITE_URL}/sitemap.xml`,
+  }
 }

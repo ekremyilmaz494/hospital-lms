@@ -1,11 +1,15 @@
+import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/site-metadata'
 import Link from 'next/link'
 import { ArrowLeft, Shield, Database, Share2, Clock, UserCheck, Mail, Scale } from 'lucide-react'
 import { BlurFade } from '@/components/ui/blur-fade'
 
-export const metadata = {
-  title: 'KVKK Aydınlatma Metni — KlinoVax',
-  description: 'Kişisel Verilerin Korunması Kanunu kapsamında aydınlatma metni',
-}
+export const metadata: Metadata = pageMetadata({
+  title: 'KVKK Aydınlatma Metni',
+  description:
+    '6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında KlinoVax aydınlatma metni: işlenen veriler, amaçlar ve haklarınız.',
+  path: '/kvkk',
+})
 
 // KlinoVax palette (admin chrome tokens)
 const INK = '#1c1917'        // --k-text-primary (warm dark)

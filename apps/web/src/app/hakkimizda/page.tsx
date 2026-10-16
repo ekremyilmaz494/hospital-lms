@@ -1,3 +1,4 @@
+import { pageMetadata } from '@/lib/site-metadata';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BRAND } from '@/lib/brand';
@@ -7,17 +8,12 @@ import { Footer } from '@/components/landing-3d/footer';
 import { FounderCard } from '@/components/landing-3d/founder-card';
 import '@/app/landing-3d/landing-3d.css';
 
-export const metadata: Metadata = {
-  title: `Hakkımızda — ${BRAND.name}`,
-  description: `${BRAND.name}, ${BRAND.legal.foundedYear} yılında Konya'da kurulan; hastane, klinik ve eczaneler için personel eğitim ve sınav platformudur. Kurucu: ${BRAND.founder.name}.`,
-  alternates: { canonical: '/hakkimizda', languages: { tr: '/hakkimizda', en: '/en' } },
-  openGraph: {
-    title: `Hakkımızda — ${BRAND.name}`,
-    description: `${BRAND.legal.foundedYear}, Konya. Hastaneler için eğitim & sınav platformu.`,
-    type: 'website',
-    locale: 'tr_TR',
-  },
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Hakkımızda',
+  description:
+    'KlinoVax, 2026\'da Konya\'da kurulan, hastane ve sağlık kurumları için personel eğitim ve sınav platformudur. Kurucu: Ekrem Yılmaz.',
+  path: '/hakkimizda',
+});
 
 const FACTS = [
   { label: 'Kuruluş', value: `${BRAND.legal.foundedYear} · Konya` },

@@ -1,8 +1,16 @@
 import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { extractSubdomain } from '@/lib/organization-utils'
 
 export async function proxy(request: NextRequest) {
-  return await updateSession(request)
+  const response = await updateSession(request)
+  // Kurum alt alan adları (devakent.klinovax.com) ana sitenin kopyası gibi
+  // indekslenmesin. Host'a bağlı olduğu için statik sayfa metadata'sıyla yapılamaz.
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || ''
+  if (baseDomain && extractSubdomain(request.headers.get('host') || '', baseDomain)) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  }
+  return response
 }
 
 export const config = {

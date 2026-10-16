@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { pageMetadata, HOME_LANGUAGES } from '@/lib/site-metadata';
 import { BRAND } from '@/lib/brand';
 import { organizationJsonLd } from '@/lib/organization-jsonld';
 import { Header } from '@/components/landing-3d/header';
@@ -6,18 +7,15 @@ import { Footer } from '@/components/landing-3d/footer';
 import { FounderCard } from '@/components/landing-3d/founder-card';
 import '@/app/landing-3d/landing-3d.css';
 
-export const metadata: Metadata = {
-  title: { absolute: `${BRAND.name} — Training & Exam Platform for Hospitals` },
+export const metadata: Metadata = pageMetadata({
+  title: 'KlinoVax | Staff Training and Exam Platform for Hospitals',
   description:
-    'KlinoVax is a cloud-based staff training and compliance platform for hospitals, clinics and pharmacies: assignment, video tracking, exams, certificates and audit-ready reports.',
-  alternates: { canonical: '/en', languages: { tr: '/', en: '/en' } },
-  openGraph: {
-    title: `${BRAND.name} — Training & Exam Platform for Hospitals`,
-    description: 'Staff training and compliance platform for hospitals. Founded in 2026 in Konya, Türkiye.',
-    type: 'website',
-    locale: 'en_US',
-  },
-};
+    'Staff training and compliance platform for hospitals: assignment, locked video, pre and post exams, QR-verified certificates and audit reports.',
+  path: '/en',
+  locale: 'en',
+  absoluteTitle: true,
+  languages: HOME_LANGUAGES,
+});
 
 const FEATURES = [
   { title: 'Assignment', text: 'Assign trainings by department, role or person — deadlines and reminders included.' },

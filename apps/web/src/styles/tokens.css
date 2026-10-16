@@ -190,6 +190,44 @@
   --landing-sector-health-soft: rgba(13, 150, 104, 0.12);
   --landing-sector-industry: #b45309;
   --landing-sector-industry-soft: rgba(180, 83, 9, 0.12);
+
+  /* ══ SITE PALETTE ("klinik sakinlik": pazarlama sitesi v2) ══
+     Scope: yeni `src/components/site/**` kabuğu. --landing-* login geçişi bitene dek kalır.
+     Bilinçli olarak `.dark` altında YENİDEN TANIMLANMAZ: site tek tema (açık) + tek koyu bant.
+     Ölçülmüş kontrastlar (zemin #f1f5f9 üstünde): ink 16.3, ink-soft 6.9, ink-muted 5.2,
+     brand-ink 4.9 (metin/link), brand 3.4 (YALNIZ çizgi/ikon/grafik, metin değil).
+     CTA: beyaz yazı brand-ink zeminde 5.35. */
+  --site-bg: #f1f5f9;
+  --site-surface: #ffffff;
+  --site-surface-sunken: #e8eef4;
+  --site-ink: #0f172a;
+  --site-ink-soft: #475569;
+  --site-ink-muted: #5b6779;
+  --site-rule: rgba(15, 23, 42, 0.08);
+  --site-rule-strong: rgba(15, 23, 42, 0.16);
+  --site-brand: var(--brand-600);         /* #0d9668: çizgi, ikon, illüstrasyon */
+  --site-brand-ink: var(--brand-700);     /* #087a54: link metni + CTA zemini */
+  --site-brand-ink-hover: var(--brand-800);
+  --site-brand-tint: var(--brand-50);     /* #ecfdf5: açık yeşil yüzey */
+  --site-brand-tint-strong: var(--brand-100);
+  --site-attn: #f59e0b;                   /* kehribar: YALNIZ durum + illüstrasyonda tek nokta */
+  --site-attn-ink: #b45309;               /* kehribar metin (beyaz üstünde 5.0) */
+  /* Koyu bant (güvenlik bölümü): tek bilinçli tema geçişi */
+  --site-band: #0f172a;
+  --site-band-surface: #1e293b;
+  --site-band-ink: #e2e8f0;
+  --site-band-ink-soft: #94a3b8;
+  --site-band-rule: rgba(226, 232, 240, 0.12);
+  --site-band-brand: var(--brand-400);    /* #34d399: koyu zeminde 9.3 */
+  --site-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
+  --site-shadow-lift: 0 2px 4px rgba(15, 23, 42, 0.05), 0 18px 36px -16px rgba(15, 23, 42, 0.18);
+  --site-focus: 0 0 0 2px var(--site-surface), 0 0 0 4px var(--site-brand-ink);
+  --site-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --site-radius-sm: 10px;
+  --site-radius: 16px;                    /* rounded-2xl ile aynı */
+  --site-radius-lg: 24px;
+  --site-gutter: clamp(16px, 4vw, 40px);
+  --site-max: 1200px;
 }
 
 .dark {

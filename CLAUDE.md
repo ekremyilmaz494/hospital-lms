@@ -193,7 +193,8 @@ super_admin null `organizationId` ile gelirse 400 döner, route'a girmez. Bu, "g
 ### UI / Frontend
 - Mevcut shadcn/ui component'lerini kullan, sıfırdan yazma
 - Generic "AI slop" tasarımdan kaç — kalın estetik kararlar al
-- Inter/Roboto/Arial/sistem fontlarından kaç
+- Font: başlık/display Plus Jakarta Sans, gövde Inter (yalnız gövde metni; başlıkta/kişilik öğesinde Inter, Roboto, Arial veya sistem fontu kullanma). Yeni font ailesi ekleme. Üçü de değişken font: `next/font` çağrısına `weight` dizisi ekleme
+- Pazarlama sitesi renkleri `--site-*` token'larından (`tokens.css`); `#0d9668` üstünde beyaz metin AA'yı geçmez → CTA zemini `--site-brand-ink`
 - Mor gradient + beyaz arka plandan kaç
 - Hastane/sağlık bağlamına özgü tasarım dili
 

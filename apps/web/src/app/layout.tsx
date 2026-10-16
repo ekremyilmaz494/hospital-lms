@@ -9,34 +9,45 @@ import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { DevSWCleaner } from "@/components/dev-sw-cleaner";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { BRAND } from "@/lib/brand";
+import { SITE_URL, TITLE_TEMPLATE } from "@/lib/site-metadata";
 import "./globals.css";
 
+// Üçü de değişken font: `weight` verilmeyince alt küme başına TEK değişken dosya gelir
+// (ağırlık başına ayrı dosyadan küçük) ve paneller 400-800 arası her ağırlığı gerçek çizer.
 const fontDisplay = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
-  weight: ["500", "600", "700", "800"],
   display: "swap",
   variable: "--font-display-loaded",
 });
 
 const fontBody = Inter({
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-body-loaded",
 });
 
+// Mono yalnız veri parçalarında (sertifika kodu, sayaç) → ilk boyamayı beklemesin.
 const fontMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  subsets: ["latin", "latin-ext"],
   display: "swap",
+  preload: false,
   variable: "--font-mono-loaded",
 });
 
 export const metadata: Metadata = {
   // Canonical/hreflang/OG göreli URL'leri kanonik alan adına çözülsün.
-  metadataBase: new URL(`https://${BRAND.domain}`),
-  title: `${BRAND.fullName} - Personel Eğitim Sistemi`,
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${BRAND.name} | Hastane Personel Eğitim ve Sınav Platformu`,
+    template: TITLE_TEMPLATE,
+  },
   description: BRAND.shortDesc,
+  applicationName: BRAND.name,
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
   icons: {
     apple: '/apple-touch-icon.png',
   },
@@ -76,7 +87,7 @@ export default async function RootLayout({
       className={`${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable}`}
     >
       <head>
-        <meta name="theme-color" content="#0d9668" />
+        {/* theme-color `viewport` export'undan gelir; burada tekrar basılmaz. */}
         {/* On-prem runtime config — HER client script'inden ÖNCE (Supabase browser client
             bunu okur). Bulutta onpremConfig null → hiç basılmaz, baked NEXT_PUBLIC kullanılır. */}
         {onpremConfig && (

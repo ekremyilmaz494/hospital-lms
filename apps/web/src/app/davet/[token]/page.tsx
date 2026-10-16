@@ -1,9 +1,16 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { hashInvitationToken, getInvitationClaimError } from '@/lib/invitations'
 import { AcceptInvitationForm } from './_components/accept-form'
 
 export const dynamic = 'force-dynamic'
+
+// Davet URL'i gizli token taşır: indekslenmez, bağlantıları izlenmez.
+export const metadata: Metadata = {
+  title: 'Davet',
+  robots: { index: false, follow: false },
+}
 
 interface PageProps {
   params: Promise<{ token: string }>

@@ -3,6 +3,13 @@ import { SessionTimeoutManager } from "@/components/providers/session-timeout-pr
 import { createClient } from "@/lib/supabase/server";
 import { extractAdminAccess } from "@/lib/auth/admin-authority";
 import type { User } from "@/types/database";
+import type { Metadata } from "next";
+
+// Paneller ve auth ekranları arama sonucuna girmez. robots.txt'te /auth/ engellenmez:
+// engellenen URL'deki noindex'i Google göremez, eski indeks kayıtları düşmez.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 // Oturumlu paneller (admin, staff, super-admin, group, exam) + auth akışı.
 // Session okuması (cookies()) KÖK layout'ta değil burada: kök layout request-time API

@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
-import { BRAND } from '@/lib/brand'
 import { Sector } from '@/generated/prisma/enums'
 
 // Faz 3 (2026-05-17): Sektör-bazlı marketing landing'leri. 5 sektör için minimal
@@ -79,9 +78,12 @@ export async function generateMetadata({
   const { sector } = await params
   const content = SECTOR_CONTENT[sector as Sector]
   if (!content) return {}
+  // Sektör sayfaları (üretim/eğitim/perakende) hastane konumlandırmasını dağıtıyor:
+  // erişilebilir kalır ama indekslenmez. Yerine rol/hastane tipi çözüm sayfaları gelecek.
   return {
-    title: `${content.title} - ${BRAND.fullName}`,
+    title: content.title,
     description: content.tagline,
+    robots: { index: false, follow: true },
   }
 }
 

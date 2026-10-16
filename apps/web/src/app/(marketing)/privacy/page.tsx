@@ -1,10 +1,13 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import type { Metadata } from "next";
 import { BRAND } from "@/lib/brand";
 
-export const metadata: Metadata = {
-  title: `Gizlilik Politikasi | ${BRAND.fullName}`,
-  description: `${BRAND.fullName} gizlilik politikasi - KVKK uyumlu, App Store ve Google Play veri beyanlariyla uyumlu kisisel verilerin korunmasi.`,
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Gizlilik Politikası',
+  description:
+    'KlinoVax web sitesi ve mobil uygulamasında kişisel verilerin nasıl işlendiği, saklandığı ve korunduğu hakkında bilgilendirme.',
+  path: '/privacy',
+});
 
 // KVKK / yasal basvuru e-postasi (veri sorumlusu irtibat kutusu).
 const CONTACT_EMAIL = "kvkk@klinovax.info";
