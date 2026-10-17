@@ -10,7 +10,6 @@ import {
   HERO,
   MODULES,
   SECTIONS,
-  SECURITY,
   SHOWCASE,
   STATS,
   type Module,
@@ -269,44 +268,6 @@ export function ScrollSections() {
               <ModuleList items={g.modules} />
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* Güvenlik — "teknik künye": sayfadaki tek imza öğe. Mono etiketli spesifikasyon satırları. */}
-      <section
-        id={SECURITY.id}
-        className="l3d-band l3d-band--dark"
-        aria-labelledby="guvenlik-baslik"
-      >
-        <div className="l3d-band-inner">
-          <div className="l3d-band-head l3d-band-head--left l3d-reveal">
-            <span className="l3d-eyebrow">{SECURITY.eyebrow}</span>
-            <h2 id="guvenlik-baslik" className="l3d-showcase-title">
-              {SECURITY.title}
-            </h2>
-            <p className="l3d-band-lead">{SECURITY.lead}</p>
-          </div>
-          <div className="l3d-spec l3d-reveal">
-            <div className="l3d-spec-bar">
-              <span className="l3d-spec-bar-title">{SECURITY.panelTitle}</span>
-            </div>
-            <dl className="l3d-spec-list">
-              {SECURITY.rows.map((row) => (
-                <div key={row.label} className="l3d-spec-row">
-                  <dt className="l3d-spec-label">{row.label}</dt>
-                  <dd className="l3d-spec-value">
-                    {row.items.map((item) => (
-                      <span key={item.text} className="l3d-spec-item">
-                        {item.text}
-                        {item.note ? <span className="l3d-spec-note">{item.note}</span> : null}
-                      </span>
-                    ))}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <p className="l3d-spec-foot">{SECURITY.footnote}</p>
-          </div>
         </div>
       </section>
 

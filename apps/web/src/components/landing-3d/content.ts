@@ -267,65 +267,6 @@ export const FEATURE_GROUPS = {
   groups: readonly { title: string; modules: readonly Module[] }[];
 };
 
-type SpecItem = { text: string; note?: string };
-
-/** Güvenlik "teknik künye" — mono etiketli spesifikasyon satırları. */
-export const SECURITY = {
-  id: 'guvenlik',
-  eyebrow: 'GÜVENLİK',
-  title: 'Teknik künye.',
-  lead: 'Bilgi işlem ve satın alma ekiplerinin sorduğu soruların kısa yanıtları, tek sayfada.',
-  panelTitle: 'KLİNOVAX · TEKNİK KÜNYE',
-  noteLabel: 'TALEP ÜZERİNE',
-  rows: [
-    { label: 'BARINDIRMA', items: [{ text: 'AB · Frankfurt' }] },
-    {
-      label: 'ŞİFRELEME',
-      items: [
-        { text: 'Aktarımda TLS' },
-        { text: 'Dosyalarda AES-256' },
-        { text: 'T.C. kimlik no ve gizli anahtarlarda AES-256-GCM' },
-      ],
-    },
-    { label: 'YEDEKLEME', items: [{ text: 'Günlük, şifreli ve doğrulanan yedek' }] },
-    {
-      label: 'İZOLASYON',
-      items: [
-        { text: 'Satır düzeyi güvenlik (RLS)' },
-        { text: 'Her sorguda kurum filtresi' },
-      ],
-    },
-    {
-      label: 'ERİŞİM',
-      items: [
-        { text: '2FA (TOTP + SMS)' },
-        { text: 'Güvenilir cihaz' },
-        { text: 'IP izin listesi' },
-        { text: 'Kuruma özel oturum zaman aşımı' },
-        { text: 'Sınavda tek sekme kilidi' },
-      ],
-    },
-    { label: 'İŞLEM KAYDI', items: [{ text: 'SHA-256 zincirli, bütünlüğü doğrulanabilir' }] },
-    {
-      label: 'KVKK',
-      items: [
-        { text: 'Veri sahibi başvuru yönetimi' },
-        { text: 'Aydınlatma metni onayı' },
-        { text: 'Kuruma özel saklama süreleri' },
-        { text: 'Kullanıcı verisi silme' },
-      ],
-    },
-    {
-      label: 'KURUMSAL',
-      items: [
-        { text: 'SSO (SAML/OIDC)', note: 'Talep üzerine' },
-        { text: 'Kurum içi (on-premise) kurulum', note: 'Talep üzerine' },
-      ],
-    },
-  ] as readonly { label: string; items: readonly SpecItem[] }[],
-  footnote: 'KlinoVax, kurumunuzun KVKK süreçlerine destek olur.',
-} as const;
-
 export const FAQ = {
   id: 'sss',
   ariaLabel: 'Sık sorulan sorular',
@@ -401,7 +342,6 @@ export const SECTION_IDS = [
   SHOWCASE.id,
   FLOW.id,
   FEATURE_GROUPS.id,
-  SECURITY.id,
   FAQ.id,
 ] as const;
 

@@ -102,3 +102,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* /hakkimizda: 3 kartlı keşif bloğu masaüstünde 3 sütun (tablet/mobil kuralları ana dosyada). */
+@media (min-width: 1025px) {
+  .l3d-about-features--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

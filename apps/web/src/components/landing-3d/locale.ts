@@ -41,13 +41,6 @@ export const LANDING_NAV: Record<LandingLocale, LandingNavItem[]> = {
       placement: 'drawer',
     },
     {
-      href: '/#guvenlik',
-      label: 'Güvenlik',
-      desc: 'Veri koruma, erişim denetimi',
-      icon: 'security',
-      placement: 'both',
-    },
-    {
       href: '/#sss',
       label: 'SSS',
       desc: 'Sık sorulan sorular',

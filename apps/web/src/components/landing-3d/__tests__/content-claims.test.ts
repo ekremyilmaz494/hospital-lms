@@ -10,7 +10,6 @@ import {
   HERO,
   MODULES,
   SECTIONS,
-  SECURITY,
   SHOWCASE,
   STATS,
   faqJsonLd,
@@ -27,7 +26,6 @@ function allCopy(): string {
     SHOWCASE,
     FLOW,
     FEATURE_GROUPS,
-    SECURITY,
     FAQ,
     FINAL_CTA,
   });
@@ -78,9 +76,9 @@ describe('ana sayfa içerik iddiaları', () => {
   });
 
   it('SSO ve kurum içi kurulum "talep üzerine" olarak işaretli', () => {
-    const kurumsal = SECURITY.rows.find((r) => r.label === 'KURUMSAL');
-    expect(kurumsal).toBeDefined();
-    for (const item of kurumsal!.items) expect(item.note).toBe('Talep üzerine');
+    const item = FAQ.items.find((f) => /SSO/.test(f.a));
+    expect(item).toBeDefined();
+    expect(item!.a).toMatch(/talep üzerine/i);
   });
 
   it('referans müşteri yalnızca Özel Devakent Hastanesi', () => {

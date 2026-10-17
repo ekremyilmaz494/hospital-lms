@@ -12,7 +12,7 @@ describe('landing Header', () => {
   it('TR: nav etiketli, yalnız both öğeleri; Nasıl Çalışır header\'da yok', () => {
     const html = renderToStaticMarkup(<Header />);
     expect(html).toMatch(/<nav[^>]*class="l3d-nav"[^>]*aria-label="Ana menü"/);
-    for (const href of ['/#egitim', '/#kanit', '/#guvenlik', '/#sss', '/hakkimizda', '/contact']) {
+    for (const href of ['/#egitim', '/#kanit', '/#sss', '/hakkimizda', '/contact']) {
       expect(html).toContain(`href="${href}"`);
     }
     // drawer'a özel öğe: drawer kapalıyken hiçbir yerde yok

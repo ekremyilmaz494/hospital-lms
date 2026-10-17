@@ -111,7 +111,6 @@ describe('<main> metin bütçeleri (3D koruması)', () => {
       'platform',
       'nasil-calisir',
       'ozellikler',
-      'guvenlik',
       'sss',
     ]);
   });

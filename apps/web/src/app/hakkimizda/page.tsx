@@ -43,13 +43,6 @@ const DETAIL_LINKS = [
     cta: 'Özellikleri incele',
   },
   {
-    href: '/#guvenlik',
-    tag: 'GÜVENLİK',
-    title: 'Verileriniz nasıl korunur?',
-    text: 'Şifreleme, yedekleme, erişim denetimi ve kurumlar arası tam izolasyon.',
-    cta: 'Güvenlik ayrıntıları',
-  },
-  {
     href: '/#sss',
     tag: 'SSS',
     title: 'Aklınıza takılanlar',
@@ -91,7 +84,7 @@ export default function AboutPage() {
           </dl>
         </section>
 
-        <section className="l3d-about-features" aria-label="Platformu keşfedin">
+        <section className="l3d-about-features l3d-about-features--3" aria-label="Platformu keşfedin">
           {DETAIL_LINKS.map((d) => (
             <article key={d.href} className="l3d-about-feature">
               <span className="l3d-about-num">{d.tag}</span>
