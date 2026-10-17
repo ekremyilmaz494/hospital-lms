@@ -6,6 +6,9 @@ import { config as dotenvConfig } from 'dotenv'
 dotenvConfig({ path: '.env.local' })
 dotenvConfig({ path: '.env' })
 
+// Yerelde başka portta çalışan sunucuya / kurulu Chrome'a karşı koşmak için (opsiyonel).
+const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000'
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -16,7 +19,8 @@ export default defineConfig({
   // Global setup: her rol için bir kez login yap, session'ı kaydet
   globalSetup: './e2e/global-setup',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: BASE_URL,
+    ...(process.env.E2E_CHANNEL ? { channel: process.env.E2E_CHANNEL } : {}),
     trace: 'on-first-retry',
     // Her test action için max bekleme süresi
     actionTimeout: 15000,
@@ -31,7 +35,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'pnpm dev',
-    url: 'http://localhost:3000',
+    url: BASE_URL,
     reuseExistingServer: true,
   },
 })

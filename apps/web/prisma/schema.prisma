@@ -916,6 +916,15 @@ model ContactMessage {
   subject      String?   @db.VarChar(300)
   message      String?   @db.Text
   ipAddress    String?   @map("ip_address") @db.VarChar(45)
+  // Pazarlama atfı (formun açıldığı oturumdaki ilk UTM'ler). Kişisel veri değil;
+  // referrer yalnız host olarak tutulur (tam URL sorgu parametresi taşıyabilir).
+  utmSource    String?   @map("utm_source") @db.VarChar(100)
+  utmMedium    String?   @map("utm_medium") @db.VarChar(100)
+  utmCampaign  String?   @map("utm_campaign") @db.VarChar(150)
+  utmTerm      String?   @map("utm_term") @db.VarChar(150)
+  utmContent   String?   @map("utm_content") @db.VarChar(150)
+  landingPath  String?   @map("landing_path") @db.VarChar(300)
+  referrerHost String?   @map("referrer_host") @db.VarChar(200)
   isRead       Boolean   @default(false) @map("is_read")
   isArchived   Boolean   @default(false) @map("is_archived")
   readAt       DateTime? @map("read_at") @db.Timestamptz

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { pageMetadata, HOME_LANGUAGES } from '@/lib/site-metadata';
-import { organizationJsonLd } from '@/lib/organization-jsonld';
+import { homeJsonLd } from '@/lib/organization-jsonld';
 import { SiteShell } from '@/components/site/site-shell';
 import { Hero } from '@/components/site/home/hero';
 import { Problem } from '@/components/site/home/problem';
@@ -30,10 +30,10 @@ export const metadata: Metadata = pageMetadata({
 export default function LandingPage() {
   return (
     <>
-      {/* Statik künye (kullanıcı girdisi yok) — şirket doğrulaması için makine-okunur */}
+      {/* Statik künye + ürün varlığı (kullanıcı girdisi yok), makine-okunur */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: organizationJsonLd('tr') }}
+        dangerouslySetInnerHTML={{ __html: homeJsonLd('tr') }}
       />
       <SiteShell>
         <Hero />
