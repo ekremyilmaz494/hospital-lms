@@ -8,7 +8,20 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/en', '/hakkimizda', '/demo', '/contact', '/kvkk'],
+        allow: [
+          '/',
+          '/en',
+          '/hakkimizda',
+          '/demo',
+          '/contact',
+          '/kvkk',
+          '/privacy',
+          '/terms',
+          '/cerez-politikasi',
+          '/data-retention',
+          '/register',
+          '/sectors/healthcare',
+        ],
         disallow: ['/admin/', '/super-admin/', '/staff/', '/exam/', '/auth/', '/api/'],
       },
     ],

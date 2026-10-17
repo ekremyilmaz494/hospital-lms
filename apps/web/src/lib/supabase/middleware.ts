@@ -31,6 +31,8 @@ const PUBLIC_ROUTES = [
   '/api/payments/callback',
   '/terms',
   '/privacy',
+  '/cerez-politikasi', // çerez politikası — anonim ziyaretçi login'e atılmasın
+  '/data-retention', // veri saklama politikası — pazarlama/yasal sayfa
   '/help',
   '/register',
   '/certificates/verify',
