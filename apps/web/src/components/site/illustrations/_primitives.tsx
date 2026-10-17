@@ -67,6 +67,8 @@ export function Paper({
     <rect
       x={x} y={y} width={w} height={h} rx={r}
       className={cx(fillClass(tone), strokeClass(stroke), className)}
+      // Rol sınıfı yokken kökteki stroke="currentColor" miras alınmasın.
+      stroke={stroke === 'none' ? 'none' : undefined}
       style={style}
     />
   )
