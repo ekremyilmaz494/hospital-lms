@@ -5,6 +5,7 @@ import {
   lockScroll,
   markIntroStart,
   onTexturesReady,
+  scrollToDeepLinkTarget,
   unlockScroll,
 } from "@/lib/scene-ready";
 
@@ -76,6 +77,8 @@ export function LoadingScreen() {
         setHidden(true);
         markIntroStart();
         unlockScroll();
+        // WebGL yok: lockScroll sayfayı başa aldı; `/#egitim` gibi derin linkte hedef bölüme dön.
+        scrollToDeepLinkTarget();
       }, FADE_TO_INTRO);
     }, FAILSAFE_TIMEOUT);
 

@@ -1,0 +1,235 @@
+/* ════════════════════════════════════════════════════════════════
+   KlinoVax — 3D landing · showcase SONRASI bantlar
+   Kapsam: #nasil-calisir · #ozellikler · kapanış CTA
+   Yalnızca YENİ sınıflar (.l3d-band*, .l3d-flow-*, .l3d-feature-*,
+   .l3d-final-cta*, .l3d-cta-ghost). landing-3d.css ana dosyasına dokunulmaz
+   (showcase/faq scroll-margin-top orada, C7);
+   showcase / faq / modül kuralları aynı görsel dille burada yansıtılır.
+   Renkler yalnızca --landing-* token'larından; transition-all YOK.
+   Bu bantlar <main> DIŞINDA (telefon canvas'ı showcase'te çıkar) → 3D etkilenmez.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Ortak bant iskeleti (showcase kurallarını yansıtır) ─────────── */
+.l3d-band {
+  position: relative;
+  z-index: 1;
+  background: var(--landing-bg);
+  padding: clamp(72px, 11vh, 140px) 8vw;
+  /* Sabit header'ın altında kalmasın (derin link / #hash kaydırması). */
+  scroll-margin-top: 88px;
+}
+.l3d-band--surface {
+  background: var(--landing-surface);
+}
+
+.l3d-band-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.l3d-band-head {
+  max-width: 720px;
+  margin: 0 auto clamp(36px, 5vh, 60px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+.l3d-band-head--left {
+  align-items: flex-start;
+  text-align: left;
+  margin-left: 0;
+}
+.l3d-band-lead {
+  font-family: var(--font-body);
+  font-size: clamp(15px, 1.3vw, 17px);
+  line-height: 1.6;
+  color: var(--landing-ink-soft);
+  max-width: 56ch;
+  margin: 0;
+}
+
+/* ── #nasil-calisir — 4 adımlı sıra (numara burada anlamlı) ──────── */
+.l3d-flow-grid {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 1180px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 36px 28px;
+}
+.l3d-flow-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 24px;
+  border-top: 1px solid var(--landing-rule-strong);
+}
+/* İnce zaman çizelgesi düğümü — zemin halkasıyla çizgiyi "deler". */
+.l3d-flow-step::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--landing-brand);
+  box-shadow: 0 0 0 4px var(--landing-surface);
+}
+.l3d-flow-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--landing-brand);
+}
+.l3d-flow-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--landing-ink);
+}
+.l3d-flow-desc {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--landing-ink-soft);
+}
+
+/* ── #ozellikler — 4 grup (mevcut ModuleList ile) ─────────────── */
+.l3d-feature-groups {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+.l3d-feature-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px 22px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--landing-rule);
+  background: var(--landing-surface);
+  box-shadow: var(--landing-shadow-card);
+}
+.l3d-feature-group-title {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.015em;
+  color: var(--landing-ink);
+}
+/* Grup içinde modüller tek sütun (dar kolon). Özgüllük .l3d-modules'ten yüksek. */
+.l3d-feature-group .l3d-modules {
+  grid-template-columns: 1fr;
+  column-gap: 0;
+  margin-top: 14px;
+}
+.l3d-feature-group .l3d-module:last-child {
+  border-bottom: none;
+}
+
+/* ── Kapanış CTA bandı ────────────────────────────────────────────── */
+.l3d-final-cta {
+  border-top: 1px solid var(--landing-rule);
+}
+.l3d-final-cta-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+}
+.l3d-final-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+}
+/* İkincil buton: .l3d-cta ile aynı ölçü (≥44px dokunma hedefi), çerçeveli. */
+.l3d-cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  border: 1px solid var(--landing-rule-strong);
+  background: transparent;
+  color: var(--landing-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  transition: border-color 0.3s ease, background-color 0.3s ease, transform 0.3s ease;
+}
+.l3d-cta-ghost:hover {
+  border-color: var(--landing-brand);
+  background: var(--landing-surface);
+  transform: translateY(-2px);
+}
+.l3d-final-cta .l3d-cta {
+  min-height: 48px;
+}
+
+/* ── Tablet: 4 → 2 kolon ──────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .l3d-flow-grid,
+  .l3d-feature-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Telefon: 2 → 1 kolon, yatay taşma yok ────────────────────────── */
+@media (max-width: 768px) {
+  .l3d-band {
+    padding: 64px 6vw;
+    scroll-margin-top: 72px;
+  }
+  .l3d-band-head {
+    margin-bottom: 32px;
+  }
+  .l3d-flow-grid,
+  .l3d-feature-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .l3d-flow-grid {
+    gap: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .l3d-final-cta-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .l3d-final-cta-actions > * {
+    width: 100%;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .l3d-cta-ghost {
+    transition: none;
+  }
+  .l3d-cta-ghost:hover {
+    transform: none;
+  }
+}

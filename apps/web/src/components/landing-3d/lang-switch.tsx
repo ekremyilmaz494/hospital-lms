@@ -9,15 +9,20 @@ interface LangSwitchProps {
   onNavigate?: () => void;
 }
 
-/** TR / EN seçici — aktif dil vurgulu span, diğeri karşılık sayfaya link. */
+/**
+ * TR / EN seçici — aktif dil vurgulu span, diğeri karşılık sayfaya link.
+ * Aktif dil, `aria-current` (yalnız link/gezinti öğelerinde anlamlı) yerine
+ * ekran okuyucuya özel "(geçerli dil)" metniyle bildirilir.
+ */
 export function LangSwitch({ locale, alternateHref, className, onNavigate }: LangSwitchProps) {
   const other: LandingLocale = locale === 'tr' ? 'en' : 'tr';
   const otherHref = alternateHref ?? LANDING_HOME[other];
 
   const item = (code: LandingLocale) =>
     code === locale ? (
-      <span key={code} className="is-active" aria-current="true">
+      <span key={code} className="is-active">
         {code.toUpperCase()}
+        <span className="sr-only"> ({LANDING_COPY[locale].currentLang})</span>
       </span>
     ) : (
       <Link key={code} href={otherHref} hrefLang={code} lang={code} onClick={onNavigate}>

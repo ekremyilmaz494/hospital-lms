@@ -19,18 +19,23 @@ export function Header({ locale = 'tr', alternateHref }: HeaderProps) {
         KlinoVax
       </Link>
 
-      <nav className="l3d-nav">
-        {LANDING_NAV[locale].map((item) => (
-          <Link key={item.href} href={item.href}>
-            {item.label}
-          </Link>
-        ))}
+      <nav className="l3d-nav" aria-label={copy.mainNav}>
+        {LANDING_NAV[locale]
+          .filter((item) => item.placement === 'both')
+          .map((item) => (
+            <Link key={item.href} href={item.href} data-priority={item.priority}>
+              {item.label}
+            </Link>
+          ))}
       </nav>
 
       <div className="l3d-header-actions">
         <LangSwitch locale={locale} alternateHref={alternateHref} />
         <Link href="/auth/login" className="l3d-login">
           {copy.login}
+        </Link>
+        <Link href={copy.demoHref} className="l3d-header-cta">
+          {copy.demo}
         </Link>
       </div>
 
