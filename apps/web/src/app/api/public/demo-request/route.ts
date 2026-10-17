@@ -5,6 +5,7 @@ import { sendEmail } from '@/lib/email'
 import { BRAND } from '@/lib/brand'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { parseAttribution } from '@/lib/attribution'
 
 /** Simple email validation */
 function isValidEmail(email: string): boolean {
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
     const allowed = await checkRateLimit(rateLimitKey, 3, 3600)
     if (!allowed) {
       return errorResponse(
-        'Cok fazla istek gonderdiniz. Lutfen bir saat sonra tekrar deneyin.',
+        'Çok fazla istek gönderdiniz. Lütfen bir saat sonra tekrar deneyin.',
         429
       )
     }
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json()
     } catch {
-      return errorResponse('Gecersiz istek formati.', 400)
+      return errorResponse('Geçersiz istek biçimi.', 400)
     }
 
     const {
@@ -69,23 +70,26 @@ export async function POST(request: NextRequest) {
 
     // Required fields
     if (!firstName || typeof firstName !== 'string' || firstName.trim().length < 2) {
-      return errorResponse('Ad alani zorunludur (en az 2 karakter).', 400)
+      return errorResponse('Ad alanı zorunludur (en az 2 karakter).', 400)
     }
     if (!lastName || typeof lastName !== 'string' || lastName.trim().length < 1) {
-      return errorResponse('Soyad alani zorunludur.', 400)
+      return errorResponse('Soyad alanı zorunludur.', 400)
     }
     if (!email || typeof email !== 'string' || !isValidEmail(email.trim())) {
-      return errorResponse('Gecerli bir e-posta adresi giriniz.', 400)
+      return errorResponse('Geçerli bir e-posta adresi giriniz.', 400)
     }
     if (!phone || typeof phone !== 'string' || phone.trim().length < 5) {
-      return errorResponse('Telefon alani zorunludur.', 400)
+      return errorResponse('Telefon alanı zorunludur.', 400)
     }
     if (!organizationName || typeof organizationName !== 'string' || organizationName.trim().length < 2) {
-      return errorResponse('Hastane adi zorunludur.', 400)
+      return errorResponse('Hastane adı zorunludur.', 400)
     }
     if (!staffCount || typeof staffCount !== 'string') {
-      return errorResponse('Personel sayisi zorunludur.', 400)
+      return errorResponse('Personel sayısı zorunludur.', 400)
     }
+
+    // Pazarlama atfı isteğe bağlı: geçersizse yok sayılır, istek reddedilmez.
+    const attribution = parseAttribution(body.attribution)
 
     // Sanitize
     const sanitized = {
@@ -125,6 +129,7 @@ export async function POST(request: NextRequest) {
           subject: isContactForm ? organizationName.trim().slice(0, 300) : null,
           message: cleanMessage.slice(0, 1000) || null,
           ipAddress: ip.slice(0, 45),
+          ...(attribution ?? {}),
         },
       })
     } catch (err) {
@@ -175,7 +180,15 @@ export async function POST(request: NextRequest) {
                 ` : ''}
               </table>
               <div style="margin-top: 24px; padding: 16px; background: #f1f5f9; border-radius: 8px; font-size: 12px; color: #64748b;">
-                IP: ${ip} | Tarih: ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}
+                IP: ${ip} | Tarih: ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}${
+                  attribution
+                    ? ` | Kaynak: ${escapeHtml(
+                        [attribution.utmSource, attribution.utmMedium, attribution.utmCampaign]
+                          .filter(Boolean)
+                          .join(' / ') || attribution.referrerHost || attribution.landingPath || '-',
+                      )}`
+                    : ''
+                }
               </div>
             </div>
           `,
@@ -188,9 +201,9 @@ export async function POST(request: NextRequest) {
 
     return jsonResponse({
       success: true,
-      message: 'Demo talebiniz basariyla alindi. En kisa surede sizinle iletisime gececegiz.',
+      message: 'Demo talebiniz başarıyla alındı. En kısa sürede sizinle iletişime geçeceğiz.',
     })
   } catch {
-    return errorResponse('Beklenmeyen bir hata olustu. Lutfen tekrar deneyin.', 500)
+    return errorResponse('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.', 500)
   }
 }

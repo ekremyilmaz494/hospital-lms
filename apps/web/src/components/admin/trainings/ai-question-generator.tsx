@@ -18,7 +18,7 @@ import {
   UploadCloud, X, FileText,
 } from 'lucide-react';
 import { CURATED_MODELS, DEFAULT_MODEL_ID, getModel } from '@/lib/openrouter-models';
-import { K } from '@/app/admin/trainings/new/_steps/types';
+import { K } from '@/app/(app)/admin/trainings/new/_steps/types';
 import { useAiQuestionQueue, type AiPendingState } from '@/hooks/use-ai-question-queue';
 
 /** Pending AI questions snapshot — parent (questions-step) tarafından state lift için.

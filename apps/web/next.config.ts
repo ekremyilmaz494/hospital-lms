@@ -145,6 +145,8 @@ const nextConfig: NextConfig = {
     // Eski /marketing/* URL'leri root marketing route group'una taşındı.
     // Eski bookmark/SEO için 301 redirect.
     { source: '/marketing', destination: '/', permanent: true },
+    // İletişim sayfası Türkçe slug'a taşındı (SEO). Eski link/bookmark için kalıcı yönlendirme.
+    { source: '/contact', destination: '/iletisim', permanent: true },
     { source: '/marketing/:path*', destination: '/:path*', permanent: true },
     // Ek hak talepleri sınav değil, eğitim assignment life-cycle'ına ait.
     {

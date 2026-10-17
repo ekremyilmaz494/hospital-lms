@@ -338,16 +338,16 @@ function drawReports(ctx: CanvasRenderingContext2D): void {
     ctx.fill();
   }
 
-  // Başarı oranı
+  // Çıktı türü — uydurma metrik YOK (yayına gerçek veri dışı rakam girmez)
   ctx.textAlign = 'left';
   ctx.fillStyle = C.ink;
   ctx.font = `800 80px ${FONT}`;
-  ctx.fillText('%94', bx, iy + ih + 112);
+  ctx.fillText('PDF', bx, iy + ih + 112);
   ctx.fillStyle = C.inkSoft;
   ctx.font = `500 28px ${FONT}`;
-  ctx.fillText('ortalama başarı oranı', bx, iy + ih + 156);
+  ctx.fillText('denetim formları tek tıkla', bx, iy + ih + 156);
 
-  // KVKK uyum rozeti
+  // Denetim rozeti
   pill(ctx, W / 2, iy + ih + 232, 380, 84, C.surface, C.brand, 'Denetime hazır');
 }
 

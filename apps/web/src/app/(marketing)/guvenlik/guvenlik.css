@@ -1,0 +1,48 @@
+/* ── /guvenlik ───────────────────────────────────────────────────────────
+   Uzun sayfa: bölüm aralığı ana sayfadan biraz daha sıkı. Yalnız --site-* token'ları;
+   liste ve bant düzenleri site.css'teki .s-rows / .s-points / .s-band sınıflarından gelir. */
+.g-section { padding-block: clamp(56px, 8vw, 104px); }
+
+.g-rows-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 48px; }
+
+.g-note {
+  margin: 28px 0 0;
+  max-width: 72ch;
+  font-size: 0.9375rem;
+  color: var(--site-ink-muted);
+}
+
+.g-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.g-links a,
+.g-mail a {
+  color: var(--site-brand-ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color 0.2s var(--site-ease);
+}
+.g-links a:hover,
+.g-mail a:hover { color: var(--site-brand-ink-hover); }
+
+.g-mail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin: 32px 0 0;
+  font-size: 1.125rem;
+}
+.g-mail a { overflow-wrap: anywhere; }
+.g-mail-label { font-size: 0.9375rem; color: var(--site-ink-muted); }
+
+@media (max-width: 860px) {
+  .g-rows-3 { grid-template-columns: minmax(0, 1fr); }
+}

@@ -1,0 +1,81 @@
+/* ── Form sayfaları (/iletisim + /demo) ──────────────────────────────────
+   Solda form kartı, sağda yapışkan bilgi sütunu. Yalnız --site-* token'ları.
+   Form alanlarının kendisi site.css'teki .s-form* sınıflarından gelir. */
+.s-formpage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+}
+
+.s-formpage-card { padding: clamp(20px, 3.4vw, 36px); }
+.s-formpage-card .s-h2 { font-size: clamp(1.375rem, 2.2vw, 1.75rem); }
+.s-formpage-intro { margin: 8px 0 28px; color: var(--site-ink-soft); font-size: 0.9375rem; }
+
+.s-required { color: var(--site-danger); font-weight: 700; }
+
+.s-formpage-submit { width: 100%; }
+
+.s-formpage-note { margin: 0; font-size: 0.875rem; color: var(--site-ink-muted); }
+
+.s-formpage-link {
+  color: var(--site-brand-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  overflow-wrap: anywhere;
+}
+.s-formpage-link:hover { color: var(--site-brand-ink-hover); }
+
+/* Başarı durumu: odak buraya taşınır, görünür odak halkası site.css'ten */
+.s-formpage-success { display: grid; gap: 12px; justify-items: start; }
+.s-formpage-success p { margin: 0; color: var(--site-ink-soft); }
+.s-formpage-success .s-btn { margin-top: 12px; }
+
+/* ── Bilgi sütunu ── */
+.s-formpage-aside {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 36px;
+}
+.s-formpage-block > .s-h3 { margin-bottom: 16px; }
+.s-formpage-block > p { margin: 0; color: var(--site-ink-soft); font-size: 0.9375rem; }
+.s-formpage-block > p + p { margin-top: 12px; }
+
+.s-formpage-list {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.s-formpage-list li { display: flex; gap: 14px; align-items: flex-start; }
+.s-formpage-list .s-point-icon { width: 40px; height: 40px; border-radius: 10px; }
+.s-formpage-term { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--site-ink-muted); }
+.s-formpage-value { margin: 2px 0 0; color: var(--site-ink); font-weight: 550; }
+
+.s-formpage-steps {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding-left: 1.4em;
+  color: var(--site-ink-soft);
+}
+.s-formpage-steps li { padding-left: 4px; }
+.s-formpage-steps li::marker {
+  color: var(--site-brand-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.s-formpage-steps strong { display: block; color: var(--site-ink); font-weight: 650; }
+
+.s-formpage-rule {
+  padding-top: 28px;
+  border-top: 1px solid var(--site-rule);
+}
+
+@media (max-width: 860px) {
+  .s-formpage { grid-template-columns: minmax(0, 1fr); }
+  .s-formpage-aside { position: static; }
+}

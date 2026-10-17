@@ -1,203 +1,153 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import { LegalPage } from "@/components/site/legal-page";
 
-export const metadata: Metadata = {
-  title: `Kullanim Sartlari | ${BRAND.fullName}`,
-  description: `${BRAND.fullName} platformu kullanim sartlari ve kosullari.`,
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'Kullanım Şartları',
+  description:
+    'KlinoVax personel eğitim platformunun kurumlar ve kullanıcılar için kullanım şartları ve koşulları.',
+  path: '/terms',
+});
 
 const LAST_UPDATED = "Temmuz 2026";
 
+// Bölüm başlıkları hem `<h2>` hem içindekiler için tek kaynaktır.
+const S = {
+  hizmet: { id: "hizmet-tanimi", label: "1. Hizmet Tanımı" },
+  yukumlulukler: { id: "kullanici-yukumlulukleri", label: "2. Kullanıcı Yükümlülükleri" },
+  fikriMulkiyet: { id: "fikri-mulkiyet", label: "3. Fikri Mülkiyet" },
+  guvenlik: { id: "veri-guvenligi", label: "4. Veri Güvenliği" },
+  seviye: { id: "hizmet-seviyesi", label: "5. Hizmet Seviyesi" },
+  fesih: { id: "fesih-kosullari", label: "6. Fesih Koşulları" },
+  sorumluluk: { id: "sorumluluk-sinirlamasi", label: "7. Sorumluluk Sınırlaması" },
+  uyusmazlik: { id: "uyusmazlik-cozumu", label: "8. Uyuşmazlık Çözümü" },
+  degisiklik: { id: "degisiklik-hakki", label: "9. Değişiklik Hakkı" },
+  iletisim: { id: "iletisim", label: "İletişim" },
+} as const;
+
+const SECTIONS = Object.values(S);
+
 export default function TermsPage() {
   return (
-    <div className="max-w-4xl mx-auto px-6 py-16">
-      <h1
-        className="text-3xl font-bold mb-2"
-        style={{ color: "var(--color-text-primary)" }}
-      >
-        Kullanim Sartlari
-      </h1>
-      <p
-        className="text-sm mb-10"
-        style={{ color: "var(--color-text-tertiary)" }}
-      >
-        Son guncelleme: {LAST_UPDATED}
+    <LegalPage breadcrumbPath="/terms" title="Kullanım Şartları" updated={LAST_UPDATED} sections={SECTIONS}>
+      <h2 id={S.hizmet.id}>{S.hizmet.label}</h2>
+      <p>
+        {BRAND.fullName} (&quot;Platform&quot;), kurumlar bünyesinde çalışan personelin
+        mesleki eğitim, sınav ve sertifikasyon süreçlerini dijital ortamda yönetmek
+        amacıyla sunulan bir bulut tabanlı öğrenme yönetim sistemidir. Platform,
+        eğitim içeriklerinin oluşturulması, atanması, takip edilmesi ve raporlanması
+        hizmetlerini kapsar.
       </p>
 
-      <div className="space-y-10 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-        {/* 1. Hizmet Tanimi */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            1. Hizmet Tanimi
-          </h2>
-          <p>
-            {BRAND.fullName} (&quot;Platform&quot;), kurumlar bunyesinde calisan personelin
-            mesleki egitim, sinav ve sertifikasyon sureclerini dijital ortamda yonetmek
-            amaciyla sunulan bir bulut tabanli ogrenme yonetim sistemidir. Platform,
-            egitim iceriklerinin olusturulmasi, atanmasi, takip edilmesi ve raporlanmasi
-            hizmetlerini kapsar.
-          </p>
-        </section>
+      <h2 id={S.yukumlulukler.id}>{S.yukumlulukler.label}</h2>
+      <ul>
+        <li>
+          Kullanıcı, platforma erişim için kendisine tanımlanan hesap bilgilerini
+          gizli tutmakla yükümlüdür. Hesap bilgilerinin üçüncü kişilerle
+          paylaşılmasından doğan tüm sorumluluk kullanıcıya aittir.
+        </li>
+        <li>
+          Platform üzerindeki eğitim içeriklerine yalnızca atandığı kapsam dahilinde
+          erişim sağlanabilir. Yetkisiz erişim girişimleri tespit edildiğinde hesap
+          askıya alınabilir.
+        </li>
+        <li>
+          Kullanıcı, platformu yalnızca mesleki eğitim ve gelişim amacıyla kullanmayı
+          kabul eder. Platformun kötüye kullanımı, yasadışı içerik paylaşımı veya
+          sistem bütünlüğünü tehdit eden davranışlar kesinlikle yasaktır.
+        </li>
+        <li>
+          Sınav süreçlerinde kopya çekmek, başkaları adına sınava girmek veya sistem
+          açıklıkları üzerinden haksız avantaj elde etmeye çalışmak disiplin işlemi
+          gerektirir.
+        </li>
+      </ul>
 
-        {/* 2. Kullanici Yukumlulukleri */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            2. Kullanici Yukumlulukleri
-          </h2>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>
-              Kullanici, platforma erisim icin kendisine tanimlanan hesap bilgilerini
-              gizli tutmakla yukumludur. Hesap bilgilerinin ucuncu kisilerle
-              paylasilmasindan dogan tum sorumluluk kullaniciya aittir.
-            </li>
-            <li>
-              Platform uzerindeki egitim iceriklerine yalnizca atandigi kapsam dahilinde
-              erisim saglanabilir. Yetkisiz erisim girisimleri tespit edildiginde hesap
-              askiya alinabilir.
-            </li>
-            <li>
-              Kullanici, platformu yalnizca mesleki egitim ve gelisim amaciyla kullanmayi
-              kabul eder. Platformun kotuye kullanimi, yasadisi icerik paylasimi veya
-              sistem butunlugunu tehdit eden davranislar kesinlikle yasaktir.
-            </li>
-            <li>
-              Sinav sureclerinde kopya cekmek, baskalari adina sinava girmek veya sistem
-              acikliklari uzerinden haksiz avantaj elde etmeye calismak disiplin islemi
-              gerektirir.
-            </li>
-          </ul>
-        </section>
+      <h2 id={S.fikriMulkiyet.id}>{S.fikriMulkiyet.label}</h2>
+      <p>
+        Platform üzerindeki tüm yazılım, tasarım, logo, içerik ve eğitim materyalleri{" "}
+        {BRAND.fullName} ve/veya ilgili içerik sağlayıcılarının fikri mülkiyetindedir.
+        Bu materyaller, önceden yazılı izin alınmaksızın kopyalanamaz, dağıtılmaz,
+        değiştirilemez veya ticari amaçla kullanılamaz. Kullanıcılar tarafından platforma
+        yüklenen içerikler üzerindeki haklar, ilgili organizasyona aittir.
+      </p>
 
-        {/* 3. Fikri Mulkiyet */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            3. Fikri Mulkiyet
-          </h2>
-          <p>
-            Platform uzerindeki tum yazilim, tasarim, logo, icerik ve egitim materyalleri
-            {BRAND.fullName} ve/veya ilgili icerik saglayicilarinin fikri mulkiyetindedir.
-            Bu materyaller, onceden yazili izin alinmaksizin kopyalanamaz, dagitilmaz,
-            degistirilemez veya ticari amacla kullanilamaz. Kullanicilar tarafindan platforma
-            yuklenen icerikler uzerindeki haklar, ilgili organizasyona aittir.
-          </p>
-        </section>
+      <h2 id={S.guvenlik.id}>{S.guvenlik.label}</h2>
+      <p>
+        Platform, kullanıcı verilerinin korunması için endüstri standartlarında
+        güvenlik önlemleri uygular. Veriler şifrelenmiş bağlantı (TLS/SSL) üzerinden
+        iletilir ve sunucularda şifrelenmiş olarak saklanır. Detaylı bilgi için{" "}
+        <Link href="/privacy">Gizlilik Politikamızı</Link> inceleyebilirsiniz.
+      </p>
 
-        {/* 4. Veri Guvenligi */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            4. Veri Guvenligi
-          </h2>
-          <p>
-            Platform, kullanici verilerinin korunmasi icin endüstri standartlarinda
-            guvenlik onlemleri uygular. Veriler sifrelenmis baglanti (TLS/SSL) uzerinden
-            iletilir ve sunucularda sifrelenmis olarak saklanir. Detayli bilgi icin{" "}
-            <a href="/privacy" className="underline" style={{ color: "#0d9668" }}>
-              Gizlilik Politikamizi
-            </a>{" "}
-            inceleyebilirsiniz.
-          </p>
-        </section>
+      <h2 id={S.seviye.id}>{S.seviye.label}</h2>
+      <p>
+        {BRAND.fullName}, aylık %99,5 erişim oranı hedeflemektedir. Planlı bakım
+        çalışmaları, en az 48 saat önceden kullanıcılara bildirilir. Mücbir sebepler
+        (doğal afet, siber saldırı, altyapı sağlayıcı kaynaklı kesintiler vb.)
+        nedeniyle oluşan hizmet kesintilerinden {BRAND.fullName} sorumlu tutulamaz.
+      </p>
 
-        {/* 5. Hizmet Seviyesi */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            5. Hizmet Seviyesi
-          </h2>
-          <p>
-            {BRAND.fullName}, aylik %99,5 erisim orani hedeflemektedir. Planli bakim
-            calismalari, en az 48 saat onceden kullanicilara bildirilir. Mucbir sebepler
-            (dogal afet, siber saldiri, altyapi saglayici kaynakli kesintiler vb.)
-            nedeniyle olusan hizmet kesintilerinden {BRAND.fullName} sorumlu tutulamaz.
-          </p>
-        </section>
+      <h2 id={S.fesih.id}>{S.fesih.label}</h2>
+      <ul>
+        <li>
+          Organizasyonlar, abonelik döneminin sonunda sözleşmeyi feshedebilir.
+          Fesih bildirimi en az 30 gün önceden yazılı olarak yapılmalıdır.
+        </li>
+        <li>
+          Kullanım şartlarının ihlali halinde, {BRAND.fullName} ilgili hesabı veya
+          organizasyonu önceden bildirimde bulunmaksızın askıya alma veya feshetme
+          hakkını saklı tutar.
+        </li>
+        <li>
+          Fesih durumunda organizasyona ait veriler, talep üzerine 30 gün içerisinde
+          dışa aktarılabilir formatta teslim edilir. Bu sürenin ardından veriler
+          kalıcı olarak silinir.
+        </li>
+      </ul>
 
-        {/* 6. Fesih Kosullari */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            6. Fesih Kosullari
-          </h2>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>
-              Organizasyonlar, abonelik doneminin sonunda sozlesmeyi feshedebilir.
-              Fesih bildirimi en az 30 gun onceden yazili olarak yapilmalidir.
-            </li>
-            <li>
-              Kullanim sartlarinin ihlali halinde, {BRAND.fullName} ilgili hesabi veya
-              organizasyonu onceden bildirimde bulunmaksizin askiya alma veya feshetme
-              hakkini sakli tutar.
-            </li>
-            <li>
-              Fesih durumunda organizasyona ait veriler, talep uzerine 30 gun icerisinde
-              disa aktarilabilir formatta teslim edilir. Bu surenin ardından veriler
-              kalici olarak silinir.
-            </li>
-          </ul>
-        </section>
+      <h2 id={S.sorumluluk.id}>{S.sorumluluk.label}</h2>
+      <p>
+        {BRAND.fullName}, platformun kullanımından kaynaklanan dolaylı, özel, arızi veya
+        cezai zararlardan sorumlu değildir. {BRAND.fullName}&apos;in toplam sorumluluğu,
+        her halükarda ilgili organizasyonun son 12 ayda ödediği abonelik bedelini
+        aşamaz. Platform üzerinden sunulan eğitim içerikleri bilgilendirme amaçlı olup,
+        tıbbi tavsiye niteliğinde değildir.
+      </p>
 
-        {/* 7. Sorumluluk Sinirlamasi */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            7. Sorumluluk Sinirlamasi
-          </h2>
-          <p>
-            {BRAND.fullName}, platformun kullanimindan kaynaklanan dolayli, ozel, arizi veya
-            cezai zararlardan sorumlu degildir. {BRAND.fullName}&apos;in toplam sorumlulugu,
-            her halukarda ilgili organizasyonun son 12 ayda odedigi abonelik bedelini
-            asamaz. Platform uzerinden sunulan egitim icerikleri bilgilendirme amacli olup,
-            tibbi tavsiye niteliginde degildir.
-          </p>
-        </section>
+      <h2 id={S.uyusmazlik.id}>{S.uyusmazlik.label}</h2>
+      <p>
+        Bu kullanım şartlarından doğan uyuşmazlıklarda Türkiye Cumhuriyeti kanunları
+        uygulanır. Taraflar, öncelikle uzlaşma yoluyla çözüm aramayı kabul eder.
+        Uzlaşma sağlanamadığı takdirde Konya Mahkemeleri ve İcra Daireleri yetkilidir.
+      </p>
 
-        {/* 8. Uyusmazlik Cozumu */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            8. Uyusmazlik Cozumu
-          </h2>
-          <p>
-            Bu kullanim sartlarindan dogan uyusmazliklarda Turkiye Cumhuriyeti kanunlari
-            uygulanir. Taraflar, oncelikle uzlasma yoluyla cozum aramayi kabul eder.
-            Uzlasma saglanamadigi takdirde Konya Mahkemeleri ve Icra Daireleri yetkilidir.
-          </p>
-        </section>
+      <h2 id={S.degisiklik.id}>{S.degisiklik.label}</h2>
+      <p>
+        {BRAND.fullName}, bu kullanım şartlarını önceden bildirimde bulunarak değiştirme
+        hakkını saklı tutar. Önemli değişiklikler, yürürlüğe girmesinden en az 15 gün
+        önce platform üzerinden ve/veya e-posta yoluyla kullanıcılara bildirilir.
+        Değişikliklerin yürürlüğe girmesinden sonra platformu kullanmaya devam etmeniz,
+        güncellenmiş şartları kabul ettiğiniz anlamına gelir.
+      </p>
 
-        {/* 9. Degisiklik Hakki */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            9. Degisiklik Hakki
-          </h2>
-          <p>
-            {BRAND.fullName}, bu kullanim sartlarini onceden bildirimde bulunarak degistirme
-            hakkini sakli tutar. Onemli degisiklikler, yururluge girmesinden en az 15 gun
-            once platform uzerinden ve/veya e-posta yoluyla kullanicilara bildirilir.
-            Degisikliklerin yururluge girmesinden sonra platformu kullanmaya devam etmeniz,
-            guncellenmis sartlari kabul ettiginiz anlamina gelir.
-          </p>
-        </section>
-
-        {/* Iletisim */}
-        <section
-          className="rounded-2xl p-6"
-          style={{ backgroundColor: "var(--color-surface-alt, #f8fafc)", border: "1px solid var(--color-border)" }}
-        >
-          <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            Iletisim
-          </h2>
-          <p>
-            Bu kullanim sartlari hakkinda sorulariniz icin bizimle iletisime gecebilirsiniz:
-          </p>
-          <ul className="mt-3 space-y-1">
-            <li>
-              <strong>E-posta:</strong> {BRAND.supportEmail}
-            </li>
-            <li>
-              <strong>Telefon:</strong> 0553 953 06 96
-            </li>
-            <li>
-              <strong>Adres:</strong> Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu / Konya
-            </li>
-          </ul>
-        </section>
-      </div>
-    </div>
+      <h2 id={S.iletisim.id}>{S.iletisim.label}</h2>
+      <p>
+        Bu kullanım şartları hakkında sorularınız için bizimle iletişime geçebilirsiniz:
+      </p>
+      <ul>
+        <li>
+          <strong>E-posta:</strong> {BRAND.supportEmail}
+        </li>
+        <li>
+          <strong>Telefon:</strong> 0553 953 06 96
+        </li>
+        <li>
+          <strong>Adres:</strong> Konya, Türkiye
+        </li>
+      </ul>
+    </LegalPage>
   );
 }

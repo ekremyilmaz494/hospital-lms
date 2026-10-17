@@ -13,11 +13,11 @@ import {
   Loader2,
   Shield,
   Clock,
-  Sparkles,
+  CreditCard,
+  ListChecks,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BlurFade } from '@/components/ui/blur-fade'
 
 /* ── Zod-free client-side validation (mirrors selfRegisterSchema) ── */
 
@@ -55,14 +55,14 @@ const ORGANIZATION_CODE_REGEX = /^[a-z0-9-]+$/
 function validateStep1(data: FormData): FieldErrors {
   const errors: FieldErrors = {}
   if (!data.organizationName || data.organizationName.length < 2) {
-    errors.organizationName = 'Organizasyon adi en az 2 karakter olmalidir'
+    errors.organizationName = 'Organizasyon adı en az 2 karakter olmalıdır'
   }
   if (!data.organizationCode || data.organizationCode.length < 3) {
-    errors.organizationCode = 'Organizasyon kodu en az 3 karakter olmalidir'
+    errors.organizationCode = 'Organizasyon kodu en az 3 karakter olmalıdır'
   } else if (data.organizationCode.length > 20) {
     errors.organizationCode = 'Organizasyon kodu en fazla 20 karakter olabilir'
   } else if (!ORGANIZATION_CODE_REGEX.test(data.organizationCode)) {
-    errors.organizationCode = 'Sadece kucuk harf, rakam ve tire kullanin'
+    errors.organizationCode = 'Yalnızca küçük harf, rakam ve tire kullanın'
   }
   if (!data.sector || !SECTOR_OPTIONS.some((o) => o.value === data.sector)) {
     errors.sector = 'Sektör seçimi zorunludur'
@@ -79,24 +79,24 @@ function validateStep1(data: FormData): FieldErrors {
 function validateStep2(data: FormData): FieldErrors {
   const errors: FieldErrors = {}
   if (!data.firstName || data.firstName.length < 2) {
-    errors.firstName = 'Ad en az 2 karakter olmalidir'
+    errors.firstName = 'Ad en az 2 karakter olmalıdır'
   }
   if (!data.lastName || data.lastName.length < 2) {
-    errors.lastName = 'Soyad en az 2 karakter olmalidir'
+    errors.lastName = 'Soyad en az 2 karakter olmalıdır'
   }
   if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    errors.email = 'Gecerli bir e-posta adresi girin'
+    errors.email = 'Geçerli bir e-posta adresi girin'
   }
   if (!data.password || data.password.length < 8) {
-    errors.password = 'Sifre en az 8 karakter olmalidir' // secret-scanner-disable-line
+    errors.password = 'Şifre en az 8 karakter olmalıdır' // secret-scanner-disable-line
   } else if (!PASSWORD_REGEX.test(data.password)) {
-    errors.password = 'Buyuk harf, kucuk harf, rakam ve ozel karakter gerekli' // secret-scanner-disable-line
+    errors.password = 'Büyük harf, küçük harf, rakam ve özel karakter gerekli' // secret-scanner-disable-line
   }
   if (data.password !== data.passwordConfirm) {
-    errors.passwordConfirm = 'Sifreler uyusmuyor'
+    errors.passwordConfirm = 'Şifreler uyuşmuyor'
   }
   if (!data.kvkkAccepted) {
-    errors.kvkkAccepted = 'KVKK aydinlatma metnini onaylamaniz gereklidir'
+    errors.kvkkAccepted = 'KVKK aydınlatma metnini onaylamanız gerekir'
   }
   return errors
 }
@@ -110,28 +110,29 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
   if (/\d/.test(pw)) score++
   if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw)) score++
 
-  if (score <= 2) return { score, label: 'Zayif', color: '#dc2626' }
-  if (score <= 3) return { score, label: 'Orta', color: '#f59e0b' }
-  if (score <= 4) return { score, label: 'Iyi', color: '#0d9668' }
-  return { score, label: 'Guclu', color: '#059669' }
+  if (score <= 2) return { score, label: 'Zayıf', color: 'var(--site-danger)' }
+  if (score <= 3) return { score, label: 'Orta', color: 'var(--site-attn-ink)' }
+  if (score <= 4) return { score, label: 'İyi', color: 'var(--site-brand)' }
+  return { score, label: 'Güçlü', color: 'var(--site-brand-ink)' }
 }
 
 /* ── Password requirement checks ── */
 function PasswordRequirements({ password }: { password: string }) {
   const checks = [
     { label: 'En az 8 karakter', met: password.length >= 8 },
-    { label: 'Kucuk harf (a-z)', met: /[a-z]/.test(password) },
-    { label: 'Buyuk harf (A-Z)', met: /[A-Z]/.test(password) },
+    { label: 'Küçük harf (a-z)', met: /[a-z]/.test(password) },
+    { label: 'Büyük harf (A-Z)', met: /[A-Z]/.test(password) },
     { label: 'Rakam (0-9)', met: /\d/.test(password) },
-    { label: 'Ozel karakter (!@#$...)', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) },
+    { label: 'Özel karakter (!@#$...)', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) },
   ]
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
       {checks.map(({ label, met }) => (
-        <div key={label} className="flex items-center gap-1.5 text-xs" style={{ color: met ? '#059669' : '#94a3b8' }}>
+        <div key={label} className="flex items-center gap-1.5 text-xs" style={{ color: met ? 'var(--site-brand-ink)' : 'var(--site-ink-muted)' }}>
           <div
-            className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-            style={{ backgroundColor: met ? '#059669' : '#e2e8f0' }}
+            className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold"
+            style={{ backgroundColor: met ? 'var(--site-brand)' : 'var(--site-rule-strong)', color: 'var(--site-surface)' }}
+            aria-hidden="true"
           >
             {met ? '\u2713' : ''}
           </div>
@@ -235,13 +236,13 @@ export default function RegisterPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setApiError(data.error || 'Bir hata olustu. Lutfen tekrar deneyin.')
+        setApiError(data.error || 'Bir hata oluştu. Lütfen tekrar deneyin.')
         return
       }
 
       setSuccess(true)
     } catch {
-      setApiError('Baglanti hatasi. Lutfen internet baglantinizi kontrol edin.')
+      setApiError('Bağlantı hatası. Lütfen internet bağlantınızı kontrol edin.')
     } finally {
       setLoading(false)
     }
@@ -251,56 +252,53 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4 py-16">
-        <BlurFade delay={0.1}>
-          <div
+        <div
             className="w-full max-w-lg rounded-2xl p-8 text-center"
             style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)',
+              backgroundColor: 'var(--site-surface)',
+              border: '1px solid var(--site-rule-strong)',
+              boxShadow: 'var(--site-shadow-lift)',
             }}
           >
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ backgroundColor: '#dcfce7' }}
+              style={{ backgroundColor: 'var(--site-brand-tint)' }}
             >
-              <CheckCircle2 className="w-8 h-8" style={{ color: '#16a34a' }} />
+              <CheckCircle2 className="w-8 h-8" style={{ color: 'var(--site-brand-ink)' }} aria-hidden="true" />
             </div>
-            <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>
-              Kaydınız Basarıyla Tamamlandı!
+            <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--site-ink)' }}>
+              Kaydınız tamamlandı
             </h1>
-            <p className="mb-6 text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-              <strong>{form.email}</strong> adresine bir dogrulama e-postasi gonderildi.
-              Lutfen gelen kutunuzu kontrol ederek hesabinizi dogrulayin.
+            <p className="mb-6 text-sm leading-relaxed" style={{ color: 'var(--site-ink-soft)' }}>
+              <strong>{form.email}</strong> adresine bir e-posta gönderildi.
+              Gelen kutunuzu kontrol ederek hesabınızı doğrulayın.
             </p>
             <div
               className="rounded-xl p-4 mb-6 text-left text-sm"
-              style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a' }}
+              style={{ backgroundColor: 'var(--site-surface-sunken)', border: '1px solid var(--site-rule-strong)' }}
             >
-              <p className="font-semibold mb-1" style={{ color: '#92400e' }}>
-                Onemli Bilgiler:
+              <p className="font-semibold mb-1" style={{ color: 'var(--site-ink)' }}>
+                Önemli bilgiler
               </p>
-              <ul className="space-y-1" style={{ color: '#a16207' }}>
+              <ul className="space-y-1" style={{ color: 'var(--site-ink-soft)' }}>
                 <li className="flex items-start gap-2">
-                  <Clock className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  30 gunluk ucretsiz deneme sureniz basladi
+                  <Clock className="w-4 h-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                  30 günlük ücretsiz deneme süreniz başladı.
                 </li>
                 <li className="flex items-start gap-2">
-                  <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  E-posta dogrulaması yapilmadan giris yapilamaz
+                  <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                  E-posta adresinizi doğrulamadan giriş yapamazsınız.
                 </li>
               </ul>
             </div>
             <Link
               prefetch={false} href="/auth/login"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-105"
-              style={{ backgroundColor: '#0d9668' }}
+              className="s-btn s-btn-primary"
             >
-              Giris Sayfasina Git
-              <ArrowRight className="w-4 h-4" />
+              Giriş sayfasına git
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
           </div>
-        </BlurFade>
       </div>
     )
   }
@@ -309,15 +307,14 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-16">
-      <BlurFade delay={0.1}>
         <div className="w-full max-w-2xl">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>
+            <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--site-ink)' }}>
               Organizasyonunuzu Kaydedin
             </h1>
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-              30 gun ucretsiz deneyin — kredi karti gerekmez
+            <p className="text-sm" style={{ color: 'var(--site-ink-soft)' }}>
+              30 gün ücretsiz deneyin, kredi kartı gerekmez.
             </p>
           </div>
 
@@ -325,31 +322,31 @@ export default function RegisterPage() {
           <div className="flex items-center gap-3 mb-8 max-w-md mx-auto">
             <div className="flex items-center gap-2 flex-1">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                style={{ backgroundColor: '#0d9668' }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                style={{ backgroundColor: 'var(--site-brand-ink)', color: 'var(--site-surface)' }}
               >
-                {step > 1 ? <CheckCircle2 className="w-4 h-4" /> : '1'}
+                {step > 1 ? <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> : '1'}
               </div>
-              <span className="hidden text-sm font-medium sm:inline" style={{ color: step >= 1 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+              <span className="hidden text-sm font-medium sm:inline" style={{ color: step >= 1 ? 'var(--site-ink)' : 'var(--site-ink-soft)' }}>
                 Organizasyon Bilgileri
               </span>
             </div>
             <div
               className="flex-1 h-0.5 rounded"
-              style={{ backgroundColor: step >= 2 ? '#0d9668' : '#e2e8f0' }}
+              style={{ backgroundColor: step >= 2 ? 'var(--site-brand-ink)' : 'var(--site-rule-strong)' }}
             />
             <div className="flex items-center gap-2 flex-1">
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
                 style={{
-                  backgroundColor: step >= 2 ? '#0d9668' : '#e2e8f0',
-                  color: step >= 2 ? 'white' : '#94a3b8',
+                  backgroundColor: step >= 2 ? 'var(--site-brand-ink)' : 'var(--site-rule-strong)',
+                  color: step >= 2 ? 'var(--site-surface)' : 'var(--site-ink-soft)',
                 }}
               >
                 2
               </div>
-              <span className="hidden text-sm font-medium sm:inline" style={{ color: step >= 2 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
-                Yonetici Hesabi
+              <span className="hidden text-sm font-medium sm:inline" style={{ color: step >= 2 ? 'var(--site-ink)' : 'var(--site-ink-soft)' }}>
+                Yönetici Hesabı
               </span>
             </div>
           </div>
@@ -358,16 +355,13 @@ export default function RegisterPage() {
           <div
             className="rounded-2xl p-6 sm:p-8"
             style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)',
+              backgroundColor: 'var(--site-surface)',
+              border: '1px solid var(--site-rule-strong)',
+              boxShadow: 'var(--site-shadow-lift)',
             }}
           >
             {apiError && (
-              <div
-                className="rounded-xl px-4 py-3 mb-6 text-sm font-medium"
-                style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}
-              >
+              <div role="alert" className="s-form-alert s-form-alert-error mb-6">
                 {apiError}
               </div>
             )}
@@ -379,53 +373,53 @@ export default function RegisterPage() {
                   <div className="flex items-center gap-3 mb-2">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ backgroundColor: '#f0fdf4' }}
+                      style={{ backgroundColor: 'var(--site-brand-tint)' }}
                     >
-                      <Building2 className="w-5 h-5" style={{ color: '#0d9668' }} />
+                      <Building2 className="w-5 h-5" style={{ color: 'var(--site-brand-ink)' }} aria-hidden="true" />
                     </div>
                     <div>
-                      <h2 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                      <h2 className="font-bold" style={{ color: 'var(--site-ink)' }}>
                         Organizasyon Bilgileri
                       </h2>
-                      <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      <p className="text-xs" style={{ color: 'var(--site-ink-soft)' }}>
                         Organizasyonunuzun temel bilgilerini girin
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="organizationName" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                      Organizasyon Adi *
+                    <Label htmlFor="organizationName" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
+                      Organizasyon Adı *
                     </Label>
                     <Input
                       id="organizationName"
-                      placeholder="ornek: Devakent Hastanesi"
+                      placeholder="örnek: Merkez Hastanesi"
                       value={form.organizationName}
                       onChange={(e) => handleOrganizationNameChange(e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.organizationName && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.organizationName}</p>}
+                    {errors.organizationName && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.organizationName}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="organizationCode" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    <Label htmlFor="organizationCode" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
                       Organizasyon Kodu *
                     </Label>
                     <Input
                       id="organizationCode"
-                      placeholder="ornek: ankara-sehir"
+                      placeholder="örnek: merkez-hastanesi"
                       value={form.organizationCode}
                       onChange={(e) => update('organizationCode', e.target.value.toLowerCase())}
                       className="mt-1.5 font-mono"
                     />
-                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-                      Kucuk harf, rakam ve tire (-) kullanilabilir. 3-20 karakter.
+                    <p className="text-xs mt-1" style={{ color: 'var(--site-ink-soft)' }}>
+                      Küçük harf, rakam ve tire (-) kullanılabilir. 3-20 karakter.
                     </p>
-                    {errors.organizationCode && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.organizationCode}</p>}
+                    {errors.organizationCode && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.organizationCode}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="sector" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    <Label htmlFor="sector" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
                       Sektör *
                     </Label>
                     <select
@@ -434,8 +428,8 @@ export default function RegisterPage() {
                       onChange={(e) => update('sector', e.target.value)}
                       className="mt-1.5 w-full rounded-md border bg-transparent px-3 py-2 text-base focus:outline-none sm:text-sm"
                       style={{
-                        borderColor: errors.sector ? '#dc2626' : 'var(--color-border)',
-                        color: 'var(--color-text-primary)',
+                        borderColor: errors.sector ? 'var(--site-danger)' : 'var(--site-rule-strong)',
+                        color: 'var(--site-ink)',
                       }}
                     >
                       <option value="" disabled>
@@ -447,48 +441,47 @@ export default function RegisterPage() {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p className="text-xs mt-1" style={{ color: 'var(--site-ink-soft)' }}>
                       Sektör seçimi platform içindeki menüleri ve özellikleri belirler.
                     </p>
-                    {errors.sector && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.sector}</p>}
+                    {errors.sector && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.sector}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="address" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    <Label htmlFor="address" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
                       Adres
                     </Label>
                     <Input
                       id="address"
-                      placeholder="Organizasyon adresi (istege bagli)"
+                      placeholder="Organizasyon adresi (isteğe bağlı)"
                       value={form.address}
                       onChange={(e) => update('address', e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.address && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.address}</p>}
+                    {errors.address && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.address}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="phone" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    <Label htmlFor="phone" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
                       Telefon
                     </Label>
                     <Input
                       id="phone"
-                      placeholder="ornek: 0312 000 00 00"
+                      placeholder="örnek: 0312 000 00 00"
                       value={form.phone}
                       onChange={(e) => update('phone', e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.phone && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.phone}</p>}
+                    {errors.phone && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.phone}</p>}
                   </div>
 
                   <button
                     type="button"
                     onClick={goToStep2}
-                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.02]"
-                    style={{ backgroundColor: '#0d9668' }}
+                    className="s-btn s-btn-primary w-full"
                   >
                     Devam Et
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               )}
@@ -499,51 +492,51 @@ export default function RegisterPage() {
                   <div className="flex items-center gap-3 mb-2">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ backgroundColor: '#eff6ff' }}
+                      style={{ backgroundColor: 'var(--site-brand-tint)' }}
                     >
-                      <User className="w-5 h-5" style={{ color: '#2563eb' }} />
+                      <User className="w-5 h-5" style={{ color: 'var(--site-brand-ink)' }} aria-hidden="true" />
                     </div>
                     <div>
-                      <h2 className="font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                        Yonetici Hesabi
+                      <h2 className="font-bold" style={{ color: 'var(--site-ink)' }}>
+                        Yönetici Hesabı
                       </h2>
-                      <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                        Organizasyon yoneticisi olarak giris yapacak hesabi olusturun
+                      <p className="text-xs" style={{ color: 'var(--site-ink-soft)' }}>
+                        Organizasyon yöneticisi olarak giriş yapacak hesabı oluşturun
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="firstName" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      <Label htmlFor="firstName" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
                         Ad *
                       </Label>
                       <Input
                         id="firstName"
-                        placeholder="Adiniz"
+                        placeholder="Adınız"
                         value={form.firstName}
                         onChange={(e) => update('firstName', e.target.value)}
                         className="mt-1.5"
                       />
-                      {errors.firstName && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.firstName}</p>}
+                      {errors.firstName && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.firstName}</p>}
                     </div>
                     <div>
-                      <Label htmlFor="lastName" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                      <Label htmlFor="lastName" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
                         Soyad *
                       </Label>
                       <Input
                         id="lastName"
-                        placeholder="Soyadiniz"
+                        placeholder="Soyadınız"
                         value={form.lastName}
                         onChange={(e) => update('lastName', e.target.value)}
                         className="mt-1.5"
                       />
-                      {errors.lastName && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.lastName}</p>}
+                      {errors.lastName && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.lastName}</p>}
                     </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="email" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                    <Label htmlFor="email" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
                       E-posta *
                     </Label>
                     <Input
@@ -554,12 +547,12 @@ export default function RegisterPage() {
                       onChange={(e) => update('email', e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.email && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.email}</p>}
+                    {errors.email && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.email}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="password" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                      Sifre *
+                    <Label htmlFor="password" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
+                      Şifre *
                     </Label>
                     <div className="relative mt-1.5">
                       <Input
@@ -574,18 +567,19 @@ export default function RegisterPage() {
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2"
-                        style={{ color: '#94a3b8' }}
+                        style={{ color: 'var(--site-ink-muted)' }}
                         tabIndex={-1}
+                        aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                       </button>
                     </div>
                     {form.password && (
                       <div className="mt-2">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#e2e8f0' }}>
+                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--site-rule-strong)' }}>
                             <div
-                              className="h-full rounded-full transition-all duration-300"
+                              className="h-full rounded-full transition-[width] duration-300"
                               style={{
                                 width: `${(strength.score / 5) * 100}%`,
                                 backgroundColor: strength.color,
@@ -599,18 +593,18 @@ export default function RegisterPage() {
                         <PasswordRequirements password={form.password} />
                       </div>
                     )}
-                    {errors.password && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.password}</p>}
+                    {errors.password && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.password}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="passwordConfirm" className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                      Sifre Tekrar *
+                    <Label htmlFor="passwordConfirm" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
+                      Şifre Tekrar *
                     </Label>
                     <div className="relative mt-1.5">
                       <Input
                         id="passwordConfirm"
                         type={showPasswordConfirm ? 'text' : 'password'}
-                        placeholder="Sifrenizi tekrar girin"
+                        placeholder="Şifrenizi tekrar girin"
                         value={form.passwordConfirm}
                         onChange={(e) => update('passwordConfirm', e.target.value)}
                         className="pr-10"
@@ -619,13 +613,14 @@ export default function RegisterPage() {
                         type="button"
                         onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
                         className="absolute right-3 top-1/2 -translate-y-1/2"
-                        style={{ color: '#94a3b8' }}
+                        style={{ color: 'var(--site-ink-muted)' }}
                         tabIndex={-1}
+                        aria-label={showPasswordConfirm ? 'Şifreyi gizle' : 'Şifreyi göster'}
                       >
-                        {showPasswordConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPasswordConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                       </button>
                     </div>
-                    {errors.passwordConfirm && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.passwordConfirm}</p>}
+                    {errors.passwordConfirm && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.passwordConfirm}</p>}
                   </div>
 
                   {/* KVKK açık rıza — kayıt (veri toplama) anında zorunlu onay */}
@@ -636,16 +631,16 @@ export default function RegisterPage() {
                         checked={form.kvkkAccepted}
                         onChange={(e) => setKvkkAccepted(e.target.checked)}
                         className="mt-0.5 h-4 w-4 shrink-0"
-                        style={{ accentColor: '#0d9668' }}
+                        style={{ accentColor: 'var(--site-brand-ink)' }}
                       />
-                      <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                        <a href="/kvkk" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#0d9668' }}>KVKK Aydınlatma Metni</a>
+                      <span className="text-xs" style={{ color: 'var(--site-ink-soft)' }}>
+                        <a href="/kvkk" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: 'var(--site-brand-ink)' }}>KVKK Aydınlatma Metni</a>
                         {' '}ve{' '}
-                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: '#0d9668' }}>Kullanım Koşulları</a>
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: 'var(--site-brand-ink)' }}>Kullanım Koşulları</a>
                         &apos;nı okudum, kabul ediyorum. Kişisel verilerimin bu sistemde işlenmesine açık rıza veriyorum.
                       </span>
                     </label>
-                    {errors.kvkkAccepted && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{errors.kvkkAccepted}</p>}
+                    {errors.kvkkAccepted && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.kvkkAccepted}</p>}
                   </div>
 
                   <div className="flex gap-3">
@@ -654,29 +649,29 @@ export default function RegisterPage() {
                       onClick={() => setStep(1)}
                       className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-colors"
                       style={{
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border)',
+                        color: 'var(--site-ink-soft)',
+                        border: '1px solid var(--site-rule-strong)',
                         backgroundColor: 'transparent',
                       }}
                     >
-                      <ArrowLeft className="w-4 h-4" />
+                      <ArrowLeft className="w-4 h-4" aria-hidden="true" />
                       Geri
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: '#0d9668' }}
+                      className="s-btn s-btn-primary flex-1"
+                      aria-busy={loading}
                     >
                       {loading ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Kaydediliyor...
+                          <Loader2 className="w-4 h-4 motion-safe:animate-spin" aria-hidden="true" />
+                          Kaydediliyor
                         </>
                       ) : (
                         <>
-                          Hesap Olustur
-                          <Sparkles className="w-4 h-4" />
+                          Hesap Oluştur
+                          <ArrowRight className="w-4 h-4" aria-hidden="true" />
                         </>
                       )}
                     </button>
@@ -686,11 +681,11 @@ export default function RegisterPage() {
             </form>
 
             {/* Footer links */}
-            <div className="mt-6 pt-6 text-center text-sm" style={{ borderTop: '1px solid var(--color-border)' }}>
-              <p style={{ color: 'var(--color-text-secondary)' }}>
-                Zaten hesabiniz var mi?{' '}
-                <Link prefetch={false} href="/auth/login" className="font-semibold" style={{ color: '#0d9668' }}>
-                  Giris Yapin
+            <div className="mt-6 pt-6 text-center text-sm" style={{ borderTop: '1px solid var(--site-rule-strong)' }}>
+              <p style={{ color: 'var(--site-ink-soft)' }}>
+                Zaten hesabınız var mı?{' '}
+                <Link prefetch={false} href="/auth/login" className="font-semibold" style={{ color: 'var(--site-brand-ink)' }}>
+                  Giriş Yapın
                 </Link>
               </p>
             </div>
@@ -699,22 +694,21 @@ export default function RegisterPage() {
           {/* Features */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
             {[
-              { icon: Shield, label: '256-bit SSL Sifreleme' },
-              { icon: Clock, label: '30 Gun Ucretsiz Deneme' },
-              { icon: Sparkles, label: 'Kurulum Sihirbazi' },
+              { icon: Clock, label: '30 gün ücretsiz deneme' },
+              { icon: CreditCard, label: 'Kredi kartı gerekmez' },
+              { icon: ListChecks, label: 'İki adımda kayıt' },
             ].map(({ icon: Icon, label }) => (
               <div
                 key={label}
                 className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-medium"
-                style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
+                style={{ backgroundColor: 'var(--site-surface)', color: 'var(--site-ink-soft)', border: '1px solid var(--site-rule-strong)' }}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: '#0d9668' }} />
+                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--site-brand-ink)' }} aria-hidden="true" />
                 {label}
               </div>
             ))}
           </div>
         </div>
-      </BlurFade>
     </div>
   )
 }

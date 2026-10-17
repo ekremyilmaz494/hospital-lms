@@ -1,12 +1,15 @@
+import { pageMetadata } from '@/lib/site-metadata'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { BRAND } from '@/lib/brand'
 import { isOnPrem } from '@/lib/deployment'
 
-export const metadata: Metadata = {
-  title: `API Dokumantasyonu — ${BRAND.fullName}`,
-  description: `${BRAND.fullName} REST API interaktif dokumantasyonu (OpenAPI / Swagger UI)`,
-}
+export const metadata: Metadata = pageMetadata({
+  title: 'API Dokümantasyonu',
+  description:
+    'KlinoVax REST API için etkileşimli OpenAPI (Swagger UI) dokümantasyonu.',
+  path: '/docs',
+});
 
 /**
  * Swagger UI sayfasi — CDN uzerinden yuklenir, ek npm paketi gerektirmez.

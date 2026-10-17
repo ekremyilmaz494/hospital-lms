@@ -1,0 +1,95 @@
+/* Çerez banner'ı: site token'ları (tokens.css global) ile; site.css'e bağımlı değil
+   çünkü panellerde de render edilir. */
+.ck-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 9999;
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid var(--site-rule);
+  border-radius: 16px;
+  background: var(--site-surface);
+  color: var(--site-ink);
+  box-shadow: var(--site-shadow-lift);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  outline: none;
+}
+.ck-banner :focus-visible { outline: 2px solid var(--site-brand-ink); outline-offset: 2px; }
+.ck-title { margin: 0; font-family: var(--font-display); font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.01em; }
+.ck-text { margin: 8px 0 0; color: var(--site-ink-soft); }
+.ck-text a { color: var(--site-brand-ink); text-decoration: underline; text-underline-offset: 3px; }
+
+.ck-prefs { display: grid; gap: 4px; margin: 16px 0 0; padding: 0; list-style: none; }
+.ck-pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--site-rule);
+}
+.ck-pref-label { margin: 0; font-weight: 650; }
+.ck-pref-desc { margin: 2px 0 0; font-size: 0.8125rem; color: var(--site-ink-muted); }
+.ck-badge { flex: none; font-size: 0.8125rem; font-weight: 600; color: var(--site-brand-ink); }
+
+.ck-switch {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--site-rule-strong);
+  cursor: pointer;
+  transition: background-color 0.2s var(--site-ease);
+}
+.ck-switch[aria-checked="true"] { background: var(--site-brand-ink); }
+.ck-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--site-surface);
+  transition: transform 0.2s var(--site-ease);
+}
+.ck-switch[aria-checked="true"] .ck-switch-thumb { transform: translateX(18px); }
+
+.ck-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.ck-btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.2s var(--site-ease), border-color 0.2s var(--site-ease);
+}
+.ck-btn-primary { background: var(--site-brand-ink); color: var(--site-surface); }
+.ck-btn-primary:hover { background: var(--site-brand-ink-hover); }
+.ck-btn-ghost { background: var(--site-surface); color: var(--site-ink); border-color: var(--site-rule-strong); }
+.ck-btn-ghost:hover { border-color: var(--site-ink-muted); }
+.ck-link {
+  flex: 1 1 100%;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--site-ink-soft);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ck-switch, .ck-switch-thumb, .ck-btn { transition: none; }
+}
