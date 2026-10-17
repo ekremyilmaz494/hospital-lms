@@ -84,7 +84,7 @@ export const FAQ_TR = {
           a: 'Süre sunucuda tutulur; sayfayı yenilemek veya cihaz saatini değiştirmek süreyi uzatmaz, süre dolunca sınav otomatik olarak sonlanır. Soruların karıştırılması varsayılan olarak açıktır ve her denemede sorular farklı bir sırayla gelir.',
         },
         {
-          q: 'Sınavda başarısız olan personel ne olur?',
+          q: 'Personel sınavda başarısız olursa ne olur?',
           a: 'Belirlediğiniz hak sayısı kadar tekrar dener. Hakkı biten personel ek hak talep edebilir, yönetici onaylarsa yeniden sınava girer.',
         },
         {
