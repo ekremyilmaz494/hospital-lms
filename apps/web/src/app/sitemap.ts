@@ -9,7 +9,9 @@ const LAST_MODIFIED: Record<string, string> = {
   '/en': '2026-10-17',
   '/hakkimizda': '2026-10-10',
   '/demo': '2026-10-17',
-  '/contact': '2026-10-17',
+  '/iletisim': '2026-10-17',
+  '/sss': '2026-10-17',
+  '/guvenlik': '2026-10-17',
   '/kvkk': '2026-07-08',
   '/privacy': '2026-07-08',
   '/terms': '2026-07-08',
@@ -17,7 +19,7 @@ const LAST_MODIFIED: Record<string, string> = {
   '/data-retention': '2026-07-08',
 }
 
-const PRIORITY: Record<string, number> = { '/': 1, '/demo': 0.9, '/en': 0.8, '/hakkimizda': 0.7, '/contact': 0.6 }
+const PRIORITY: Record<string, number> = { '/': 1, '/demo': 0.9, '/en': 0.8, '/hakkimizda': 0.7, '/guvenlik': 0.7, '/sss': 0.6, '/iletisim': 0.6 }
 
 /** Yalnız gerçek dil karşılığı olan sayfa çifti. */
 const HOME_PAIR = { tr: `${SITE_URL}/`, en: `${SITE_URL}/en`, 'x-default': `${SITE_URL}/` }

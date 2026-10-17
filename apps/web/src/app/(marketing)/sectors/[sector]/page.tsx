@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Sector } from '@/generated/prisma/enums'
+import { PageHead } from '@/components/site/page-head'
 
-// Faz 3 (2026-05-17): Sektör-bazlı marketing landing'leri. 5 sektör için minimal
-// statik içerik — generateStaticParams ile build-time render edilir, dynamic'e
-// düşmez. Içerik kopyaları pazarlama tarafından sonraki sprint'te genişletilir.
+// Faz 3 (2026-05-17): Sektör-bazlı marketing landing'leri. generateStaticParams ile
+// build-time render edilir. Sayfalar indekslenmez (hastane konumlandırmasını dağıtmasın);
+// maddeler yalnız kodda doğrulanabilen genel yetenekleri anlatır (iddia politikası:
+// akreditasyon/ISO/SMG/KVKK uyumu, hazır içerik, fiyat YOK).
 type SectorContent = {
   title: string
   tagline: string
@@ -15,53 +16,53 @@ type SectorContent = {
 
 const SECTOR_CONTENT: Record<Sector, SectorContent> = {
   healthcare: {
-    title: 'Sağlık Sektörü için LMS',
-    tagline: 'SKS uyumlu eğitim, SMG takibi, otomatik sertifikasyon',
+    title: 'Sağlık kurumları için eğitim platformu',
+    tagline: 'Zorunlu eğitim, sınav, sertifika ve denetim belgeleri tek platformda.',
     bullets: [
-      'SKS-EY standardına uygun eğitim ve denetim raporları',
-      'SMG kategori-bazlı hekim aktivite puan takibi',
-      'Sertifika geçerliliği + yenileme bildirimleri',
-      'Hastane bölüm ve unvan hiyerarşisine göre atama',
+      'Hastane birimi ve unvan yapısına göre eğitim ataması',
+      'İleri sarılamayan video ve sunucuda doğrulanan izleme süresi',
+      'Ön sınav, son sınav ve QR kodla doğrulanan sertifika',
+      'Denetimde istenen formlar ve birim bazında uyum raporu',
     ],
   },
   manufacturing: {
-    title: 'Üretim Sektörü için LMS',
-    tagline: 'İSG, kalite ve operasyon eğitimleri tek panelde',
+    title: 'Üretim sektörü için eğitim platformu',
+    tagline: 'Zorunlu ve operasyonel eğitimleri tek panelden yönetin.',
     bullets: [
-      'İSG eğitim takvimi ve uyum raporları',
-      'Vardiyalı personel için esnek atama',
-      'Makina-bazlı yetkinlik matrisi',
-      'ISO denetimleri için otomatik kayıt',
+      'Birime, unvana veya kişiye eğitim ataması',
+      'Vardiyalı personel için web ve mobil uygulamadan erişim',
+      'Son tarih yaklaşınca otomatik hatırlatma',
+      'Tamamlanma ve sertifika takibi',
     ],
   },
   education: {
-    title: 'Eğitim Kurumları için LMS',
-    tagline: 'Öğretmen, idari personel ve hizmet sağlayıcılar için',
+    title: 'Eğitim kurumları için eğitim platformu',
+    tagline: 'Öğretmen ve idari personelin zorunlu eğitimlerini tek yerden takip edin.',
     bullets: [
-      'Yıllık zorunlu eğitim takibi',
-      'Branş bazlı içerik kütüphanesi',
-      'Veli-okul iletişimi için bildirim',
-      'MEB raporlama formatında çıktı',
+      'Zorunlu eğitimlerin atanması ve takibi',
+      'Kendi video, PDF ve ses içeriklerinizle eğitim hazırlama',
+      'Ön sınav, son sınav ve otomatik sertifika',
+      'Eksik eğitimler için hatırlatma',
     ],
   },
   retail: {
-    title: 'Perakende için LMS',
-    tagline: 'Mağaza zinciri eğitimleri ve operasyon standardizasyonu',
+    title: 'Perakende için eğitim platformu',
+    tagline: 'Mağaza ekiplerinin eğitimlerini standart bir akışta yürütün.',
     bullets: [
-      'Mağaza-bazlı eğitim atamaları',
-      'Yeni ürün lansman eğitimi',
-      'Müşteri deneyimi sertifikasyonu',
-      'Hızlı onboarding akışı',
+      'Birim bazlı eğitim atamaları',
+      'Son tarih ve gecikme hatırlatmaları',
+      'Mobil uygulamadan eğitim ve sınav',
+      'Yeni personel için departman kuralıyla otomatik atama',
     ],
   },
   other: {
-    title: 'Kurumunuz için LMS',
-    tagline: 'Sektörden bağımsız personel eğitim platformu',
+    title: 'Kurumunuz için eğitim platformu',
+    tagline: 'Sektörden bağımsız personel eğitim ve sınav platformu.',
     bullets: [
-      'Esnek rol ve yetki yapısı',
-      'Özel içerik kütüphanesi',
-      'Türkçe destek ve KVKK uyumu',
-      'Hızlı kurulum, kredi kartı gerekmez',
+      'Rol bazlı yetki yapısı',
+      'Kendi eğitim içeriklerinizi yükleme',
+      'KVKK süreçlerini destekleyen başvuru akışı',
+      'Excel ile toplu personel aktarımı',
     ],
   },
 }
@@ -97,67 +98,44 @@ export default async function SectorPage({
   if (!content) notFound()
 
   return (
-    <div className="min-h-[80vh] px-4 py-16 sm:py-24">
-      <div className="mx-auto max-w-3xl">
-        <div className="text-center mb-12">
-          <h1
-            className="text-4xl sm:text-5xl font-bold mb-4"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            {content.title}
-          </h1>
-          <p
-            className="text-lg sm:text-xl"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            {content.tagline}
-          </p>
-        </div>
-
-        <div
-          className="rounded-2xl p-6 sm:p-8 mb-8"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)',
-          }}
-        >
-          <h2 className="text-lg font-bold mb-5" style={{ color: 'var(--color-text-primary)' }}>
+    <>
+      <PageHead title={content.title} lead={content.tagline} />
+      <section className="s-container s-page-body" aria-labelledby="sektor-sunulanlar">
+        <div className="s-head">
+          <h2 id="sektor-sunulanlar" className="s-h2">
             Sektörünüz için neler sunuyoruz
           </h2>
-          <ul className="space-y-3">
-            {content.bullets.map((bullet) => (
-              <li key={bullet} className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: '#0d9668' }} />
-                <span style={{ color: 'var(--color-text-primary)' }}>{bullet}</span>
-              </li>
-            ))}
-          </ul>
         </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link
-            prefetch={false}
-            href="/register"
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-105"
-            style={{ backgroundColor: '#0d9668' }}
-          >
-            Ücretsiz Deneyin
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link
-            prefetch={false}
-            href="/demo"
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-colors"
-            style={{
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
+        <ul className="s-checks">
+          {content.bullets.map((bullet) => (
+            <li key={bullet}>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>{bullet}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="s-cta-row">
+          <Link href="/demo" className="s-btn s-btn-primary">
             Demo Talep Edin
           </Link>
+          <Link href="/iletisim" className="s-btn s-btn-ghost">
+            Bize yazın
+          </Link>
         </div>
-      </div>
-    </div>
+      </section>
+    </>
   )
 }

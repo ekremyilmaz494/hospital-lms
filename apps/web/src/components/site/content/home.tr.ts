@@ -127,7 +127,7 @@ export const HOME_TR = {
     title: 'Verileriniz kurumunuza ait.',
     lead: 'Her hastanenin verisi diğerlerinden ayrı tutulur ve yalnızca yetkili kişilerce görülür.',
     items: [
-      { title: 'Kurumlar arası izolasyon', desc: 'Her sorgu kurum bazında sınırlanır, veritabanında satır bazlı güvenlik politikaları uygulanır.' },
+      { title: 'Kurumlar arası izolasyon', desc: 'Hastane kullanıcılarının sorguları kendi kurumlarıyla sınırlanır; veritabanında satır bazlı güvenlik politikaları da tanımlıdır.' },
       { title: 'Hassas alanlar şifreli', desc: 'TC kimlik numaraları uygulama katmanında şifrelenerek saklanır; yedekler şifrelidir.' },
       { title: 'KVKK başvuru akışı', desc: 'Personelin bilgi, düzeltme ve silme talepleri sistem içinden alınır ve yanıtlanır.' },
       { title: 'Barındırma ve kurulum seçeneği', desc: 'Bulut sürümü Avrupa (Frankfurt) bölgesinde çalışır. Verisini kendi sunucusunda tutmak isteyen kurumlar için kurum içi kurulum seçeneği vardır.' },

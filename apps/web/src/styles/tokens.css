@@ -212,6 +212,8 @@
   --site-brand-tint-strong: var(--brand-100);
   --site-attn: #f59e0b;                   /* kehribar: YALNIZ durum + illüstrasyonda tek nokta */
   --site-attn-ink: #b45309;               /* kehribar metin (beyaz üstünde 5.0) */
+  --site-danger: #b42318;                 /* form hatası metni/kenarı (beyaz üstünde 6.6, #f1f5f9 üstünde 6.0) */
+  --site-danger-tint: #fef3f2;
   /* Koyu bant (güvenlik bölümü): tek bilinçli tema geçişi */
   --site-band: #0f172a;
   --site-band-surface: #1e293b;

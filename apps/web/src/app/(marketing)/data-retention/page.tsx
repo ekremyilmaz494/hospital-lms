@@ -1,6 +1,7 @@
 import { pageMetadata } from '@/lib/site-metadata'
 import type { Metadata } from 'next'
 import { BRAND } from '@/lib/brand'
+import { LegalPage, type LegalSection } from '@/components/site/legal-page'
 
 const KVKK_EMAIL = 'ekrem@klinovax.com'
 
@@ -11,140 +12,166 @@ export const metadata: Metadata = pageMetadata({
   path: '/data-retention',
 });
 
-const sections = [
-  {
-    title: '1. Amac ve Kapsam',
-    content: `Bu politika, 6698 sayili Kisisel Verilerin Korunmasi Kanunu ("KVKK") ve Kisisel Verilerin Silinmesi, Yok Edilmesi veya Anonim Hale Getirilmesi Hakkinda Yonetmelik uyarinca hazirlanmistir. ${BRAND.fullName} platformunda islenen tum kisisel verilerin saklanma sureleri, imha kosullari ve yontemlerini kapsar.`,
-  },
-  {
-    title: '2. Tanimlar',
-    content: `**Kisisel Veri:** Kimliginizi belirli veya belirlenebilir kilan her turlu bilgi.
-**Veri Sorumlusu:** Ekrem Yilmaz, Konya, Turkiye.
-**Imha:** Kisisel verilerin silinmesi, yok edilmesi veya anonim hale getirilmesi.
-**Periyodik Imha:** Kanun'da yer alan kisisel veri isleme sartlarinin tamamen ortadan kalkmasi durumunda, tekrarlayan surelerle resen gerceklestirilen silme, yok etme veya anonimlestime islemidir.`,
-  },
-  {
-    title: '3. Veri Kategorileri ve Saklama Sureleri',
-    items: [
-      { category: 'Kimlik Bilgileri', data: 'Ad, soyad, TC kimlik no, unvan', period: 'Uyelik suresi + 1 yil', basis: 'Sozlesme ifasi' },
-      { category: 'Iletisim Bilgileri', data: 'E-posta, telefon', period: 'Uyelik suresi + 1 yil', basis: 'Sozlesme ifasi' },
-      { category: 'Mesleki Bilgiler', data: 'Departman, gorev, sicil no', period: 'Uyelik suresi + 1 yil', basis: 'Sozlesme ifasi' },
-      { category: 'Egitim ve Sinav Verileri', data: 'Tamamlama durumu, sinav puanlari, video izleme ilerlemesi', period: 'En az 10 yil', basis: 'Yasal yukumluluk (saglik mevzuati)' },
-      { category: 'Sertifika Bilgileri', data: 'Sertifika numarasi, verilis/bitis tarihi', period: 'Sertifika gecerlilik suresi + 5 yil', basis: 'Yasal yukumluluk' },
-      { category: 'Erisim Kayitlari', data: 'Giris zamanlari, IP adresi, tarayici bilgisi', period: '2 yil', basis: 'Mesru menfaat (guvenlik)' },
-      { category: 'Denetim Kayitlari', data: 'Islem kayitlari (audit log)', period: '3 yil', basis: 'Yasal yukumluluk' },
-      { category: 'Gorsel Veriler', data: 'Profil fotografi (istege bagli)', period: 'Kullanici sildikten sonra 30 gun', basis: 'Acik riza' },
-      { category: 'KVKK Talep Kayitlari', data: 'Basvuru icerigi, sonuc, tarih', period: '5 yil', basis: 'Yasal yukumluluk (ispat)' },
-    ],
-  },
-  {
-    title: '4. Imha Yontemleri',
-    content: `**Silme:** Kisisel veriler, ilgili kullanicilarin erisemeyecegi sekilde dijital ortamdan kaldirilir. Veritabaninda ilgili satirlar silinir veya anonim hale getirilir.
+const S = {
+  amac: { id: 'amac-ve-kapsam', label: '1. Amaç ve Kapsam' },
+  tanimlar: { id: 'tanimlar', label: '2. Tanımlar' },
+  sureler: { id: 'saklama-sureleri', label: '3. Veri Kategorileri ve Saklama Süreleri' },
+  yontemler: { id: 'imha-yontemleri', label: '4. İmha Yöntemleri' },
+  periyodik: { id: 'periyodik-imha', label: '5. Periyodik İmha Süreci' },
+  talep: { id: 'talep-hakki', label: '6. Veri Sahibinin Talep Hakkı' },
+  guvenlik: { id: 'guvenlik-onlemleri', label: '7. Güvenlik Önlemleri' },
+  guncelleme: { id: 'politika-guncellemeleri', label: '8. Politika Güncellemeleri' },
+} as const satisfies Record<string, LegalSection>
 
-**Anonimlestime:** Kisisel veriler, baska verilerle eslestirilse dahi hicbir surette kimliginizi belirlenemez hale getirilir. Ornegin:
-- Ad/Soyad → "Silinmis Kullanici"
-- E-posta → "deleted_[uuid]@anonymized.local"
-- TC Kimlik No → null (tamamen silme)
-- Telefon → null (tamamen silme)
+const SECTIONS: readonly LegalSection[] = Object.values(S)
 
-**Yok Etme:** Fiziksel ortamlarda (yedek medya vb.) geri dondurulemez sekilde imha. Dijital ortamda uzerine yazma veya sifreleme anahtarinin imhasi.`,
-  },
-  {
-    title: '5. Periyodik Imha Sureci',
-    content: `Saklama suresi dolan kisisel veriler, **her 6 ayda bir** resen kontrol edilir ve imha edilir. Periyodik imha takvimleri:
-
-- **Ocak (ilk is gunu):** Temmuz-Aralik donemi sona eren veriler
-- **Temmuz (ilk is gunu):** Ocak-Haziran donemi sona eren veriler
-
-Imha islemleri kayit altina alinir ve 3 yil saklanir.`,
-  },
-  {
-    title: '6. Veri Sahibinin Talep Hakki',
-    content: `KVKK Madde 11 uyarinca, kisisel verilerinizin silinmesini, yok edilmesini veya anonim hale getirilmesini talep edebilirsiniz.
-
-**Basvuru Yollari:**
-- Platform icerisinden: Staff Paneli → Kisisel Verilerim (KVKK) → Yeni Talep
-- E-posta: ${KVKK_EMAIL}
-- Posta: Ekrem Yilmaz, Konya, Türkiye
-
-**Yasal Sure:** Talebiniz en gec **30 gun** icinde sonuclandirilir. Islem ucret gerektiriyorsa (Kurul tarifesi), bilgilendirilirsiniz.
-
-**Istisnalar:** Kanuni saklama yukumlulugu devam eden veriler (saglik egitim kayitlari — 10 yil), talep uzerine silinemez ancak erisim kisitlanir.`,
-  },
-  {
-    title: '7. Guvenlik Onlemleri',
-    content: `- Tum veriler aktarimda TLS/SSL sifreleme ile korunur
-- Veritabani erisimi rol tabanli yetkilendirme (RLS) ile kisitlanir
-- Yedekleme verileri AES-256-GCM sifreleme ile korunur
-- Erisim ve islem kayitlari (audit log) tam izlenebilirlik saglar
-- Multi-tenant mimari: Her organizasyon verisi birbirinden tamamen izole`,
-  },
-  {
-    title: '8. Politika Guncellemeleri',
-    content: `Bu politika, mevzuat degisiklikleri veya isleme faaliyetlerindeki degisiklikler dogrultusunda guncellenebilir. Guncellemeler platform uzerinden ve/veya e-posta ile bildirilir.
-
-**Son Guncelleme:** Temmuz 2026
-**Iletisim:** ${KVKK_EMAIL}`,
-  },
-]
+const RETENTION_ROWS = [
+  { category: 'Kimlik Bilgileri', data: 'Ad, soyad, TC kimlik no, unvan', period: 'Üyelik süresi + 1 yıl', basis: 'Sözleşme ifası' },
+  { category: 'İletişim Bilgileri', data: 'E-posta, telefon', period: 'Üyelik süresi + 1 yıl', basis: 'Sözleşme ifası' },
+  { category: 'Mesleki Bilgiler', data: 'Departman, görev, sicil no', period: 'Üyelik süresi + 1 yıl', basis: 'Sözleşme ifası' },
+  { category: 'Eğitim ve Sınav Verileri', data: 'Tamamlama durumu, sınav puanları, video izleme ilerlemesi', period: 'En az 10 yıl', basis: 'Yasal yükümlülük (sağlık mevzuatı)' },
+  { category: 'Sertifika Bilgileri', data: 'Sertifika numarası, veriliş/bitiş tarihi', period: 'Sertifika geçerlilik süresi + 5 yıl', basis: 'Yasal yükümlülük' },
+  { category: 'Erişim Kayıtları', data: 'Giriş zamanları, IP adresi, tarayıcı bilgisi', period: '2 yıl', basis: 'Meşru menfaat (güvenlik)' },
+  { category: 'Denetim Kayıtları', data: 'İşlem kayıtları (audit log)', period: '3 yıl', basis: 'Yasal yükümlülük' },
+  { category: 'Görsel Veriler', data: 'Profil fotoğrafı (isteğe bağlı)', period: 'Kullanıcı sildikten sonra 30 gün', basis: 'Açık rıza' },
+  { category: 'KVKK Talep Kayıtları', data: 'Başvuru içeriği, sonuç, tarih', period: '5 yıl', basis: 'Yasal yükümlülük (ispat)' },
+] as const
 
 export default function DataRetentionPage() {
   return (
-    <div className="min-h-screen py-24 px-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] mb-3" style={{ color: '#0d9668' }}>
-            KVKK Uyum
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight mb-3" style={{ color: '#0f172a' }}>
-            Kisisel Veri Saklama ve Imha Politikasi
-          </h1>
-          <p className="text-sm" style={{ color: '#64748b' }}>
-            6698 sayili Kanun ve ilgili yonetmelik kapsaminda hazirlanan politika
-          </p>
-        </div>
+    <LegalPage breadcrumbPath="/data-retention"
+      title="Kişisel Veri Saklama ve İmha Politikası"
+      lead="6698 sayılı Kanun ve ilgili yönetmelik kapsamında hazırlanan politika"
+      sections={SECTIONS}
+    >
+      <h2 id={S.amac.id}>{S.amac.label}</h2>
+      <p>
+        Bu politika, 6698 sayılı Kişisel Verilerin Korunması Kanunu (&quot;KVKK&quot;) ve Kişisel Verilerin
+        Silinmesi, Yok Edilmesi veya Anonim Hale Getirilmesi Hakkında Yönetmelik uyarınca hazırlanmıştır.{' '}
+        {BRAND.fullName} platformunda işlenen tüm kişisel verilerin saklanma süreleri, imha koşulları ve
+        yöntemlerini kapsar.
+      </p>
 
-        <div className="space-y-8">
-          {sections.map((section) => (
-            <div key={section.title}>
-              <h2 className="text-lg font-bold mb-3" style={{ color: '#0f172a' }}>
-                {section.title}
-              </h2>
+      <h2 id={S.tanimlar.id}>{S.tanimlar.label}</h2>
+      <p>
+        <strong>Kişisel Veri:</strong> Kimliğinizi belirli veya belirlenebilir kılan her türlü bilgi.
+      </p>
+      <p>
+        <strong>Veri Sorumlusu:</strong> Ekrem Yılmaz, Konya, Türkiye.
+      </p>
+      <p>
+        <strong>İmha:</strong> Kişisel verilerin silinmesi, yok edilmesi veya anonim hale getirilmesi.
+      </p>
+      <p>
+        <strong>Periyodik İmha:</strong> Kanun&apos;da yer alan kişisel veri işleme şartlarının tamamen ortadan
+        kalkması durumunda, tekrarlayan sürelerle resen gerçekleştirilen silme, yok etme veya anonimleştirme
+        işlemidir.
+      </p>
 
-              {section.content && (
-                <div className="text-sm leading-relaxed whitespace-pre-line" style={{ color: '#475569' }}>
-                  {section.content}
-                </div>
-              )}
-
-              {section.items && (
-                <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid #e2e8f0' }}>
-                  <table className="w-full min-w-[640px] text-sm">
-                    <thead>
-                      <tr style={{ background: '#f8fafc' }}>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#64748b' }}>Kategori</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#64748b' }}>Veri Tipleri</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#64748b' }}>Saklama Suresi</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#64748b' }}>Hukuki Dayanak</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {section.items.map((item, i) => (
-                        <tr key={i} style={{ borderTop: '1px solid #e2e8f0' }}>
-                          <td className="px-4 py-3 font-medium text-xs" style={{ color: '#0f172a' }}>{item.category}</td>
-                          <td className="px-4 py-3 text-xs" style={{ color: '#475569' }}>{item.data}</td>
-                          <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#0d9668' }}>{item.period}</td>
-                          <td className="px-4 py-3 text-xs" style={{ color: '#64748b' }}>{item.basis}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+      <h2 id={S.sureler.id}>{S.sureler.label}</h2>
+      <div className="s-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Kategori</th>
+              <th scope="col">Veri Tipleri</th>
+              <th scope="col">Saklama Süresi</th>
+              <th scope="col">Hukuki Dayanak</th>
+            </tr>
+          </thead>
+          <tbody>
+            {RETENTION_ROWS.map((row) => (
+              <tr key={row.category}>
+                <th scope="row">{row.category}</th>
+                <td>{row.data}</td>
+                <td>
+                  <strong>{row.period}</strong>
+                </td>
+                <td>{row.basis}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </div>
+
+      <h2 id={S.yontemler.id}>{S.yontemler.label}</h2>
+      <p>
+        <strong>Silme:</strong> Kişisel veriler, ilgili kullanıcıların erişemeyeceği şekilde dijital ortamdan
+        kaldırılır. Veritabanında ilgili satırlar silinir veya anonim hale getirilir.
+      </p>
+      <p>
+        <strong>Anonimleştirme:</strong> Kişisel veriler, başka verilerle eşleştirilse dahi hiçbir surette
+        kimliğinizi belirlenemez hale getirilir. Örneğin:
+      </p>
+      <ul>
+        <li>Ad/Soyad → &quot;Silinmiş Kullanıcı&quot;</li>
+        <li>E-posta → &quot;deleted_[uuid]@anonymized.local&quot;</li>
+        <li>TC Kimlik No → null (tamamen silme)</li>
+        <li>Telefon → null (tamamen silme)</li>
+      </ul>
+      <p>
+        <strong>Yok Etme:</strong> Fiziksel ortamlarda (yedek medya vb.) geri döndürülemez şekilde imha. Dijital
+        ortamda üzerine yazma veya şifreleme anahtarının imhası.
+      </p>
+
+      <h2 id={S.periyodik.id}>{S.periyodik.label}</h2>
+      <p>
+        Saklama süresi dolan kişisel veriler, <strong>her 6 ayda bir</strong> resen kontrol edilir ve imha
+        edilir. Periyodik imha takvimleri:
+      </p>
+      <ul>
+        <li>
+          <strong>Ocak (ilk iş günü):</strong> Temmuz-Aralık dönemi sona eren veriler
+        </li>
+        <li>
+          <strong>Temmuz (ilk iş günü):</strong> Ocak-Haziran dönemi sona eren veriler
+        </li>
+      </ul>
+      <p>İmha işlemleri kayıt altına alınır ve 3 yıl saklanır.</p>
+
+      <h2 id={S.talep.id}>{S.talep.label}</h2>
+      <p>
+        KVKK Madde 11 uyarınca, kişisel verilerinizin silinmesini, yok edilmesini veya anonim hale
+        getirilmesini talep edebilirsiniz.
+      </p>
+      <p>
+        <strong>Başvuru Yolları:</strong>
+      </p>
+      <ul>
+        <li>Platform içerisinden: Staff Paneli → Kişisel Verilerim (KVKK) → Yeni Talep</li>
+        <li>
+          E-posta: <a href={`mailto:${KVKK_EMAIL}`}>{KVKK_EMAIL}</a>
+        </li>
+        <li>Posta: Ekrem Yılmaz, Konya, Türkiye</li>
+      </ul>
+      <p>
+        <strong>Yasal Süre:</strong> Talebiniz en geç <strong>30 gün</strong> içinde sonuçlandırılır. İşlem ücret
+        gerektiriyorsa (Kurul tarifesi), bilgilendirilirsiniz.
+      </p>
+      <p>
+        <strong>İstisnalar:</strong> Kanuni saklama yükümlülüğü devam eden veriler (sağlık eğitim kayıtları: 10
+        yıl), talep üzerine silinemez ancak erişim kısıtlanır.
+      </p>
+
+      <h2 id={S.guvenlik.id}>{S.guvenlik.label}</h2>
+      <ul>
+        <li>Tüm veriler aktarımda TLS/SSL şifreleme ile korunur</li>
+        <li>Veritabanı erişimi rol tabanlı yetkilendirme (RLS) ile kısıtlanır</li>
+        <li>Yedekleme verileri AES-256-GCM şifreleme ile korunur</li>
+        <li>Erişim ve işlem kayıtları (audit log) tam izlenebilirlik sağlar</li>
+        <li>Multi-tenant mimari: Her organizasyon verisi birbirinden tamamen izole</li>
+      </ul>
+
+      <h2 id={S.guncelleme.id}>{S.guncelleme.label}</h2>
+      <p>
+        Bu politika, mevzuat değişiklikleri veya işleme faaliyetlerindeki değişiklikler doğrultusunda
+        güncellenebilir. Güncellemeler platform üzerinden ve/veya e-posta ile bildirilir.
+      </p>
+      <p>
+        <strong>Son Güncelleme:</strong> Temmuz 2026
+        <br />
+        <strong>İletişim:</strong> <a href={`mailto:${KVKK_EMAIL}`}>{KVKK_EMAIL}</a>
+      </p>
+    </LegalPage>
   )
 }

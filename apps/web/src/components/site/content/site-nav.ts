@@ -16,8 +16,8 @@ export const SITE_NAV: Record<SiteLocale, SiteLink[]> = {
   tr: [
     { href: '/#nasil-calisir', label: 'Nasıl çalışır' },
     { href: '/#denetim', label: 'Denetim' },
-    { href: '/#guvenlik', label: 'Güvenlik' },
-    { href: '/#sss', label: 'SSS' },
+    { href: '/guvenlik', label: 'Güvenlik' },
+    { href: '/sss', label: 'SSS' },
     { href: '/hakkimizda', label: 'Hakkımızda' },
   ],
   en: [
@@ -38,14 +38,15 @@ export const SITE_COPY = {
     skip: 'İçeriğe geç',
     footerTagline: 'Hastaneler için personel eğitim ve sınav platformu.',
     founded: 'Kuruluş',
+    cookieSettings: 'Çerez tercihleri',
     columns: [
       {
         title: 'Ürün',
         links: [
           { href: '/#nasil-calisir', label: 'Nasıl çalışır' },
           { href: '/#denetim', label: 'Denetim belgeleri' },
-          { href: '/#guvenlik', label: 'Güvenlik' },
-          { href: '/#sss', label: 'Sık sorulan sorular' },
+          { href: '/guvenlik', label: 'Güvenlik' },
+          { href: '/sss', label: 'Sık sorulan sorular' },
         ],
       },
       {
@@ -53,7 +54,7 @@ export const SITE_COPY = {
         links: [
           { href: '/hakkimizda', label: 'Hakkımızda' },
           { href: '/demo', label: 'Demo talebi' },
-          { href: '/contact', label: 'İletişim' },
+          { href: '/iletisim', label: 'İletişim' },
         ],
       },
       {
@@ -77,6 +78,7 @@ export const SITE_COPY = {
     skip: 'Skip to content',
     footerTagline: 'Staff training and exam platform for hospitals.',
     founded: 'Founded',
+    cookieSettings: 'Cookie settings',
     columns: [
       {
         title: 'Product',

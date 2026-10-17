@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { BRAND } from '@/lib/brand'
 import { BrandMark } from './brand-mark'
 import { StoreBadges } from './store-badges'
+import { CookieSettingsButton } from './cookie-settings-button'
 import { SITE_COPY, type SiteLocale } from './content/site-nav'
 
 /**
@@ -54,6 +55,8 @@ export function SiteFooter({ locale = 'tr' }: { locale?: SiteLocale }) {
               </a>
             </>
           )}
+          {' · '}
+          <CookieSettingsButton label={copy.cookieSettings} />
         </span>
       </div>
     </footer>

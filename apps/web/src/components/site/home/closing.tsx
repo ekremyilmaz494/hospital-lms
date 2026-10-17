@@ -20,7 +20,7 @@ export function Closing() {
             <Link href="/demo" className="s-btn s-btn-primary">
               {c.primaryCta}
             </Link>
-            <Link href="/contact" className="s-btn s-btn-ghost">
+            <Link href="/iletisim" className="s-btn s-btn-ghost">
               {c.secondaryCta}
             </Link>
           </div>

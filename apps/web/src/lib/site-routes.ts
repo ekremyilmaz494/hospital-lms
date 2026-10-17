@@ -27,7 +27,9 @@ export const SITE_ROUTES: readonly SiteRoute[] = [
   { path: '/en', prefix: true, indexable: true },
   { path: '/hakkimizda', prefix: true, indexable: true },
   { path: '/demo', prefix: true, indexable: true },
-  { path: '/contact', prefix: true, indexable: true },
+  { path: '/iletisim', prefix: true, indexable: true },
+  { path: '/sss', prefix: true, indexable: true },
+  { path: '/guvenlik', prefix: true, indexable: true },
   { path: '/kvkk', prefix: true, indexable: true },
   { path: '/privacy', prefix: true, indexable: true },
   { path: '/terms', prefix: true, indexable: true },
@@ -36,6 +38,7 @@ export const SITE_ROUTES: readonly SiteRoute[] = [
 
   // ── Public ama indekslenmez ──
   { path: '/sectors', prefix: true, indexable: false },
+  { path: '/contact', prefix: true, indexable: false }, // 301 → /iletisim (next.config redirects)
   { path: '/pricing', prefix: true, indexable: false }, // route silindi; login'e değil temiz 404'e düşsün
   { path: '/register', prefix: true, indexable: false },
   { path: '/help', prefix: true, indexable: false },

@@ -15,7 +15,7 @@ export function Faq() {
             {c.title}
           </h2>
           <p className="s-lead">
-            Cevabını bulamadığınız bir soru mu var? <Link href="/contact">Bize yazın</Link>.
+            Cevabını bulamadığınız bir soru mu var? <Link href="/iletisim">Bize yazın</Link>.
           </p>
         </div>
         <div className="s-faq-list">

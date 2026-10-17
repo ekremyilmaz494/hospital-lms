@@ -1,25 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import {
-  Send,
-  CheckCircle,
-  Shield,
-  Clock,
-  Headphones,
-  Loader2,
-} from "lucide-react";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
-  }),
-};
+import { Loader2, Send } from "lucide-react";
+import { readAttribution } from "@/lib/attribution";
 
 const STAFF_OPTIONS = [
   "1-50",
@@ -40,6 +24,70 @@ type FormState = {
   message: string;
 };
 
+type RequiredField = Exclude<keyof FormState, "message">;
+type FieldErrors = Partial<Record<RequiredField, string>>;
+
+/** Formdaki sıra: ilk hatalı alana odak bu sıraya göre verilir. */
+const FIELD_ORDER: readonly RequiredField[] = [
+  "firstName",
+  "lastName",
+  "email",
+  "phone",
+  "organizationName",
+  "staffCount",
+];
+
+const FIELD_ID: Record<keyof FormState, string> = {
+  firstName: "demo-ad",
+  lastName: "demo-soyad",
+  email: "demo-eposta",
+  phone: "demo-telefon",
+  organizationName: "demo-kurum",
+  staffCount: "demo-personel",
+  message: "demo-mesaj",
+};
+
+const FIELD_MESSAGES: Record<RequiredField, { missing: string; invalid?: string }> = {
+  firstName: { missing: "Adınızı yazın." },
+  lastName: { missing: "Soyadınızı yazın." },
+  email: {
+    missing: "E-posta adresinizi yazın.",
+    invalid: "Geçerli bir e-posta adresi yazın, örneğin ad@kurum.com.",
+  },
+  phone: { missing: "Telefon numaranızı yazın." },
+  organizationName: { missing: "Kurumunuzun adını yazın." },
+  staffCount: { missing: "Personel sayısını seçin." },
+};
+
+const SUMMARY_INVALID = "Talebiniz gönderilmedi. İşaretli alanları kontrol edin.";
+const ERROR_GENERIC = "Bir hata oluştu. Lütfen tekrar deneyin.";
+const ERROR_NETWORK = "Bağlantı hatası. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.";
+const ERROR_RATE_LIMIT = "Çok fazla istek gönderdiniz. Lütfen bir saat sonra tekrar deneyin.";
+const HTTP_TOO_MANY_REQUESTS = 429;
+
+type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+
+function isRequiredField(name: string): name is RequiredField {
+  return (FIELD_ORDER as readonly string[]).includes(name);
+}
+
+/** Tarayıcının yerleşik kurallarını (required, type="email") okuyup Türkçe mesaja çevirir. */
+function fieldError(el: Control, name: RequiredField): string | undefined {
+  if (el.validity.valueMissing) return FIELD_MESSAGES[name].missing;
+  if (el.validity.typeMismatch) return FIELD_MESSAGES[name].invalid ?? FIELD_MESSAGES[name].missing;
+  return undefined;
+}
+
+function controlOf(form: HTMLFormElement, name: RequiredField): Control | null {
+  const el = form.elements.namedItem(name);
+  return el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement
+    ? el
+    : null;
+}
+
+/** Demo talep formu (istemci yaprağı). Gövde olduğu gibi `/api/public/demo-request`'e gider. */
 export function DemoClient() {
   const [form, setForm] = useState<FormState>({
     firstName: "",
@@ -50,17 +98,49 @@ export function DemoClient() {
     staffCount: "",
     message: "",
   });
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const successRef = useRef<HTMLHeadingElement>(null);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  useEffect(() => {
+    if (submitted) successRef.current?.focus();
+  }, [submitted]);
+
+  function handleChange(e: React.ChangeEvent<Control>) {
+    const { name } = e.target;
+    const target = e.target;
+    setForm((prev) => ({ ...prev, [name]: target.value }));
     setError(null);
+    // Hata gösterilen alan düzeltildikçe mesaj güncellenir; yeni hata erken gösterilmez.
+    if (isRequiredField(name) && fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: fieldError(target, name) }));
+    }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const formEl = e.currentTarget;
+
+    const nextErrors: FieldErrors = {};
+    let firstInvalid: Control | null = null;
+    for (const name of FIELD_ORDER) {
+      const el = controlOf(formEl, name);
+      if (!el) continue;
+      const message = fieldError(el, name);
+      if (message) {
+        nextErrors[name] = message;
+        firstInvalid ??= el;
+      }
+    }
+    setFieldErrors(nextErrors);
+    if (firstInvalid) {
+      setError(SUMMARY_INVALID);
+      firstInvalid.focus();
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -68,314 +148,252 @@ export function DemoClient() {
       const res = await fetch("/api/public/demo-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, attribution: readAttribution() }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Bir hata olustu. Lutfen tekrar deneyin.");
+        setError(
+          res.status === HTTP_TOO_MANY_REQUESTS ? ERROR_RATE_LIMIT : data.error || ERROR_GENERIC,
+        );
         return;
       }
 
       setSubmitted(true);
     } catch {
-      setError("Baglanti hatasi. Lutfen internet baglantinizi kontrol edip tekrar deneyin.");
+      setError(ERROR_NETWORK);
     } finally {
       setLoading(false);
     }
   }
 
-  if (submitted) {
-    return (
-      <div className="py-20 lg:py-28">
-        <div className="max-w-lg mx-auto px-6 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ backgroundColor: "rgba(13,150,104,0.1)" }}
-            >
-              <CheckCircle className="w-8 h-8" style={{ color: "#0d9668" }} />
-            </div>
-            <h2 className="text-2xl font-black mb-3" style={{ color: "var(--color-text-primary)" }}>
-              Talebiniz Alindi!
-            </h2>
-            <p className="text-base leading-relaxed mb-8" style={{ color: "var(--color-text-secondary)" }}>
-              Demo talebiniz basariyla iletildi. Ekibimiz en kisa surede sizinle iletisime gececektir.
-            </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
-              style={{ backgroundColor: "#0d9668" }}
-            >
-              Ana Sayfaya Don
-            </Link>
-          </motion.div>
-        </div>
-      </div>
-    );
+  function a11y(name: RequiredField) {
+    const invalid = Boolean(fieldErrors[name]);
+    return {
+      "aria-invalid": invalid ? true : undefined,
+      "aria-describedby": invalid ? `${FIELD_ID[name]}-hata` : undefined,
+    } as const;
   }
 
+  function errorFor(name: RequiredField) {
+    const message = fieldErrors[name];
+    return message ? (
+      <p id={`${FIELD_ID[name]}-hata`} className="s-field-error">
+        {message}
+      </p>
+    ) : null;
+  }
+
+  const requiredMark = (
+    <span className="s-required" aria-hidden="true">
+      *
+    </span>
+  );
+
   return (
-    <div className="py-16 lg:py-24">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid lg:grid-cols-5 gap-12 lg:gap-16">
-          {/* Left info */}
-          <div className="lg:col-span-2">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{ visible: { transition: { staggerChildren: 0.08 } } }}
-            >
-              <motion.p
-                variants={fadeUp}
-                custom={0}
-                className="text-xs font-bold tracking-widest uppercase mb-3"
-                style={{ color: "#0d9668" }}
-              >
-                Demo Talep Et
-              </motion.p>
-              <motion.h1
-                variants={fadeUp}
-                custom={1}
-                className="text-3xl lg:text-4xl font-black mb-4"
-                style={{ color: "var(--color-text-primary)" }}
-              >
-                Platformu Deneyin
-              </motion.h1>
-              <motion.p
-                variants={fadeUp}
-                custom={2}
-                className="text-base leading-relaxed mb-10"
-                style={{ color: "var(--color-text-secondary)" }}
-              >
-                Formu doldurun, ekibimiz size ozel bir demo sunumu ayarlasin.
-                14 gunluk ucretsiz deneme erisimi de saglayacagiz.
-              </motion.p>
-
-              <motion.div variants={fadeUp} custom={3} className="space-y-5">
-                {[
-                  { icon: Clock, title: "30 Dakika Demo", desc: "Size ozel canli demo sunumu" },
-                  { icon: Shield, title: "Baglayici Degil", desc: "Herhangi bir taahhut gerektirmez" },
-                  { icon: Headphones, title: "Uzman Destek", desc: "Demo sonrasi teknik destek" },
-                ].map(({ icon: Icon, title, desc }) => (
-                  <div key={title} className="flex items-start gap-3">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: "rgba(13,150,104,0.08)" }}
-                    >
-                      <Icon className="w-5 h-5" style={{ color: "#0d9668" }} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>{title}</p>
-                      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
-            </motion.div>
+    <div className="s-card s-formpage-card">
+      {/* Başarı mesajı canlı bölgede: ekran okuyucu duyurur, odak başlığa taşınır. */}
+      <div aria-live="polite">
+        {submitted && (
+          <div className="s-formpage-success">
+            <h2 ref={successRef} tabIndex={-1} className="s-h2">
+              Talebiniz alındı
+            </h2>
+            <p>Demo talebiniz iletildi. Ekibimiz en kısa sürede sizinle iletişime geçecek.</p>
+            <Link href="/" className="s-btn s-btn-ghost">
+              Ana sayfaya dön
+            </Link>
           </div>
-
-          {/* Right form */}
-          <div className="lg:col-span-3">
-            <motion.form
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.15 }}
-              onSubmit={handleSubmit}
-              className="rounded-2xl border p-6 sm:p-8"
-              style={{
-                backgroundColor: "var(--color-surface)",
-                borderColor: "var(--color-border)",
-              }}
-            >
-              <div className="grid sm:grid-cols-2 gap-5 mb-5">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    Ad <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    required
-                    value={form.firstName}
-                    onChange={handleChange}
-                    placeholder="Adiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: "var(--color-text-primary)",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    Soyad <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    required
-                    value={form.lastName}
-                    onChange={handleChange}
-                    placeholder="Soyadiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: "var(--color-text-primary)",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-5 mb-5">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    E-posta <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={form.email}
-                    onChange={handleChange}
-                    placeholder="ornek@kurum.com"
-                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: "var(--color-text-primary)",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    Telefon <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    required
-                    value={form.phone}
-                    onChange={handleChange}
-                    placeholder="+90 5XX XXX XX XX"
-                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: "var(--color-text-primary)",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-5 mb-5">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    Organizasyon Adi <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="organizationName"
-                    required
-                    value={form.organizationName}
-                    onChange={handleChange}
-                    placeholder="Organizasyon adiniz"
-                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: "var(--color-text-primary)",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                    Personel Sayisi <span style={{ color: "#dc2626" }}>*</span>
-                  </label>
-                  <select
-                    name="staffCount"
-                    required
-                    value={form.staffCount}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668]"
-                    style={{
-                      borderColor: "var(--color-border)",
-                      backgroundColor: "var(--color-bg)",
-                      color: form.staffCount ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                    }}
-                  >
-                    <option value="">Seciniz</option>
-                    {STAFF_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text-primary)" }}>
-                  Mesaj (Opsiyonel)
-                </label>
-                <textarea
-                  name="message"
-                  rows={4}
-                  value={form.message}
-                  onChange={handleChange}
-                  placeholder="Ozel gereksinimleriniz veya sorulariniz varsa yazabilirsiniz..."
-                  className="w-full px-4 py-3 rounded-xl border text-base sm:text-sm outline-none transition-colors focus:border-[#0d9668] resize-none"
-                  style={{
-                    borderColor: "var(--color-border)",
-                    backgroundColor: "var(--color-bg)",
-                    color: "var(--color-text-primary)",
-                  }}
-                />
-              </div>
-
-              {error && (
-                <div
-                  className="rounded-xl px-4 py-3 text-sm mb-5"
-                  style={{ backgroundColor: "rgba(220,38,38,0.08)", color: "#dc2626" }}
-                >
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.02] disabled:opacity-60 disabled:hover:scale-100 cursor-pointer"
-                style={{
-                  backgroundColor: "#0d9668",
-                  boxShadow: "0 8px 24px rgba(13,150,104,0.25)",
-                }}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Gonderiliyor...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Demo Talep Et
-                  </>
-                )}
-              </button>
-
-              <p className="text-xs text-center mt-4" style={{ color: "var(--color-text-muted)" }}>
-                Bilgileriniz KVKK kapsaminda korunmaktadir ve ucuncu taraflarla paylasilmaz.
-              </p>
-            </motion.form>
-          </div>
-        </div>
+        )}
       </div>
+
+      {!submitted && (
+        <>
+          <h2 className="s-h2">Demo talep formu</h2>
+          <p className="s-formpage-intro">
+            {requiredMark} ile işaretli alanların doldurulması zorunludur.
+          </p>
+
+          <form
+            className="s-form"
+            onSubmit={handleSubmit}
+            noValidate
+            aria-describedby={error ? "demo-ozet" : undefined}
+          >
+            {error && (
+              <div id="demo-ozet" role="alert" className="s-form-alert s-form-alert-error">
+                {error}
+              </div>
+            )}
+
+            <div className="s-form-row">
+              <div className="s-field">
+                <label className="s-label" htmlFor={FIELD_ID.firstName}>
+                  Ad {requiredMark}
+                </label>
+                <input
+                  id={FIELD_ID.firstName}
+                  className="s-input"
+                  type="text"
+                  name="firstName"
+                  autoComplete="given-name"
+                  required
+                  value={form.firstName}
+                  onChange={handleChange}
+                  placeholder="Adınız"
+                  {...a11y("firstName")}
+                />
+                {errorFor("firstName")}
+              </div>
+              <div className="s-field">
+                <label className="s-label" htmlFor={FIELD_ID.lastName}>
+                  Soyad {requiredMark}
+                </label>
+                <input
+                  id={FIELD_ID.lastName}
+                  className="s-input"
+                  type="text"
+                  name="lastName"
+                  autoComplete="family-name"
+                  required
+                  value={form.lastName}
+                  onChange={handleChange}
+                  placeholder="Soyadınız"
+                  {...a11y("lastName")}
+                />
+                {errorFor("lastName")}
+              </div>
+            </div>
+
+            <div className="s-form-row">
+              <div className="s-field">
+                <label className="s-label" htmlFor={FIELD_ID.email}>
+                  E-posta {requiredMark}
+                </label>
+                <input
+                  id={FIELD_ID.email}
+                  className="s-input"
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  required
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="ornek@kurum.com"
+                  {...a11y("email")}
+                />
+                {errorFor("email")}
+              </div>
+              <div className="s-field">
+                <label className="s-label" htmlFor={FIELD_ID.phone}>
+                  Telefon {requiredMark}
+                </label>
+                <input
+                  id={FIELD_ID.phone}
+                  className="s-input"
+                  type="tel"
+                  name="phone"
+                  autoComplete="tel"
+                  required
+                  value={form.phone}
+                  onChange={handleChange}
+                  placeholder="+90 5XX XXX XX XX"
+                  {...a11y("phone")}
+                />
+                {errorFor("phone")}
+              </div>
+            </div>
+
+            <div className="s-form-row">
+              <div className="s-field">
+                <label className="s-label" htmlFor={FIELD_ID.organizationName}>
+                  Kurum adı {requiredMark}
+                </label>
+                <input
+                  id={FIELD_ID.organizationName}
+                  className="s-input"
+                  type="text"
+                  name="organizationName"
+                  autoComplete="organization"
+                  required
+                  value={form.organizationName}
+                  onChange={handleChange}
+                  placeholder="Hastane veya kurum adı"
+                  {...a11y("organizationName")}
+                />
+                {errorFor("organizationName")}
+              </div>
+              <div className="s-field">
+                <label className="s-label" htmlFor={FIELD_ID.staffCount}>
+                  Personel sayısı {requiredMark}
+                </label>
+                <select
+                  id={FIELD_ID.staffCount}
+                  className="s-select"
+                  name="staffCount"
+                  required
+                  value={form.staffCount}
+                  onChange={handleChange}
+                  {...a11y("staffCount")}
+                >
+                  <option value="">Seçin</option>
+                  {STAFF_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                {errorFor("staffCount")}
+              </div>
+            </div>
+
+            <div className="s-field">
+              <label className="s-label" htmlFor={FIELD_ID.message}>
+                Mesaj <span className="s-label-opt">(isteğe bağlı)</span>
+              </label>
+              <textarea
+                id={FIELD_ID.message}
+                className="s-textarea"
+                name="message"
+                rows={4}
+                value={form.message}
+                onChange={handleChange}
+                placeholder="Özel gereksinimlerinizi veya sorularınızı yazabilirsiniz"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="s-btn s-btn-primary s-formpage-submit"
+              disabled={loading}
+              aria-busy={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+                  Gönderiliyor
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" aria-hidden="true" />
+                  Demo talep edin
+                </>
+              )}
+            </button>
+
+            <p className="s-formpage-note">
+              Formdaki bilgileri demo talebinizle ilgili sizinle iletişim kurmak amacıyla işleriz.
+              Kişisel verilerinizle ilgili haklarınız{" "}
+              <Link href="/kvkk" className="s-formpage-link">
+                KVKK Aydınlatma Metni
+              </Link>
+              &apos;nde açıklanır.
+            </p>
+          </form>
+        </>
+      )}
     </div>
   );
 }

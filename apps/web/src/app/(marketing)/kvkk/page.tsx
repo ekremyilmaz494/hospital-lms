@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/site-metadata'
-import Link from 'next/link'
-import { ArrowLeft, Shield, Database, Share2, Clock, UserCheck, Mail, Scale } from 'lucide-react'
-import { BlurFade } from '@/components/ui/blur-fade'
+import { LegalPage, type LegalSection } from '@/components/site/legal-page'
 
 export const metadata: Metadata = pageMetadata({
   title: 'KVKK Aydınlatma Metni',
@@ -11,240 +9,145 @@ export const metadata: Metadata = pageMetadata({
   path: '/kvkk',
 })
 
-// KlinoVax palette (admin chrome tokens)
-const INK = '#1c1917'        // --k-text-primary (warm dark)
-const INK_SOFT = '#78716c'   // --k-text-muted (warm gray)
-const CREAM = '#fafaf9'      // --k-bg (warm gray)
-const RULE = '#e7e5e4'       // --k-border (warm gray)
-const ACCENT = '#0d9668'     // --k-primary (emerald-600)
+const KVKK_EMAIL = 'ekrem@klinovax.com'
 
-const sections = [
-  {
-    icon: Shield,
-    title: '1. Veri Sorumlusu',
-    content:
-      'Bu platformu işleten Ekrem Yılmaz ("KlinoVax" veya "Veri Sorumlusu"), 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi bu metinde açıklanan amaçlarla ve kanuna uygun olarak işlemektedir.',
-  },
-  {
-    icon: UserCheck,
-    title: '2. Veri İşleyen Sıfatımız ve Sınırı',
-    content:
-      'KlinoVax, hizmet verdiği sağlık kuruluşlarının personeline ait verileri, ilgili kuruluşun talimatı doğrultusunda ve onun adına "veri işleyen" sıfatıyla işler; bu veriler bakımından "veri sorumlusu" ilgili sağlık kuruluşudur. KlinoVax bu verileri, kuruluşla yapılan veri işleme sözleşmesinde belirlenen amaçların dışında kullanmaz.',
-  },
-  {
-    icon: Database,
-    title: '3. Kişisel Verilerin İşlenme Amacı',
-    content:
-      'Kişisel verileriniz; personel eğitim süreçlerinin yönetilmesi, sınav ve değerlendirme faaliyetlerinin gerçekleştirilmesi, eğitim performansının raporlanması, yasal yükümlülüklerin yerine getirilmesi, sertifika düzenlenmesi, bilgi güvenliği süreçlerinin yürütülmesi ve iletişim faaliyetlerinin yönetilmesi amaçlarıyla işlenmektedir.',
-  },
-  {
-    icon: Scale,
-    title: '4. İşlemenin Hukuki Sebepleri',
-    content: 'Kişisel verileriniz aşağıdaki hukuki sebeplere dayanılarak işlenmektedir (KVKK md. 5/2):',
-    items: [
-      'md. 5/2-c — Sözleşmenin kurulması veya ifasıyla doğrudan ilgili olması (iş akdi gereği eğitim kayıtlarının tutulması)',
-      'md. 5/2-ç — Veri sorumlusunun hukuki yükümlülüğünü yerine getirebilmesi (Sağlık Bakanlığı zorunlu eğitim gereksinimleri)',
-      'md. 5/2-f — Veri sorumlusunun meşru menfaatleri için zorunlu olması (platform güvenliği, sistem yönetimi)',
-    ],
-  },
-  {
-    icon: UserCheck,
-    title: '5. İşlenen Kişisel Veriler',
-    items: [
-      'Ad ve Soyad',
-      'E-posta adresi',
-      'Departman ve unvan bilgisi',
-      'Sınav sonuçları ve başarı durumu',
-      'Video izleme kayıtları ve ilerleme bilgileri',
-      'Dijital imza görselleri (eğitim katılım/imza formu)',
-      'Oturum açma zaman damgaları ve IP adresi (audit log)',
-    ],
-  },
-  {
-    icon: Share2,
-    title: '6. Verilerin Aktarılması',
-    content:
-      'Kişisel verileriniz, hizmetin sunulabilmesi için yurt içi ve yurt dışı bulut/altyapı ve yazılım hizmeti sağlayıcıları ile yalnızca ilgili amaçla sınırlı olarak, KVKK m.8 ve m.9 kapsamında gerekli teknik ve idari tedbirler alınarak paylaşılabilir.',
-    footer:
-      'Yurt dışına veri aktarımı yalnızca KVKK m.9\'da öngörülen şartların (Kurulca ilan edilen yeterli korumaya sahip ülkelere aktarım, standart sözleşme, taahhütname veya açık rıza) sağlanması hâlinde gerçekleştirilir.',
-  },
-  {
-    icon: Clock,
-    title: '7. Veri Saklama Süresi',
-    content: 'Kişisel verileriniz aşağıdaki süreler boyunca saklanır:',
-    items: [
-      'Kimlik ve iletişim bilgileri (ad, e-posta): İş akdi sona ermesinden itibaren 10 yıl (BK md. 146)',
-      'Video izleme kayıtları ve sertifikalar: 5 yıl',
-      'IP adresi ve audit loglar: 2 yıl',
-    ],
-    footer:
-      'Saklama süresinin dolması veya işleme amacının ortadan kalkması halinde veriler silinir ya da anonim hale getirilir.',
-  },
-  {
-    icon: UserCheck,
-    title: '8. Veri Sahibinin Hakları',
-    content: 'KVKK\'nın 11. maddesi uyarınca aşağıdaki haklara sahipsiniz:',
-    items: [
-      'Kişisel verilerinizin işlenip işlenmediğini öğrenme',
-      'Kişisel verileriniz işlenmişse buna ilişkin bilgi talep etme',
-      'Kişisel verilerinizin işlenme amacını ve bunların amacına uygun kullanılıp kullanılmadığını öğrenme',
-      'Yurt içinde veya yurt dışında kişisel verilerinizin aktarıldığı üçüncü kişileri bilme',
-      'Kişisel verilerinizin eksik veya yanlış işlenmiş olması hâlinde bunların düzeltilmesini isteme',
-      'KVKK\'nın 7. maddesi kapsamında kişisel verilerinizin silinmesini veya yok edilmesini isteme',
-      'İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle aleyhinize bir sonucun ortaya çıkmasına itiraz etme',
-    ],
-  },
-  {
-    icon: Mail,
-    title: '9. Başvuru ve İletişim',
-    content:
-      'KVKK kapsamındaki haklarınızı kullanmak için aşağıdaki kanaldan başvurabilirsiniz. Başvurularınız en geç 30 (otuz) gün içinde sonuçlandırılır.',
-    footer: 'E-posta: ekrem@klinovax.com',
-  },
-]
+const S = {
+  sorumlu: { id: 'veri-sorumlusu', label: '1. Veri Sorumlusu' },
+  isleyen: { id: 'veri-isleyen', label: '2. Veri İşleyen Sıfatımız ve Sınırı' },
+  amac: { id: 'isleme-amaci', label: '3. Kişisel Verilerin İşlenme Amacı' },
+  sebepler: { id: 'hukuki-sebepler', label: '4. İşlemenin Hukuki Sebepleri' },
+  veriler: { id: 'islenen-veriler', label: '5. İşlenen Kişisel Veriler' },
+  aktarim: { id: 'veri-aktarimi', label: '6. Verilerin Aktarılması' },
+  saklama: { id: 'saklama-suresi', label: '7. Veri Saklama Süresi' },
+  haklar: { id: 'haklariniz', label: '8. Veri Sahibinin Hakları' },
+  basvuru: { id: 'basvuru-ve-iletisim', label: '9. Başvuru ve İletişim' },
+} as const satisfies Record<string, LegalSection>
+
+const SECTIONS: readonly LegalSection[] = Object.values(S)
+
+/** md. 5/2 bentleri: madde atfı kalın, açıklaması alt satırda. */
+const LEGAL_BASES = [
+  { ref: 'md. 5/2-c', text: 'Sözleşmenin kurulması veya ifasıyla doğrudan ilgili olması (iş akdi gereği eğitim kayıtlarının tutulması)' },
+  { ref: 'md. 5/2-ç', text: 'Veri sorumlusunun hukuki yükümlülüğünü yerine getirebilmesi (Sağlık Bakanlığı zorunlu eğitim gereksinimleri)' },
+  { ref: 'md. 5/2-f', text: 'Veri sorumlusunun meşru menfaatleri için zorunlu olması (platform güvenliği, sistem yönetimi)' },
+] as const
+
+const PROCESSED_DATA = [
+  'Ad ve Soyad',
+  'E-posta adresi',
+  'Departman ve unvan bilgisi',
+  'Sınav sonuçları ve başarı durumu',
+  'Video izleme kayıtları ve ilerleme bilgileri',
+  'Dijital imza görselleri (eğitim katılım/imza formu)',
+  'Oturum açma zaman damgaları ve IP adresi (audit log)',
+] as const
+
+const RETENTION = [
+  'Kimlik ve iletişim bilgileri (ad, e-posta): İş akdi sona ermesinden itibaren 10 yıl (BK md. 146)',
+  'Video izleme kayıtları ve sertifikalar: 5 yıl',
+  'IP adresi ve audit loglar: 2 yıl',
+] as const
+
+const RIGHTS = [
+  'Kişisel verilerinizin işlenip işlenmediğini öğrenme',
+  'Kişisel verileriniz işlenmişse buna ilişkin bilgi talep etme',
+  'Kişisel verilerinizin işlenme amacını ve bunların amacına uygun kullanılıp kullanılmadığını öğrenme',
+  'Yurt içinde veya yurt dışında kişisel verilerinizin aktarıldığı üçüncü kişileri bilme',
+  'Kişisel verilerinizin eksik veya yanlış işlenmiş olması hâlinde bunların düzeltilmesini isteme',
+  'KVKK\'nın 7. maddesi kapsamında kişisel verilerinizin silinmesini veya yok edilmesini isteme',
+  'İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle aleyhinize bir sonucun ortaya çıkmasına itiraz etme',
+] as const
 
 export default function KVKKPage() {
   return (
-    <div className="min-h-screen" style={{ background: CREAM }}>
-      {/* Header */}
-      <header
-        className="sticky top-0 z-30 border-b"
-        style={{
-          background: 'rgba(250, 250, 249, 0.85)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderColor: RULE,
-        }}
-      >
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm font-semibold transition-colors duration-150"
-            style={{ color: ACCENT }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Giriş Sayfasına Dön
-          </Link>
-          <div className="flex items-center gap-2.5">
-            <div
-              className="flex h-9 w-9 items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-                borderRadius: 10,
-                boxShadow: '0 6px 18px rgba(16, 185, 129, 0.32), inset 0 1px 0 rgba(255,255,255,0.3)',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-editorial), Georgia, serif",
-                  fontStyle: 'italic', fontWeight: 700, fontSize: 18,
-                  color: '#ffffff', lineHeight: 1, transform: 'translateY(1px)',
-                }}
-              >
-                K
-              </span>
-            </div>
-            <span
-              style={{
-                fontFamily: "var(--font-editorial), Georgia, serif",
-                fontStyle: 'italic', fontWeight: 500, fontSize: 18,
-                color: INK, letterSpacing: '-0.01em',
-              }}
-            >
-              KlinoVax
-            </span>
-          </div>
-        </div>
-      </header>
+    <LegalPage breadcrumbPath="/kvkk"
+      title="KVKK Aydınlatma Metni"
+      lead="Kişisel Verilerin Korunması Kanunu kapsamında veri işleme faaliyetlerimize ilişkin aydınlatma metni."
+      updated="Temmuz 2026"
+      sections={SECTIONS}
+    >
+      <h2 id={S.sorumlu.id}>{S.sorumlu.label}</h2>
+      <p>
+        Bu platformu işleten Ekrem Yılmaz (&quot;KlinoVax&quot; veya &quot;Veri Sorumlusu&quot;), 6698 sayılı Kişisel
+        Verilerin Korunması Kanunu (&quot;KVKK&quot;) kapsamında veri sorumlusu sıfatıyla kişisel verilerinizi bu
+        metinde açıklanan amaçlarla ve kanuna uygun olarak işlemektedir.
+      </p>
 
-      {/* Content */}
-      <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-12">
-        <BlurFade delay={0.1}>
-          <div className="mb-10">
-            <div
-              className="mb-4 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold"
-              style={{
-                background: 'rgba(13, 150, 104, 0.1)',
-                color: ACCENT,
-                border: `1px solid ${RULE}`,
-              }}
-            >
-              <Shield className="h-3.5 w-3.5" />
-              6698 Sayılı Kanun
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" style={{ color: INK }}>
-              KVKK Aydınlatma Metni
-            </h1>
-            <p className="text-sm leading-relaxed" style={{ color: INK_SOFT }}>
-              Kişisel Verilerin Korunması Kanunu kapsamında veri işleme faaliyetlerimize ilişkin aydınlatma metni.
-            </p>
-          </div>
-        </BlurFade>
+      <h2 id={S.isleyen.id}>{S.isleyen.label}</h2>
+      <p>
+        KlinoVax, hizmet verdiği sağlık kuruluşlarının personeline ait verileri, ilgili kuruluşun talimatı
+        doğrultusunda ve onun adına &quot;veri işleyen&quot; sıfatıyla işler; bu veriler bakımından &quot;veri
+        sorumlusu&quot; ilgili sağlık kuruluşudur. KlinoVax bu verileri, kuruluşla yapılan veri işleme
+        sözleşmesinde belirlenen amaçların dışında kullanmaz.
+      </p>
 
-        <div className="space-y-8">
-          {sections.map((section, i) => (
-            <BlurFade key={section.title} delay={0.15 + i * 0.05}>
-              <section
-                className="rounded-2xl p-5 sm:p-6 bg-white"
-                style={{
-                  border: `1px solid ${RULE}`,
-                  boxShadow: '0 1px 3px rgba(28, 25, 23, 0.04)',
-                }}
-              >
-                <div className="mb-4 flex items-center gap-3">
-                  <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: 'rgba(13, 150, 104, 0.1)' }}
-                  >
-                    <section.icon className="h-4.5 w-4.5" style={{ color: ACCENT }} />
-                  </div>
-                  <h2 className="text-lg font-bold tracking-tight" style={{ color: INK }}>{section.title}</h2>
-                </div>
+      <h2 id={S.amac.id}>{S.amac.label}</h2>
+      <p>
+        Kişisel verileriniz; personel eğitim süreçlerinin yönetilmesi, sınav ve değerlendirme faaliyetlerinin
+        gerçekleştirilmesi, eğitim performansının raporlanması, yasal yükümlülüklerin yerine getirilmesi,
+        sertifika düzenlenmesi, bilgi güvenliği süreçlerinin yürütülmesi ve iletişim faaliyetlerinin yönetilmesi
+        amaçlarıyla işlenmektedir.
+      </p>
 
-                {section.content && (
-                  <p
-                    className="text-sm leading-relaxed mb-3"
-                    style={{ color: INK_SOFT }}
-                  >
-                    {section.content}
-                  </p>
-                )}
+      <h2 id={S.sebepler.id}>{S.sebepler.label}</h2>
+      <p>Kişisel verileriniz aşağıdaki hukuki sebeplere dayanılarak işlenmektedir (KVKK md. 5/2):</p>
+      <ul>
+        {LEGAL_BASES.map((b) => (
+          <li key={b.ref}>
+            <strong>{b.ref}</strong>
+            <br />
+            {b.text}
+          </li>
+        ))}
+      </ul>
 
-                {section.items && (
-                  <ul className="space-y-2 ml-1">
-                    {section.items.map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: INK_SOFT }}>
-                        <span
-                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ background: ACCENT }}
-                        />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+      <h2 id={S.veriler.id}>{S.veriler.label}</h2>
+      <ul>
+        {PROCESSED_DATA.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
 
-                {section.footer && (
-                  <p
-                    className="mt-4 text-sm font-medium"
-                    style={{ color: INK }}
-                  >
-                    {section.footer}
-                  </p>
-                )}
-              </section>
-            </BlurFade>
-          ))}
-        </div>
+      <h2 id={S.aktarim.id}>{S.aktarim.label}</h2>
+      <p>
+        Kişisel verileriniz, hizmetin sunulabilmesi için yurt içi ve yurt dışı bulut/altyapı ve yazılım hizmeti
+        sağlayıcıları ile yalnızca ilgili amaçla sınırlı olarak, KVKK m.8 ve m.9 kapsamında gerekli teknik ve
+        idari tedbirler alınarak paylaşılabilir.
+      </p>
+      <p>
+        Yurt dışına veri aktarımı yalnızca KVKK m.9&apos;da öngörülen şartların (Kurulca ilan edilen yeterli
+        korumaya sahip ülkelere aktarım, standart sözleşme, taahhütname veya açık rıza) sağlanması hâlinde
+        gerçekleştirilir.
+      </p>
 
-        <BlurFade delay={0.6}>
-          <div className="mt-12 text-center">
-            <p className="text-xs" style={{ color: INK_SOFT }}>
-              Son güncelleme: Temmuz 2026 &middot; &copy; 2026 KlinoVax
-            </p>
-          </div>
-        </BlurFade>
-      </main>
-    </div>
+      <h2 id={S.saklama.id}>{S.saklama.label}</h2>
+      <p>Kişisel verileriniz aşağıdaki süreler boyunca saklanır:</p>
+      <ul>
+        {RETENTION.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+      <p>
+        Saklama süresinin dolması veya işleme amacının ortadan kalkması halinde veriler silinir ya da anonim
+        hale getirilir.
+      </p>
+
+      <h2 id={S.haklar.id}>{S.haklar.label}</h2>
+      <p>KVKK&apos;nın 11. maddesi uyarınca aşağıdaki haklara sahipsiniz:</p>
+      <ul>
+        {RIGHTS.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+
+      <h2 id={S.basvuru.id}>{S.basvuru.label}</h2>
+      <p>
+        KVKK kapsamındaki haklarınızı kullanmak için aşağıdaki kanaldan başvurabilirsiniz. Başvurularınız en
+        geç 30 (otuz) gün içinde sonuçlandırılır.
+      </p>
+      <p>
+        E-posta: <a href={`mailto:${KVKK_EMAIL}`}>{KVKK_EMAIL}</a>
+      </p>
+    </LegalPage>
   )
 }

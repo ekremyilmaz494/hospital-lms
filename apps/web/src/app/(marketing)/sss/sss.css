@@ -1,0 +1,10 @@
+/* ── /sss ────────────────────────────────────────────────────────────────
+   Konu grupları: sol yapışkan içindekiler (.s-legal + .s-toc), sağda gruplar.
+   Soru öğeleri site.css'teki .s-faq-item sınıflarından gelir. Yalnız --site-* token'ları. */
+.sss-groups { min-width: 0; }
+.sss-group + .sss-group { margin-top: clamp(48px, 6vw, 72px); }
+.sss-group-title {
+  margin-bottom: 20px;
+  font-size: clamp(1.5rem, 2.4vw, 1.875rem);
+}
+.sss-closing { margin-top: clamp(64px, 8vw, 104px); }

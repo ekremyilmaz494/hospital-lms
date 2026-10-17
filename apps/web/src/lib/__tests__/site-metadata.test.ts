@@ -36,14 +36,16 @@ describe('yayındaki sayfa metadata sınırları', async () => {
   const pages = {
     '/': await import('@/app/page'),
     '/en': await import('@/app/en/page'),
-    '/hakkimizda': await import('@/app/hakkimizda/page'),
+    '/hakkimizda': await import('@/app/(marketing)/hakkimizda/page'),
     '/demo': await import('@/app/(marketing)/demo/page'),
-    '/contact': await import('@/app/(marketing)/contact/page'),
+    '/iletisim': await import('@/app/(marketing)/iletisim/page'),
+    '/sss': await import('@/app/(marketing)/sss/page'),
+    '/guvenlik': await import('@/app/(marketing)/guvenlik/page'),
     '/privacy': await import('@/app/(marketing)/privacy/page'),
     '/terms': await import('@/app/(marketing)/terms/page'),
     '/data-retention': await import('@/app/(marketing)/data-retention/page'),
-    '/kvkk': await import('@/app/kvkk/page'),
-    '/cerez-politikasi': await import('@/app/cerez-politikasi/page'),
+    '/kvkk': await import('@/app/(marketing)/kvkk/page'),
+    '/cerez-politikasi': await import('@/app/(marketing)/cerez-politikasi/page'),
   }
 
   it('indekslenen her sayfanın metadata testi var', () => {
