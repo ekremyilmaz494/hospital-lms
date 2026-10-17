@@ -1,4 +1,5 @@
 import { BRAND } from '@/lib/brand';
+import type { LandingLocale } from './locale';
 
 /**
  * App Store + Google Play indirme rozetleri (resmî düzen: siyah hap + logo +
@@ -6,13 +7,16 @@ import { BRAND } from '@/lib/brand';
  * Landing hero, §5 mobil bölümü ve footer paylaşır. Stiller: landing-3d.css (.l3d-store-*).
  *
  * @param variant  'default' (büyük, hero/section) | 'compact' (footer)
+ * @param locale   erişilebilir ad (aria-label) dili; varsayılan 'tr'
  */
 export function StoreBadges({
   variant = 'default',
   className,
+  locale = 'tr',
 }: {
   variant?: 'default' | 'compact';
   className?: string;
+  locale?: LandingLocale;
 }) {
   const cls = ['l3d-store-badges', variant === 'compact' ? 'l3d-store-badges-compact' : '', className]
     .filter(Boolean)
@@ -25,7 +29,11 @@ export function StoreBadges({
         target="_blank"
         rel="noopener noreferrer"
         className="l3d-store-badge l3d-store-badge-apple"
-        aria-label={`${BRAND.name} iOS uygulamasını App Store'dan indir`}
+        aria-label={
+          locale === 'en'
+            ? `Download the ${BRAND.name} iOS app on the App Store`
+            : `${BRAND.name} iOS uygulamasını App Store'dan indir`
+        }
       >
         <AppleLogo />
         <span className="l3d-store-badge-text">
@@ -39,7 +47,11 @@ export function StoreBadges({
         target="_blank"
         rel="noopener noreferrer"
         className="l3d-store-badge l3d-store-badge-gplay"
-        aria-label={`${BRAND.name} Android uygulamasını Google Play'den indir`}
+        aria-label={
+          locale === 'en'
+            ? `Get the ${BRAND.name} Android app on Google Play`
+            : `${BRAND.name} Android uygulamasını Google Play'den indir`
+        }
       >
         <GooglePlayLogo />
         <span className="l3d-store-badge-text">

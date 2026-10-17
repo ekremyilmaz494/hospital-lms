@@ -8,23 +8,112 @@ export interface LandingNavItem {
   href: string;
   label: string;
   desc: string;
-  icon: 'training' | 'proof' | 'about' | 'contact';
+  icon: 'training' | 'proof' | 'about' | 'contact' | 'flow' | 'security' | 'faq';
+  /** 'both': masaüstü header + mobil drawer · 'drawer': yalnız mobil drawer. */
+  placement: 'both' | 'drawer';
+  /** 'secondary': dar masaüstünde (1025-1180px) header'dan gizlenir; header sığsın diye. */
+  priority?: 'secondary';
 }
 
 export const LANDING_HOME: Record<LandingLocale, string> = { tr: '/', en: '/en' };
 
 export const LANDING_NAV: Record<LandingLocale, LandingNavItem[]> = {
   tr: [
-    { href: '/#egitim', label: 'Eğitim', desc: 'Eğitim & sınav yönetimi', icon: 'training' },
-    { href: '/#kanit', label: 'Kanıt', desc: 'Sertifika & denetim raporu', icon: 'proof' },
-    { href: '/hakkimizda', label: 'Hakkımızda', desc: 'Biz kimiz, kurucu', icon: 'about' },
-    { href: '/contact', label: 'İletişim', desc: 'Bize ulaşın', icon: 'contact' },
+    {
+      href: '/#egitim',
+      label: 'Eğitim',
+      desc: 'Eğitim ve sınav yönetimi',
+      icon: 'training',
+      placement: 'both',
+    },
+    {
+      href: '/#kanit',
+      label: 'Uyum',
+      desc: 'Rapor, SKS belgesi, sertifika',
+      icon: 'proof',
+      placement: 'both',
+    },
+    {
+      href: '/#nasil-calisir',
+      label: 'Nasıl Çalışır',
+      desc: 'Dört adımda kurulum ve takip',
+      icon: 'flow',
+      placement: 'drawer',
+    },
+    {
+      href: '/#guvenlik',
+      label: 'Güvenlik',
+      desc: 'Veri koruma, erişim denetimi',
+      icon: 'security',
+      placement: 'both',
+    },
+    {
+      href: '/#sss',
+      label: 'SSS',
+      desc: 'Sık sorulan sorular',
+      icon: 'faq',
+      placement: 'both',
+      priority: 'secondary',
+    },
+    {
+      href: '/hakkimizda',
+      label: 'Hakkımızda',
+      desc: 'Biz kimiz, kurucumuz',
+      icon: 'about',
+      placement: 'both',
+    },
+    {
+      href: '/contact',
+      label: 'İletişim',
+      desc: 'Bize ulaşın',
+      icon: 'contact',
+      placement: 'both',
+    },
   ],
   en: [
-    { href: '/en#product', label: 'Product', desc: 'Training & exam platform', icon: 'training' },
-    { href: '/en#proof', label: 'Proof', desc: 'Certificates & audit reports', icon: 'proof' },
-    { href: '/en#about', label: 'About', desc: 'Who we are, founder', icon: 'about' },
-    { href: '/en#contact', label: 'Contact', desc: 'Get in touch', icon: 'contact' },
+    {
+      href: '/en#proof',
+      label: 'Features',
+      desc: 'Training, exams, compliance',
+      icon: 'training',
+      placement: 'both',
+    },
+    {
+      href: '/en#how-it-works',
+      label: 'How it works',
+      desc: 'Four steps, setup to reports',
+      icon: 'flow',
+      placement: 'drawer',
+    },
+    {
+      href: '/en#security',
+      label: 'Security',
+      desc: 'Data protection, access control',
+      icon: 'security',
+      placement: 'both',
+    },
+    {
+      href: '/en#faq',
+      label: 'FAQ',
+      desc: 'Frequently asked questions',
+      icon: 'faq',
+      placement: 'both',
+      priority: 'secondary',
+    },
+    {
+      href: '/en#about',
+      label: 'About',
+      desc: 'Who we are, founder',
+      icon: 'about',
+      placement: 'both',
+    },
+    {
+      href: '/en#contact',
+      label: 'Contact',
+      desc: 'Get in touch',
+      icon: 'contact',
+      placement: 'both',
+    },
   ],
 };
 
@@ -32,21 +121,31 @@ export const LANDING_COPY = {
   tr: {
     login: 'Giriş Yap',
     demo: 'Demo Talep Et',
+    demoHref: '/demo',
     menu: 'MENÜ',
     openMenu: 'Menüyü aç',
     closeMenu: 'Menüyü kapat',
     mobileMenu: 'Mobil menü',
-    drawerFoot: 'Hastaneler için eğitim & sınav platformu',
+    drawerFoot: 'Sağlık kurumları için eğitim ve sınav platformu',
     langLabel: 'Dil seçimi',
+    currentLang: 'geçerli dil',
+    mainNav: 'Ana menü',
+    footerNav: 'Alt bilgi bağlantıları',
+    legalNav: 'Yasal bağlantılar',
   },
   en: {
     login: 'Sign in',
     demo: 'Request a demo',
+    demoHref: '/en#contact',
     menu: 'MENU',
     openMenu: 'Open menu',
     closeMenu: 'Close menu',
     mobileMenu: 'Mobile menu',
-    drawerFoot: 'Training & exam platform for hospitals',
+    drawerFoot: 'Training and exam platform for healthcare organizations',
     langLabel: 'Language',
+    currentLang: 'current language',
+    mainNav: 'Main menu',
+    footerNav: 'Footer links',
+    legalNav: 'Legal',
   },
 } as const satisfies Record<LandingLocale, Record<string, string>>;

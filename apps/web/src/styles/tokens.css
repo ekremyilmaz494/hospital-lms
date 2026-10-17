@@ -177,7 +177,8 @@
   --landing-brand: #0d9668;              /* emerald accent */
   --landing-brand-deep: #1a3a28;         /* deep brand gradient stop */
   --landing-accent: #f59e0b;             /* amber CTA */
-  --landing-accent-deep: #d97706;        /* amber hover */
+  --landing-accent-deep: #d97706;        /* amber koyu ton (beyaz metinle AA geçmez — CTA hover için KULLANMA) */
+  --landing-accent-hover: #fbbf24;       /* amber CTA hover (koyu ink metinle ~7.5:1) */
   --landing-rule: rgba(26, 58, 40, 0.08);
   --landing-rule-strong: rgba(26, 58, 40, 0.18);
   --landing-shadow-soft: 0 8px 32px rgba(26, 58, 40, 0.08);
