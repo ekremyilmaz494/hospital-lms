@@ -40,12 +40,12 @@ export function TermsModal({ open, onAccepted }: TermsModalProps) {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error || "Bir hata olustu. Lutfen tekrar deneyin.");
+        throw new Error(data?.error || "Bir hata oluştu. Lütfen tekrar deneyin.");
       }
 
       onAccepted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bir hata olustu.");
+      setError(err instanceof Error ? err.message : "Bir hata oluştu.");
     } finally {
       setLoading(false);
     }
@@ -55,9 +55,9 @@ export function TermsModal({ open, onAccepted }: TermsModalProps) {
     <Dialog open={open}>
       <DialogContent showCloseButton={false} className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Kullanim Sartlari ve Gizlilik Politikasi</DialogTitle>
+          <DialogTitle>Kullanım Şartları ve Gizlilik Politikası</DialogTitle>
           <DialogDescription>
-            Platformumuzu kullanmaya devam edebilmek icin asagidaki sartlari kabul
+            Platformumuzu kullanmaya devam edebilmek için aşağıdaki şartları kabul
             etmeniz gerekmektedir.
           </DialogDescription>
         </DialogHeader>
@@ -72,23 +72,23 @@ export function TermsModal({ open, onAccepted }: TermsModalProps) {
             }}
           >
             <p>
-              Platformumuzu kullanarak kisisel verilerinizin{" "}
+              Platformumuzu kullanarak kişisel verilerinizin{" "}
               <Link
                 href="/privacy"
                 target="_blank"
                 className="underline font-medium"
                 style={{ color: "var(--brand-600)" }}
               >
-                Gizlilik Politikamiz
+                Gizlilik Politikamız
               </Link>{" "}
-              kapsaminda islenmesini ve{" "}
+              kapsamında işlenmesini ve{" "}
               <Link
                 href="/terms"
                 target="_blank"
                 className="underline font-medium"
                 style={{ color: "var(--brand-600)" }}
               >
-                Kullanim Sartlarimiza
+                Kullanım Şartlarımıza
               </Link>{" "}
               tabi olmayi kabul etmis olursunuz.
             </p>
@@ -101,12 +101,12 @@ export function TermsModal({ open, onAccepted }: TermsModalProps) {
               className="mt-0.5"
             />
             <span className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-              Kullanim Sartlari ve Gizlilik Politikasini okudum, kabul ediyorum.
+              Kullanım Şartları ve Gizlilik Politikası&apos;nı okudum, kabul ediyorum.
             </span>
           </label>
 
           {error && (
-            <p className="text-sm font-medium" style={{ color: "#ef4444" }}>
+            <p className="text-sm font-medium" role="alert" style={{ color: "var(--color-error)" }}>
               {error}
             </p>
           )}

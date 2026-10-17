@@ -8,15 +8,16 @@ import Link from 'next/link'
 import { reportBoundaryError } from '@/lib/report-boundary-error'
 
 /**
- * Route-level error boundary — sayfa seviyesindeki hatalari yakalar.
- * Layout korunur, sadece sayfa icerigi hata mesaji ile degistirilir.
+ * Route-level error boundary — sayfa seviyesindeki hataları yakalar.
+ * Layout korunur, sadece sayfa içeriği hata mesajı ile değiştirilir.
  */
 export default function Error({
   error,
-  reset,
+  unstable_retry,
 }: {
   error: Error & { digest?: string }
-  reset: () => void
+  /** Next 16.2+: segmenti yeniden çekip render eder (`reset` yeniden çekmez; sunucu hatası olduğu gibi kalır). */
+  unstable_retry: () => void
 }) {
   useEffect(() => {
     // Sentry (bulut) + /api/telemetry/client-error (air-gap on-prem → docker logs). Bkz.
@@ -40,10 +41,10 @@ export default function Error({
 
           <div className="space-y-2">
             <h2 className="font-heading text-xl font-semibold">
-              Sayfa yuklenirken hata olustu
+              Sayfa yüklenirken hata oluştu
             </h2>
             <p className="text-sm text-muted-foreground">
-              Bu sayfayi yuklerken beklenmeyen bir hata meydana geldi. Lutfen tekrar deneyin veya ana sayfaya donun.
+              Bu sayfa yüklenirken beklenmeyen bir hata meydana geldi. Lütfen tekrar deneyin veya ana sayfaya dönün.
             </p>
           </div>
 
@@ -54,7 +55,7 @@ export default function Error({
           )}
 
           <div className="flex gap-3">
-            <Button onClick={() => reset()} variant="default">
+            <Button onClick={() => unstable_retry()} variant="default">
               <RotateCcw className="mr-2 h-4 w-4" />
               Tekrar Dene
             </Button>

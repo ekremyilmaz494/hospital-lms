@@ -150,7 +150,7 @@ export const HOME_TR = {
       { q: 'Kurulum ne kadar sürer, personeli nasıl aktarırız?', a: 'Bulut sürümünde sunucu kurmanız gerekmez. Personeli Excel ile toplu aktarabilir, birim ve unvana göre hemen eğitim atamaya başlayabilirsiniz.' },
       { q: 'Kendi eğitim içeriklerimizi kullanabilir miyiz?', a: 'Evet. Video, PDF ve ses dosyalarınızı yükleyip eğitime eklersiniz. Soruları kendiniz yazabilir, soru bankasında saklayabilir veya yüklediğiniz içerikten yapay zekâ desteğiyle soru taslağı üretebilirsiniz.' },
       { q: 'Personel videoyu atlayarak sınava geçebilir mi?', a: 'Hayır. Videoda ileri sarma kapalıdır ve izleme süresi sunucuda doğrulanır. Videonun neredeyse tamamı izlenmeden son sınav açılmaz.' },
-      { q: 'Sınavda başarısız olan personel ne olur?', a: 'Belirlediğiniz hak sayısı kadar tekrar dener. Hakkı biten personel ek hak talep edebilir, yönetici onaylarsa yeniden sınava girer.' },
+      { q: 'Personel sınavda başarısız olursa ne olur?', a: 'Belirlediğiniz hak sayısı kadar tekrar dener. Hakkı biten personel ek hak talep edebilir, yönetici onaylarsa yeniden sınava girer.' },
       { q: 'Denetimde hangi belgeleri sunabiliriz?', a: 'Eğitim Duyuru Formu, Katılım ve İmza Formu, Kayıt Sicil Formu, sertifikalar ve uyum raporu PDF veya Excel olarak alınabilir.' },
       { q: 'Verilerimiz nerede tutuluyor, güvende mi?', a: 'Bulut sürümü Avrupa (Frankfurt) bölgesinde çalışır. Her kurumun verisi diğerlerinden izole edilir, TC kimlik numaraları şifreli saklanır. İsteyen kurumlar için kurum içi kurulum seçeneği vardır.' },
       { q: 'KVKK süreçlerini nasıl destekliyor?', a: 'Personel KVKK kapsamındaki başvurularını sistem içinden yapar, yönetici yanıtlar. Aydınlatma metni sürümlüdür; metin değişince personelden yeniden onay alınır.' },

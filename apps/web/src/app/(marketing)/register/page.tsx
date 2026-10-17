@@ -393,12 +393,14 @@ export default function RegisterPage() {
                     </Label>
                     <Input
                       id="organizationName"
+                      aria-invalid={errors.organizationName ? true : undefined}
+                      aria-describedby={errors.organizationName ? 'organizationName-hata' : undefined}
                       placeholder="örnek: Merkez Hastanesi"
                       value={form.organizationName}
                       onChange={(e) => handleOrganizationNameChange(e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.organizationName && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.organizationName}</p>}
+                    {errors.organizationName && <p id="organizationName-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.organizationName}</p>}
                   </div>
 
                   <div>
@@ -407,6 +409,8 @@ export default function RegisterPage() {
                     </Label>
                     <Input
                       id="organizationCode"
+                      aria-invalid={errors.organizationCode ? true : undefined}
+                      aria-describedby={errors.organizationCode ? 'organizationCode-hata' : undefined}
                       placeholder="örnek: merkez-hastanesi"
                       value={form.organizationCode}
                       onChange={(e) => update('organizationCode', e.target.value.toLowerCase())}
@@ -415,7 +419,7 @@ export default function RegisterPage() {
                     <p className="text-xs mt-1" style={{ color: 'var(--site-ink-soft)' }}>
                       Küçük harf, rakam ve tire (-) kullanılabilir. 3-20 karakter.
                     </p>
-                    {errors.organizationCode && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.organizationCode}</p>}
+                    {errors.organizationCode && <p id="organizationCode-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.organizationCode}</p>}
                   </div>
 
                   <div>
@@ -424,6 +428,8 @@ export default function RegisterPage() {
                     </Label>
                     <select
                       id="sector"
+                      aria-invalid={errors.sector ? true : undefined}
+                      aria-describedby={errors.sector ? 'sector-hata' : undefined}
                       value={form.sector}
                       onChange={(e) => update('sector', e.target.value)}
                       className="mt-1.5 w-full rounded-md border bg-transparent px-3 py-2 text-base focus:outline-none sm:text-sm"
@@ -444,7 +450,7 @@ export default function RegisterPage() {
                     <p className="text-xs mt-1" style={{ color: 'var(--site-ink-soft)' }}>
                       Sektör seçimi platform içindeki menüleri ve özellikleri belirler.
                     </p>
-                    {errors.sector && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.sector}</p>}
+                    {errors.sector && <p id="sector-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.sector}</p>}
                   </div>
 
                   <div>
@@ -453,12 +459,14 @@ export default function RegisterPage() {
                     </Label>
                     <Input
                       id="address"
+                      aria-invalid={errors.address ? true : undefined}
+                      aria-describedby={errors.address ? 'address-hata' : undefined}
                       placeholder="Organizasyon adresi (isteğe bağlı)"
                       value={form.address}
                       onChange={(e) => update('address', e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.address && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.address}</p>}
+                    {errors.address && <p id="address-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.address}</p>}
                   </div>
 
                   <div>
@@ -467,12 +475,14 @@ export default function RegisterPage() {
                     </Label>
                     <Input
                       id="phone"
+                      aria-invalid={errors.phone ? true : undefined}
+                      aria-describedby={errors.phone ? 'phone-hata' : undefined}
                       placeholder="örnek: 0312 000 00 00"
                       value={form.phone}
                       onChange={(e) => update('phone', e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.phone && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.phone}</p>}
+                    {errors.phone && <p id="phone-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.phone}</p>}
                   </div>
 
                   <button
@@ -513,12 +523,14 @@ export default function RegisterPage() {
                       </Label>
                       <Input
                         id="firstName"
+                        aria-invalid={errors.firstName ? true : undefined}
+                        aria-describedby={errors.firstName ? 'firstName-hata' : undefined}
                         placeholder="Adınız"
                         value={form.firstName}
                         onChange={(e) => update('firstName', e.target.value)}
                         className="mt-1.5"
                       />
-                      {errors.firstName && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.firstName}</p>}
+                      {errors.firstName && <p id="firstName-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.firstName}</p>}
                     </div>
                     <div>
                       <Label htmlFor="lastName" className="text-sm font-medium" style={{ color: 'var(--site-ink)' }}>
@@ -526,12 +538,14 @@ export default function RegisterPage() {
                       </Label>
                       <Input
                         id="lastName"
+                        aria-invalid={errors.lastName ? true : undefined}
+                        aria-describedby={errors.lastName ? 'lastName-hata' : undefined}
                         placeholder="Soyadınız"
                         value={form.lastName}
                         onChange={(e) => update('lastName', e.target.value)}
                         className="mt-1.5"
                       />
-                      {errors.lastName && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.lastName}</p>}
+                      {errors.lastName && <p id="lastName-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.lastName}</p>}
                     </div>
                   </div>
 
@@ -541,13 +555,15 @@ export default function RegisterPage() {
                     </Label>
                     <Input
                       id="email"
+                      aria-invalid={errors.email ? true : undefined}
+                      aria-describedby={errors.email ? 'email-hata' : undefined}
                       type="email"
                       placeholder="ornek@kurum.gov.tr"
                       value={form.email}
                       onChange={(e) => update('email', e.target.value)}
                       className="mt-1.5"
                     />
-                    {errors.email && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.email}</p>}
+                    {errors.email && <p id="email-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.email}</p>}
                   </div>
 
                   <div>
@@ -557,6 +573,8 @@ export default function RegisterPage() {
                     <div className="relative mt-1.5">
                       <Input
                         id="password"
+                        aria-invalid={errors.password ? true : undefined}
+                        aria-describedby={errors.password ? 'password-hata' : undefined}
                         type={showPassword ? 'text' : 'password'}
                         placeholder="En az 8 karakter"
                         value={form.password}
@@ -593,7 +611,7 @@ export default function RegisterPage() {
                         <PasswordRequirements password={form.password} />
                       </div>
                     )}
-                    {errors.password && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.password}</p>}
+                    {errors.password && <p id="password-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.password}</p>}
                   </div>
 
                   <div>
@@ -603,6 +621,8 @@ export default function RegisterPage() {
                     <div className="relative mt-1.5">
                       <Input
                         id="passwordConfirm"
+                        aria-invalid={errors.passwordConfirm ? true : undefined}
+                        aria-describedby={errors.passwordConfirm ? 'passwordConfirm-hata' : undefined}
                         type={showPasswordConfirm ? 'text' : 'password'}
                         placeholder="Şifrenizi tekrar girin"
                         value={form.passwordConfirm}
@@ -620,7 +640,7 @@ export default function RegisterPage() {
                         {showPasswordConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                       </button>
                     </div>
-                    {errors.passwordConfirm && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.passwordConfirm}</p>}
+                    {errors.passwordConfirm && <p id="passwordConfirm-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.passwordConfirm}</p>}
                   </div>
 
                   {/* KVKK açık rıza — kayıt (veri toplama) anında zorunlu onay */}
@@ -628,6 +648,9 @@ export default function RegisterPage() {
                     <label className="flex items-start gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
+                        aria-required="true"
+                        aria-invalid={errors.kvkkAccepted ? true : undefined}
+                        aria-describedby={errors.kvkkAccepted ? 'kvkkAccepted-hata' : undefined}
                         checked={form.kvkkAccepted}
                         onChange={(e) => setKvkkAccepted(e.target.checked)}
                         className="mt-0.5 h-4 w-4 shrink-0"
@@ -640,7 +663,7 @@ export default function RegisterPage() {
                         &apos;nı okudum, kabul ediyorum. Kişisel verilerimin bu sistemde işlenmesine açık rıza veriyorum.
                       </span>
                     </label>
-                    {errors.kvkkAccepted && <p className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.kvkkAccepted}</p>}
+                    {errors.kvkkAccepted && <p id="kvkkAccepted-hata" className="text-xs mt-1" style={{ color: 'var(--site-danger)' }}>{errors.kvkkAccepted}</p>}
                   </div>
 
                   <div className="flex gap-3">
