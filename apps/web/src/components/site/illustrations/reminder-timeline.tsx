@@ -2,13 +2,16 @@ import type { ReactNode } from 'react'
 import { AttnDot, Bell, Check, Clock, Scene, delay } from './_primitives'
 import type { IllustrationProps } from '.'
 
-// Yatay şerit sahne: içerik ~150 birim yüksek, viewBox 480×240 (boş dikey alan yok).
-const SCENE_H = 240
-const LINE_Y = 139
-const BADGE_Y = 75
+// Geniş şerit sahne (640×212): düğümler alttaki 4 sütunlu listenin sütun ortalarına
+// denk gelir (1200px kapsayıcı, 32px aralık → %11,5 / %37,2 / %62,8 / %88,5).
+const SCENE_W = 640
+const SCENE_H = 212
+const LINE_Y = 130
+const BADGE_Y = 66
 const BADGE_R = 30
+const NODE_X = [74, 238, 402, 566]
 /** Ana çizgi boyunca gün tikleri (düğüm hizaları hariç). */
-const DAY_TICKS = [100, 128, 156, 212, 240, 268, 324, 352, 380]
+const DAY_TICKS = [115, 156, 197, 279, 320, 361, 443, 484, 525]
 
 /** Küçük takvim yaprağı: üst şerit, iki halka, tek işaretli gün. */
 function CalendarTick({ x, y, done }: { x: number; y: number; done: boolean }) {
@@ -31,19 +34,20 @@ function Renew({ cx: x, cy: y }: { cx: number; cy: number }) {
   )
 }
 
+const [N1, N2, N3, N4] = NODE_X
 const NODES: Array<{ x: number; icon: ReactNode }> = [
-  { x: 72, icon: <Check cx={72} cy={BADGE_Y} r={15} /> },
-  { x: 184, icon: <Bell cx={184} cy={BADGE_Y - 3} s={1.5} /> },
+  { x: N1, icon: <Check cx={N1} cy={BADGE_Y} r={15} /> },
+  { x: N2, icon: <Bell cx={N2} cy={BADGE_Y - 3} s={1.5} /> },
   {
-    x: 296,
+    x: N3,
     icon: (
       <g>
-        <Clock cx={296} cy={BADGE_Y} r={15} />
-        <AttnDot cx={308} cy={BADGE_Y - 12} r={4.5} />
+        <Clock cx={N3} cy={BADGE_Y} r={15} />
+        <AttnDot cx={N3 + 12} cy={BADGE_Y - 12} r={4.5} />
       </g>
     ),
   },
-  { x: 408, icon: <Renew cx={408} cy={BADGE_Y} /> },
+  { x: N4, icon: <Renew cx={N4} cy={BADGE_Y} /> },
 ]
 
 /**
@@ -52,10 +56,10 @@ const NODES: Array<{ x: number; icon: ReactNode }> = [
  */
 export function ReminderTimelineIllustration({ className }: IllustrationProps) {
   return (
-    <Scene className={className} height={SCENE_H}>
+    <Scene className={className} width={SCENE_W} height={SCENE_H}>
       <path d={DAY_TICKS.map((x) => `M${x} ${LINE_Y + 8}v6`).join('')} className="s-line" />
-      <path d={`M32 ${LINE_Y}H296`} className="s-brand s-draw" pathLength={1} strokeWidth={2.25} />
-      <path d={`M304 ${LINE_Y}H448`} className="s-line" strokeDasharray="2 6" />
+      <path d={`M24 ${LINE_Y}H${N3}`} className="s-brand s-draw" pathLength={1} strokeWidth={2.25} />
+      <path d={`M${N3 + 8} ${LINE_Y}H616`} className="s-line" strokeDasharray="2 6" />
 
       {NODES.map(({ x, icon }, i) => (
         <g key={x} className="s-pop" style={delay(200 + i * 160)}>
