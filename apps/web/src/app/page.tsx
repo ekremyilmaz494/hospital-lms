@@ -1,19 +1,15 @@
 import type { Metadata } from 'next';
 import { pageMetadata, HOME_LANGUAGES } from '@/lib/site-metadata';
 import { homeJsonLd } from '@/lib/organization-jsonld';
-import { SiteShell } from '@/components/site/site-shell';
-import { Hero } from '@/components/site/home/hero';
-import { Problem } from '@/components/site/home/problem';
-import { Flow } from '@/components/site/home/flow';
-import { VideoLock } from '@/components/site/home/video-lock';
-import { Evidence } from '@/components/site/home/evidence';
-import { Automation } from '@/components/site/home/automation';
-import { Roles } from '@/components/site/home/roles';
-import { Mobile } from '@/components/site/home/mobile';
-import { Security } from '@/components/site/home/security';
-import { Reference } from '@/components/site/home/reference';
-import { Faq } from '@/components/site/home/faq';
-import { Closing } from '@/components/site/home/closing';
+import { Header } from '@/components/landing-3d/header';
+import { LoadingScreen } from '@/components/landing-3d/loading-screen';
+import { SceneClient } from '@/components/landing-3d/scene-client';
+import { ScrollSections } from '@/components/landing-3d/scroll-sections';
+import { MobileReveal } from '@/components/landing-3d/mobile-reveal';
+import { SiteAnalytics } from '@/components/site/site-analytics';
+import { SiteAttribution } from '@/components/site/site-attribution';
+import { isOnPrem } from '@/lib/deployment';
+import '@/app/landing-3d/landing-3d.css';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Hastane Personel Eğitim ve Sınav Platformu | KlinoVax',
@@ -24,31 +20,43 @@ export const metadata: Metadata = pageMetadata({
   languages: HOME_LANGUAGES,
 });
 
-// Bölüm sırası anlatı sırasıdır: sorun → nasıl çalışır → kanıt → takip → kim için →
-// mobil → güvenlik (tek koyu bant) → referans → SSS → kapanış. Tüm metin
-// `components/site/content/home.tr.ts`'te; JS kapalıyken de eksiksiz okunur.
 export default function LandingPage() {
   return (
     <>
-      {/* Statik künye + ürün varlığı (kullanıcı girdisi yok), makine-okunur */}
+      {/* Refresh hep hero'da başlasın (hydration'dan önce server HTML'inde çalışır). */}
+      <script
+        dangerouslySetInnerHTML={{
+          // Refresh hep hero'da başlasın + mobilde (reduced-motion değilse) scroll-reveal
+          // gate'ini paint'TEN ÖNCE ekle (FOUC yok; desktop/reduced-motion'da eklenmez).
+          __html:
+            "history.scrollRestoration='manual';window.scrollTo(0,0);" +
+            "try{if(window.matchMedia('(max-width:768px)').matches&&!window.matchMedia('(prefers-reduced-motion:reduce)').matches){document.documentElement.classList.add('l3d-anim-ready')}}catch(e){}",
+        }}
+      />
+      {/* Statik künye (kullanıcı girdisi yok) — şirket doğrulaması için makine-okunur */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: homeJsonLd('tr') }}
       />
-      <SiteShell>
-        <Hero />
-        <Problem />
-        <Flow />
-        <VideoLock />
-        <Evidence />
-        <Automation />
-        <Roles />
-        <Mobile />
-        <Security />
-        <Reference />
-        <Faq />
-        <Closing />
-      </SiteShell>
+      <div className="l3d-page">
+        <Header />
+        {/* Hero arka planı — canvas'tan önce (z0, DOM sırası) → 3D telefon üstüne biner.
+            absolute + 100vh: hero'dan sonra kayıp gider, fixed canvas devam eder. */}
+        <div className="l3d-hero-bg" aria-hidden="true" />
+        {/* §2 arka planı — 2. viewport (top:100vh) hizasında, canvas'ın altında. */}
+        <div className="l3d-sec2-bg" aria-hidden="true" />
+        {/* §5/§6 arka plan bantları — ilgili viewport'un altında, kısa boy, telefonun
+            arkasında (z0 + canvas'tan önce DOM sırası). */}
+        <div className="l3d-sec5-bg" aria-hidden="true" />
+        <div className="l3d-sec6-bg" aria-hidden="true" />
+        <SceneClient />
+        <LoadingScreen />
+        <MobileReveal />
+        <ScrollSections />
+        {/* Yeni kabukla aynı: UTM atfı + (yalnız bulutta, onay sonrası) çerezsiz analitik */}
+        <SiteAttribution />
+        {!isOnPrem() && <SiteAnalytics />}
+      </div>
     </>
   );
 }
