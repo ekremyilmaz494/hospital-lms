@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   GraduationCap,
@@ -11,8 +11,12 @@ import {
   ArrowRight,
   X,
   ChevronRight,
+  Workflow,
+  LockKeyhole,
+  CircleHelp,
 } from 'lucide-react';
 import { LangSwitch } from './lang-switch';
+import { getTrapTarget } from './focus-trap';
 import {
   LANDING_COPY,
   LANDING_HOME,
@@ -27,7 +31,13 @@ const NAV_ICONS: Record<LandingNavItem['icon'], typeof Mail> = {
   proof: ShieldCheck,
   about: Users,
   contact: Mail,
+  flow: Workflow,
+  security: LockKeyhole,
+  faq: CircleHelp,
 };
+
+/** Drawer içinde Tab ile gezilebilen öğeler. */
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled])';
 
 const ANIM_MS = 420;
 
@@ -38,6 +48,11 @@ const ANIM_MS = 420;
  * Drawer YALNIZCA açıkken DOM'a girer: kapalı drawer `translateX(100%)` ile
  * ekran dışına taşıp masaüstünde yatay scroll yaratırdı (position:fixed öğe
  * .l3d-page overflow-x'ten kaçar). Mount + rAF ile slide-in, unmount gecikmeli.
+ *
+ * Erişilebilirlik: drawer `role="dialog" aria-modal`; açılışta odak kapat butonuna
+ * gider, Tab drawer içinde döner (`getTrapTarget`), Esc / X / overlay ile kapanınca
+ * odak hamburgere döner. Link tıklamasıyla kapanışta odak geri verilmez (sayfa
+ * zaten hedefe gidiyor).
  */
 export function MobileMenu({
   locale = 'tr',
@@ -51,6 +66,10 @@ export function MobileMenu({
   const [mounted, setMounted] = useState(false); // drawer DOM'da mı
   const [shown, setShown] = useState(false); // is-open class (geçiş)
   const closeTimer = useRef<number | undefined>(undefined);
+  const drawerId = useId();
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   const openMenu = useCallback(() => {
     window.clearTimeout(closeTimer.current);
@@ -59,19 +78,45 @@ export function MobileMenu({
     requestAnimationFrame(() => setShown(true));
   }, []);
 
-  const closeMenu = useCallback(() => {
+  /** @param restoreFocus  true: odağı hamburgere geri ver (Esc / X / overlay). */
+  const closeMenu = useCallback((restoreFocus: boolean) => {
     setOpen(false);
     setShown(false);
     closeTimer.current = window.setTimeout(() => setMounted(false), ANIM_MS);
+    if (restoreFocus) menuBtnRef.current?.focus({ preventScroll: true });
   }, []);
 
-  // Açıkken arka plan scroll kilidi + Esc ile kapat
+  // Link tıklamasıyla kapanış: odak geri verilmez.
+  const closeAfterNavigate = useCallback(() => closeMenu(false), [closeMenu]);
+
+  // Açılışta odağı kapat butonuna taşı
+  useEffect(() => {
+    if (mounted) closeBtnRef.current?.focus({ preventScroll: true });
+  }, [mounted]);
+
+  // Açıkken arka plan scroll kilidi + Esc ile kapat + Tab odak tuzağı
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeMenu();
+      if (e.key === 'Escape') {
+        closeMenu(true);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const drawer = drawerRef.current;
+      if (!drawer) return;
+      const items = Array.from(drawer.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      const target = getTrapTarget(
+        items.indexOf(document.activeElement as HTMLElement),
+        items.length,
+        e.shiftKey,
+      );
+      if (target !== null) {
+        e.preventDefault();
+        items[target]?.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -85,11 +130,13 @@ export function MobileMenu({
   return (
     <>
       <button
+        ref={menuBtnRef}
         type="button"
         className="l3d-menu-btn"
         aria-label={open ? copy.closeMenu : copy.openMenu}
         aria-expanded={open}
-        onClick={() => (open ? closeMenu() : openMenu())}
+        aria-controls={drawerId}
+        onClick={() => (open ? closeMenu(true) : openMenu())}
       >
         <span />
         <span />
@@ -100,19 +147,31 @@ export function MobileMenu({
         <>
           <div
             className={`l3d-drawer-overlay${shown ? ' is-open' : ''}`}
-            onClick={closeMenu}
+            onClick={() => closeMenu(true)}
             aria-hidden="true"
           />
-          <nav className={`l3d-drawer${shown ? ' is-open' : ''}`} aria-label={copy.mobileMenu}>
+          <div
+            ref={drawerRef}
+            id={drawerId}
+            className={`l3d-drawer${shown ? ' is-open' : ''}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={copy.mobileMenu}
+          >
             <div className="l3d-drawer-head">
-              <Link href={LANDING_HOME[locale]} className="l3d-drawer-logo" onClick={closeMenu}>
+              <Link
+                href={LANDING_HOME[locale]}
+                className="l3d-drawer-logo"
+                onClick={closeAfterNavigate}
+              >
                 KlinoVax
               </Link>
               <button
+                ref={closeBtnRef}
                 type="button"
                 className="l3d-drawer-close"
                 aria-label={copy.closeMenu}
-                onClick={closeMenu}
+                onClick={() => closeMenu(true)}
               >
                 <X size={20} aria-hidden="true" />
               </button>
@@ -120,35 +179,41 @@ export function MobileMenu({
 
             <div className="l3d-drawer-meta">
               <span className="l3d-drawer-eyebrow">{copy.menu}</span>
-              <LangSwitch locale={locale} alternateHref={alternateHref} onNavigate={closeMenu} />
+              <LangSwitch
+                locale={locale}
+                alternateHref={alternateHref}
+                onNavigate={closeAfterNavigate}
+              />
             </div>
 
-            <ul className="l3d-drawer-list">
-              {LANDING_NAV[locale].map(({ href, label, desc, icon }) => {
-                const Icon = NAV_ICONS[icon];
-                return (
-                <li key={href}>
-                  <Link href={href} onClick={closeMenu}>
-                    <span className="l3d-drawer-ico" aria-hidden="true">
-                      <Icon size={19} />
-                    </span>
-                    <span className="l3d-drawer-txt">
-                      <span className="l3d-drawer-label">{label}</span>
-                      <span className="l3d-drawer-desc">{desc}</span>
-                    </span>
-                    <ChevronRight size={18} className="l3d-drawer-chev" aria-hidden="true" />
-                  </Link>
-                </li>
-                );
-              })}
-            </ul>
+            <nav aria-label={copy.mainNav}>
+              <ul className="l3d-drawer-list">
+                {LANDING_NAV[locale].map(({ href, label, desc, icon }) => {
+                  const Icon = NAV_ICONS[icon];
+                  return (
+                    <li key={href}>
+                      <Link href={href} onClick={closeAfterNavigate}>
+                        <span className="l3d-drawer-ico" aria-hidden="true">
+                          <Icon size={19} />
+                        </span>
+                        <span className="l3d-drawer-txt">
+                          <span className="l3d-drawer-label">{label}</span>
+                          <span className="l3d-drawer-desc">{desc}</span>
+                        </span>
+                        <ChevronRight size={18} className="l3d-drawer-chev" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
 
             <div className="l3d-drawer-actions">
-              <Link href="/auth/login" className="l3d-drawer-login" onClick={closeMenu}>
+              <Link href="/auth/login" className="l3d-drawer-login" onClick={closeAfterNavigate}>
                 <LogIn size={17} aria-hidden="true" />
                 {copy.login}
               </Link>
-              <Link href="/demo" className="l3d-drawer-cta" onClick={closeMenu}>
+              <Link href={copy.demoHref} className="l3d-drawer-cta" onClick={closeAfterNavigate}>
                 {copy.demo}
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
@@ -172,7 +237,7 @@ export function MobileMenu({
             </div>
 
             <p className="l3d-drawer-foot">{copy.drawerFoot}</p>
-          </nav>
+          </div>
         </>
       )}
     </>

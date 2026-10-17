@@ -5,7 +5,13 @@ import * as THREE from "three";
 import { useGLTF } from "@react-three/drei";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { markTexturesReady, onIntroStart, unlockScroll } from "@/lib/scene-ready";
+import {
+  getDeepLinkTarget,
+  markTexturesReady,
+  onIntroStart,
+  scrollToDeepLinkTarget,
+  unlockScroll,
+} from "@/lib/scene-ready";
 import {
   SCROLL_STATES,
   MOBILE_SCALE_FACTOR,
@@ -278,17 +284,24 @@ type PhoneModelProps = {
 export function PhoneModel({ isMobile }: PhoneModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const screenCtrlRef = useRef<ScreenController | null>(null);
+  // Derin link (`/#egitim`) var mı? Layout effect'te bir kez okunur; asıl effect aynı değeri
+  // kullanır → INTRO_Y_OFFSET ile intro'nun atlanması her zaman tutarlı kalır.
+  const hasDeepLinkRef = useRef(false);
 
   useLayoutEffect(() => {
     const group = groupRef.current;
     if (!group) return;
     const reduced = prefersReducedMotion();
+    const hasDeepLink = getDeepLinkTarget() !== null;
+    hasDeepLinkRef.current = hasDeepLink;
+    // Hedef bölüme doğrudan inilecekse giriş dönüşü oynamaz → telefon dönük kalmasın.
+    const skipIntro = reduced || hasDeepLink;
     const hero = resolveState(0, isMobile);
     group.position.set(hero.position[0], hero.position[1], hero.position[2]);
     group.scale.setScalar(hero.scale);
     group.rotation.set(
       hero.rotation[0],
-      hero.rotation[1] + (reduced ? 0 : INTRO_Y_OFFSET),
+      hero.rotation[1] + (skipIntro ? 0 : INTRO_Y_OFFSET),
       hero.rotation[2]
     );
   }, [isMobile]);
@@ -296,12 +309,16 @@ export function PhoneModel({ isMobile }: PhoneModelProps) {
   useEffect(() => {
     const group = groupRef.current;
     if (!group) return;
-    const reduced = prefersReducedMotion();
+    const hasDeepLink = hasDeepLinkRef.current;
+    // Reduced-motion VEYA derin link: giriş animasyonu atlanır (düz "/", "/#", "/#hero" etkilenmez).
+    const skipIntro = prefersReducedMotion() || hasDeepLink;
     const hero = resolveState(0, isMobile);
     const offFns: Array<() => void> = [];
+    // StrictMode çift effect + geç abonelikte (queueMicrotask) iptal edilemeyen callback'ler için.
+    let disposed = false;
 
     const ctx = gsap.context(() => {
-      const buildScrollTimeline = () => {
+      const buildScrollTimeline = (): gsap.core.Timeline => {
         const tl = gsap.timeline({
           defaults: { duration: 1, ease: "none" },
           scrollTrigger: {
@@ -321,14 +338,29 @@ export function PhoneModel({ isMobile }: PhoneModelProps) {
           tl.to(group.scale, { x: s.scale, y: s.scale, z: s.scale }, at);
         }
         ScrollTrigger.refresh();
+        return tl;
       };
 
-      if (reduced) {
+      // Derin linkte: hedef bölüme anlık atla ve scrub tween'ini oturt. Aksi halde
+      // scrub (1.5 sn) telefonu hero'dan hedef pozuna diğer bölümlerin üstünden uçurur.
+      const settleOnDeepLink = (tl: gsap.core.Timeline) => {
+        if (!scrollToDeepLinkTarget()) return;
+        ScrollTrigger.update();
+        const st = tl.scrollTrigger;
+        if (!st) return;
+        tl.progress(st.progress);
+        st.getTween()?.progress(1);
+        screenCtrlRef.current?.(st.progress);
+      };
+
+      if (skipIntro) {
         gsap.set("[data-hero-text]", { opacity: 1, y: 0 });
         offFns.push(
           onIntroStart(() => {
+            if (disposed) return;
             unlockScroll();
-            buildScrollTimeline();
+            const tl = buildScrollTimeline();
+            if (hasDeepLink) settleOnDeepLink(tl);
           })
         );
         return;
@@ -356,6 +388,7 @@ export function PhoneModel({ isMobile }: PhoneModelProps) {
     });
 
     return () => {
+      disposed = true;
       offFns.forEach((off) => off());
       ctx.revert();
     };
