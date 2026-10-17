@@ -326,7 +326,7 @@ export default function MobileLayout({
                 className="text-[11px] font-medium"
                 style={{ color: 'rgba(255,255,255,0.35)' }}
               >
-                KVKK Uyumlu &middot; 256-bit SSL &middot; Güvenli Bağlantı
+                KVKK Süreçlerine Destek &middot; TLS Şifreli Bağlantı
               </span>
             </div>
             <p

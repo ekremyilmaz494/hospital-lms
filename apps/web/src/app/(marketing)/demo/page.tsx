@@ -4,7 +4,7 @@ import { DemoClient } from "./demo-client";
 
 export const metadata: Metadata = {
   title: `Demo Talep Et - ${BRAND.fullName}`,
-  description: `${BRAND.fullName} demo talebi. Ucretsiz demo ile platformu deneyimleyin.`,
+  description: `${BRAND.fullName} demo talebi. Kendi eğitim senaryonuzla platformu deneyimleyin; 30 günlük ücretsiz deneme sunuyoruz.`,
 };
 
 export default function DemoPage() {
