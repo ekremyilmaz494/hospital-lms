@@ -1,0 +1,104 @@
+/* ── /en ve /hakkimizda ek kuralları ────────────────────────────────
+   Ana landing-3d.css'in .l3d-about* ve .l3d-faq* kurallarını yeniden kullanır;
+   yalnız /en'deki yeni bölümler (adımlar, künye satırları, SSS yerleşimi) ve
+   özellik kartı içindeki bağlantı için gereken farkları taşır. */
+
+.l3d-about-feature .l3d-about-cta {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 14.5px;
+}
+
+.l3d-en-section {
+  padding: clamp(40px, 6vw, 72px) 0;
+  border-bottom: 1px solid var(--landing-rule);
+  scroll-margin-top: 120px;
+}
+.l3d-en-section > p {
+  max-width: 680px;
+}
+
+/* Nasıl çalışır: 4 adımlık sıralı liste (kartlar .l3d-about-feature) */
+.l3d-en-steps {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.l3d-en-steps .l3d-about-feature h3 {
+  margin: 10px 0 8px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--landing-ink);
+}
+
+/* Güvenlik: "teknik künye" — mono etiketli spesifikasyon satırları */
+.l3d-en-spec {
+  margin: 24px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--landing-rule);
+}
+.l3d-en-spec > div {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 8px 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--landing-rule);
+}
+.l3d-en-spec dt {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  /* --landing-brand bu zeminde ~3.6:1 (AA altı); anlam taşıyan etiket için ink-soft (~5.3:1). */
+  color: var(--landing-ink-soft);
+}
+.l3d-en-spec dd {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--landing-ink);
+}
+
+/* SSS: ana sayfadaki tam-genişlik bandı dar /en kolonuna uyarla */
+.l3d-about .l3d-faq {
+  background: transparent;
+  padding: clamp(40px, 6vw, 72px) 0;
+  border-bottom: 1px solid var(--landing-rule);
+  scroll-margin-top: 120px;
+}
+.l3d-about .l3d-faq-head {
+  align-items: flex-start;
+  text-align: left;
+  margin: 0 0 24px;
+  max-width: none;
+}
+.l3d-about .l3d-faq-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.6vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--landing-ink);
+}
+.l3d-about .l3d-faq-list {
+  margin: 0;
+  max-width: 820px;
+}
+
+@media (max-width: 1024px) {
+  .l3d-en-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  .l3d-en-steps {
+    grid-template-columns: 1fr;
+  }
+  .l3d-en-spec > div {
+    grid-template-columns: 1fr;
+  }
+}

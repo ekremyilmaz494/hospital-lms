@@ -1,7 +1,7 @@
 /**
  * Brand single-source-of-truth — env'den geçersiz kılınabilir.
- * White-label / multi-sector kurulumlar için NEXT_PUBLIC_BRAND_* env'leri set edin.
- * Sektör-agnostik positioning (sağlık + üretim).
+ * White-label kurulumlar için NEXT_PUBLIC_BRAND_* env'leri set edin.
+ * Varsayılan konumlandırma: sağlık kurumları (hastane, klinik); eczaneye özgü bir özellik yoktur.
  */
 const fromEnv = (key: string): string | undefined => {
   const value = process.env[key]?.trim()
@@ -13,10 +13,10 @@ const supportEmail = fromEnv('SUPPORT_EMAIL') ?? 'ekrem@klinovax.com'
 export const BRAND = {
   name: fromEnv('NEXT_PUBLIC_BRAND_NAME') ?? 'KlinoVax',
   fullName: fromEnv('NEXT_PUBLIC_BRAND_FULL_NAME') ?? 'KlinoVax Eğitim Platformu',
-  shortDesc: fromEnv('NEXT_PUBLIC_BRAND_SHORT_DESC') ?? 'Sağlık kurumları için klinik disiplinli personel eğitim platformu',
+  shortDesc: fromEnv('NEXT_PUBLIC_BRAND_SHORT_DESC') ?? 'Sağlık kurumları için personel eğitim, sınav ve uyum platformu',
   longDesc:
     fromEnv('NEXT_PUBLIC_BRAND_LONG_DESC') ??
-    'Hastane, klinik ve eczaneler için klinik disiplinde personel eğitimi: atama, video, sınav, sertifika, KVKK uyum raporlaması — kurumunuza özel uçtan uca otomasyon.',
+    'Hastane ve klinikler için personel eğitim, sınav ve uyum platformu: atama ve hatırlatma, ileri sarılamayan video, sınav, QR kodlu sertifika ve denetime hazır raporlar.',
   domain: fromEnv('NEXT_PUBLIC_BRAND_DOMAIN') ?? 'klinovax.com',
   /** SES SendEmail "From" address — DKIM imzalı domain'den çıkmalı. */
   fromAddress: fromEnv('SES_FROM_EMAIL') ?? 'noreply@klinovax.com',

@@ -17,8 +17,8 @@ export function organizationJsonLd(locale: 'tr' | 'en' = 'tr'): string {
   const url = `https://${BRAND.domain}`
   const description =
     locale === 'en'
-      ? 'Staff training and compliance platform for hospitals, clinics and pharmacies.'
-      : 'Hastane, klinik ve eczaneler için personel eğitim ve uyum platformu.'
+      ? 'Staff training, exam and compliance platform for hospitals and clinics.'
+      : 'Hastane ve klinikler için personel eğitim, sınav ve uyum platformu.'
 
   const data = {
     '@context': 'https://schema.org',

@@ -6,14 +6,15 @@ import { Header } from '@/components/landing-3d/header';
 import { Footer } from '@/components/landing-3d/footer';
 import { FounderCard } from '@/components/landing-3d/founder-card';
 import '@/app/landing-3d/landing-3d.css';
+import '@/app/landing-3d/landing-3d-about.css';
 
 export const metadata: Metadata = {
   title: `Hakkımızda — ${BRAND.name}`,
-  description: `${BRAND.name}, ${BRAND.legal.foundedYear} yılında Konya'da kurulan; hastane, klinik ve eczaneler için personel eğitim ve sınav platformudur. Kurucu: ${BRAND.founder.name}.`,
+  description: `${BRAND.name}, ${BRAND.legal.foundedYear} yılında Konya'da kurulan; hastane ve klinikler için personel eğitim, sınav ve uyum platformudur. Kurucu: ${BRAND.founder.name}.`,
   alternates: { canonical: '/hakkimizda', languages: { tr: '/hakkimizda', en: '/en' } },
   openGraph: {
     title: `Hakkımızda — ${BRAND.name}`,
-    description: `${BRAND.legal.foundedYear}, Konya. Hastaneler için eğitim & sınav platformu.`,
+    description: `${BRAND.legal.foundedYear}, Konya. Sağlık kurumları için personel eğitim, sınav ve uyum platformu.`,
     type: 'website',
     locale: 'tr_TR',
   },
@@ -23,6 +24,38 @@ const FACTS = [
   { label: 'Kuruluş', value: `${BRAND.legal.foundedYear} · Konya` },
   { label: 'Platform', value: 'Web · iOS · Android' },
   { label: 'Canlı kullanım', value: 'Özel Devakent Hastanesi' },
+];
+
+/** Ana sayfadaki ayrıntı bölümlerine bağlanan kartlar (hedef id'ler landing-3d içeriğinde tanımlıdır). */
+const DETAIL_LINKS = [
+  {
+    href: '/#nasil-calisir',
+    tag: 'SÜREÇ',
+    title: 'Nasıl çalışır?',
+    text: 'Kurumu hazırlamaktan raporlamaya kadar dört adımda tüm eğitim süreci.',
+    cta: 'Adımları gör',
+  },
+  {
+    href: '/#ozellikler',
+    tag: 'ÖZELLİKLER',
+    title: 'Neler sunuyoruz?',
+    text: 'Eğitim, sınav, sertifika, raporlama ve personel deneyimi başlıklarında tüm özellikler.',
+    cta: 'Özellikleri incele',
+  },
+  {
+    href: '/#guvenlik',
+    tag: 'GÜVENLİK',
+    title: 'Verileriniz nasıl korunur?',
+    text: 'Şifreleme, yedekleme, erişim denetimi ve kurumlar arası tam izolasyon.',
+    cta: 'Güvenlik ayrıntıları',
+  },
+  {
+    href: '/#sss',
+    tag: 'SSS',
+    title: 'Aklınıza takılanlar',
+    text: 'Deneme süresi, sınav kuralları, mobil uygulama ve KVKK süreçleri hakkında yanıtlar.',
+    cta: 'Soruları oku',
+  },
 ];
 
 export default function AboutPage() {
@@ -43,6 +76,11 @@ export default function AboutPage() {
             <br />
             yazılıma devrediyoruz.
           </h1>
+          <p className="l3d-about-lead">
+            {`${BRAND.name}, sağlık kurumlarının personel eğitimini tek yerden yönetebilmesi için geliştirildi. `}
+            Eğitimi bir kez yüklersiniz; atamayı, hatırlatmayı, sınavı, sertifikayı ve denetim
+            raporlarını platform üstlenir.
+          </p>
           <dl className="l3d-about-facts">
             {FACTS.map((f) => (
               <div key={f.label}>
@@ -53,17 +91,38 @@ export default function AboutPage() {
           </dl>
         </section>
 
+        <section className="l3d-about-features" aria-label="Platformu keşfedin">
+          {DETAIL_LINKS.map((d) => (
+            <article key={d.href} className="l3d-about-feature">
+              <span className="l3d-about-num">{d.tag}</span>
+              <h2>{d.title}</h2>
+              <p>{d.text}</p>
+              <Link href={d.href} className="l3d-about-cta">
+                {`${d.cta} →`}
+              </Link>
+            </article>
+          ))}
+        </section>
+
         <div className="l3d-about-grid">
           <div className="l3d-about-col">
             <section className="l3d-about-block" aria-labelledby="ne-yapiyoruz">
               <span className="l3d-about-num">01</span>
               <h2 id="ne-yapiyoruz">Ne yapıyoruz</h2>
               <p>
-                {BRAND.name}; hastane, klinik ve eczaneler için uçtan uca personel eğitim ve sınav
-                platformudur. Kurumun tek işi eğitimi yüklemek — atama, video izleme takibi, sınav,
-                sertifika ve denetime hazır uyum raporlarını sistem otomatik üretir.
+                {`${BRAND.name}, hastane ve klinikler için geliştirilmiş bir personel eğitim, sınav ve uyum platformudur. `}
+                Yönetici eğitimi bir kez yükler; atamayı, hatırlatmayı, video izleme takibini,
+                sınavı, sertifikayı ve denetime hazır raporları platform üstlenir.
               </p>
-              <p>Personel eğitimlerini web üzerinden veya mobil uygulamadan (iOS ve Android) tamamlar.</p>
+              <p>
+                Videoda ileri sarma kilitlidir, izleme süresi sunucuda doğrulanır, ilerleme geri gitmez ve personel kaldığı
+                yerden devam eder. Sınavı geçen personelin sertifikası otomatik oluşur; sertifikanın
+                geçerlilik süresi eğitimin yenileme süresine göre belirlenir.
+              </p>
+              <p>
+                Personel eğitimlerini vardiyasını bozmadan web üzerinden veya iOS ve Android
+                uygulamasından tamamlar.
+              </p>
             </section>
 
             <section className="l3d-about-block" aria-labelledby="kurulus">

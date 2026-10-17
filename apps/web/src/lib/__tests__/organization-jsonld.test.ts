@@ -11,6 +11,14 @@ describe('organizationJsonLd', () => {
     expect(data.email).toMatch(/@klinovax\.com$/);
   });
 
+  it('her iki dilde açıklamada eczane/pharmacy geçmez', () => {
+    for (const locale of ['tr', 'en'] as const) {
+      const data = JSON.parse(organizationJsonLd(locale));
+      expect(data.description).not.toMatch(/eczane|pharmac/i);
+      expect(data.description.length).toBeGreaterThan(20);
+    }
+  });
+
   it('script kırılmasına karşı < karakterini kaçışlar', () => {
     expect(organizationJsonLd()).not.toContain('<');
   });
