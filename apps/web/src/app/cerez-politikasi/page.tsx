@@ -73,7 +73,7 @@ const sections = [
     title: '7. İletişim',
     content:
       'Çerezler ve kişisel verilerinize ilişkin sorularınız için bizimle iletişime geçebilirsiniz. Başvurularınız en geç 30 (otuz) gün içinde sonuçlandırılır.',
-    footer: 'E-posta: kvkk@klinovax.info',
+    footer: 'E-posta: ekrem@klinovax.com',
   },
 ]
 

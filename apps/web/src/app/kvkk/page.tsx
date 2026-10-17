@@ -99,7 +99,7 @@ const sections = [
     title: '9. Başvuru ve İletişim',
     content:
       'KVKK kapsamındaki haklarınızı kullanmak için aşağıdaki kanaldan başvurabilirsiniz. Başvurularınız en geç 30 (otuz) gün içinde sonuçlandırılır.',
-    footer: 'E-posta: kvkk@klinovax.info',
+    footer: 'E-posta: ekrem@klinovax.com',
   },
 ]
 

@@ -196,7 +196,7 @@ export default function TermsPage() {
               <strong>Telefon:</strong> 0553 953 06 96
             </li>
             <li>
-              <strong>Adres:</strong> Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu / Konya
+              <strong>Adres:</strong> Konya, Türkiye
             </li>
           </ul>
         </section>

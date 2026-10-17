@@ -2,7 +2,7 @@ import { pageMetadata } from '@/lib/site-metadata'
 import type { Metadata } from 'next'
 import { BRAND } from '@/lib/brand'
 
-const KVKK_EMAIL = 'kvkk@klinovax.info'
+const KVKK_EMAIL = 'ekrem@klinovax.com'
 
 export const metadata: Metadata = pageMetadata({
   title: 'Kişisel Veri Saklama ve İmha Politikası',
@@ -65,7 +65,7 @@ Imha islemleri kayit altina alinir ve 3 yil saklanir.`,
 **Basvuru Yollari:**
 - Platform icerisinden: Staff Paneli → Kisisel Verilerim (KVKK) → Yeni Talep
 - E-posta: ${KVKK_EMAIL}
-- Posta: Ekrem Yilmaz, Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu / Konya
+- Posta: Ekrem Yilmaz, Konya, Türkiye
 
 **Yasal Sure:** Talebiniz en gec **30 gun** icinde sonuclandirilir. Islem ucret gerektiriyorsa (Kurul tarifesi), bilgilendirilirsiniz.
 

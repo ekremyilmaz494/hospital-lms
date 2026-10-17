@@ -10,15 +10,15 @@ export const metadata: Metadata = pageMetadata({
 });
 
 // KVKK / yasal basvuru e-postasi (veri sorumlusu irtibat kutusu).
-const CONTACT_EMAIL = "kvkk@klinovax.info";
+const CONTACT_EMAIL = "ekrem@klinovax.com";
 // Genel teknik destek kutusu.
-const SUPPORT_EMAIL = "ekremyilmaz@klinovax.info";
+const SUPPORT_EMAIL = "ekrem@klinovax.com";
 
 const LAST_UPDATED = "Temmuz 2026";
 
 // Veri sorumlusu — gercek kisi (sirket tuzel kisiligi yok).
 const LEGAL_ENTITY = "Ekrem Yilmaz";
-const LEGAL_ADDRESS = "Buhara Mah. Baris Cad. Damlakent Sitesi No: 77/6, Selcuklu / Konya";
+const LEGAL_ADDRESS = "Konya, Türkiye";
 const VERBIS_NUMBER = "Basvuru surecinde";
 
 const headingPrimary = { color: "var(--color-text-primary)" } as const;

@@ -263,4 +263,4 @@ tarihi, kanalı, sayaçları ve hata satırları Türkçe açıklamalarıyla lis
 ## İletişim
 
 Entegrasyon desteği için:
-**ekremyilmaz@klinovax.info · 0553 953 06 96**
+**ekrem@klinovax.com · 0553 953 06 96**

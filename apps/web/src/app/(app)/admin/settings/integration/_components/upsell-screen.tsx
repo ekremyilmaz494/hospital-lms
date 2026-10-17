@@ -3,7 +3,7 @@
 import { ChevronRight, LockKeyhole, CheckCircle2, Mail } from 'lucide-react';
 import { BlurFade } from '@/components/ui/blur-fade';
 
-const CONTACT_EMAIL = 'ekremyilmaz@klinovax.info';
+const CONTACT_EMAIL = 'ekrem@klinovax.com';
 
 const BENEFITS = [
   'Personel listesi İK/HBYS sisteminizle otomatik senkronize edilir',
