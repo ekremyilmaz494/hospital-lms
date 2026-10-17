@@ -126,8 +126,8 @@ export default function LoginBrandPanel() {
           Eğitimi yükleyin,<br />gerisi <em>otomatik.</em>
         </h1>
         <p className="lbp-lead">
-          Tek işiniz eğitimi yüklemek — sınav, atama, sertifika ve raporu yapay zekâ
-          sizin için üretir.
+          Eğitimi yükleyin; atama, sınav, sertifika ve raporlar aynı akışta hazırlanır.
+          Sınav soruları yapay zekâ desteğiyle de üretilebilir.
         </p>
         <div className="lbp-art">
           <LoginAutomationFlow />
@@ -139,7 +139,7 @@ export default function LoginBrandPanel() {
         <div className="lbp-trust">
           <span className="lbp-pill">
             <ShieldCheck size={14} strokeWidth={2} style={{ color: MINT }} />
-            KVKK Uyumlu
+            KVKK süreçlerini destekler
           </span>
         </div>
         <div className="lbp-rule" />
