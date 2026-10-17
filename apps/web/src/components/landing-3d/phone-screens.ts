@@ -338,14 +338,14 @@ function drawReports(ctx: CanvasRenderingContext2D): void {
     ctx.fill();
   }
 
-  // Başarı oranı
+  // Rapor türü sayısı (ürün gerçeği: 7 rapor, PDF/Excel çıktı)
   ctx.textAlign = 'left';
   ctx.fillStyle = C.ink;
   ctx.font = `800 80px ${FONT}`;
-  ctx.fillText('%94', bx, iy + ih + 112);
+  ctx.fillText('7', bx, iy + ih + 112);
   ctx.fillStyle = C.inkSoft;
   ctx.font = `500 28px ${FONT}`;
-  ctx.fillText('ortalama başarı oranı', bx, iy + ih + 156);
+  ctx.fillText('rapor türü · PDF ve Excel', bx, iy + ih + 156);
 
   // KVKK uyum rozeti
   pill(ctx, W / 2, iy + ih + 232, 380, 84, C.surface, C.brand, 'Denetime hazır');
@@ -456,10 +456,10 @@ function drawMobile(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('Vardiyada · Evde · Serviste', W / 2, cy + ch + 152);
 }
 
-// ── TRUST — sahada kanıtlı referans (Devakent logosu) ───────────────────────
+// ── TRUST — referans müşteri (Devakent logosu) ──────────────────────────────
 function drawTrust(ctx: CanvasRenderingContext2D): void {
   statusBar(ctx);
-  sectionTitle(ctx, 'GÜVENİYOR', 'Sahada', 'kanıtlı.');
+  sectionTitle(ctx, 'REFERANS', 'Sahada', 'kullanılıyor.');
 
   // Logo kartı — Devakent logosu (contain, kırpmasız), açık zemin.
   const cx = 56;
@@ -481,11 +481,11 @@ function drawTrust(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('Özel', W / 2, cy + ch + 96);
   ctx.fillText('Devakent Hastanesi', W / 2, cy + ch + 144);
 
-  // Etiket — uçtan uca eğitim tercihi.
+  // Etiket — tek referans müşteri; çoğul/genelleme iddiası yok.
   ctx.fillStyle = C.inkSoft;
   ctx.font = `500 28px ${FONT}`;
-  ctx.fillText('Sağlık kurumlarının uçtan uca', W / 2, cy + ch + 200);
-  ctx.fillText('eğitim tercihi', W / 2, cy + ch + 238);
+  ctx.fillText('Personel eğitimlerini', W / 2, cy + ch + 200);
+  ctx.fillText('KlinoVax ile yönetiyor', W / 2, cy + ch + 238);
 
   // Rozet — aktif kullanım.
   pill(ctx, W / 2, cy + ch + 296, 360, 84, C.brand, C.white, 'Aktif kullanımda');

@@ -1,107 +1,42 @@
+import { Fragment, type ReactNode } from 'react';
 import Link from 'next/link';
+import '@/app/landing-3d/landing-3d-bands.css';
+import {
+  DIFFERENTIATORS,
+  FAQ,
+  FEATURE_GROUPS,
+  FINAL_CTA,
+  FLOW,
+  HERO,
+  MODULES,
+  SECTIONS,
+  SECURITY,
+  SHOWCASE,
+  STATS,
+  type Module,
+} from './content';
 import { FeatureStat } from './feature-stat';
 import { Footer } from './footer';
 import { StoreBadges } from './store-badges';
 
-type Module = { title: string; desc: string };
-
-// Modüller temaya göre 4 sinematik bölüme dağıtılır (3D model o bölümdeyken
-// ilgili modüller yanında belirir). Tek-blok "Yönetim Merkezi" grid'i kaldırıldı.
-const MODULES_EGITIM: Module[] = [
-  { title: 'Eğitim Sihirbazı', desc: 'Video, doküman ve sınav tek akışta.' },
-  { title: 'Soru Bankası', desc: 'Havuzda topla, sınavlarda tekrar kullan.' },
-  { title: 'Sınav Otomasyonu', desc: 'Ön/son sınav, otomatik geçti-kaldı.' },
-  { title: 'Medya Kütüphanesi', desc: 'Tüm içerik tek merkezde, güvenli erişim.' },
-  { title: 'Eğitim Dönemleri', desc: 'Periyodik eğitimi takvime bağla, tekrarlat.' },
-];
-const MODULES_UYUM: Module[] = [
-  { title: 'KVKK Uyum Raporu', desc: 'Denetime hazır çıktı, anında dışa aktar.' },
-  { title: 'SMG / SKS Takibi', desc: 'Hizmet içi eğitim ve denetim uyumu.' },
-  { title: 'Etkinlik Analizi', desc: 'Eğitimin gerçek etkisini ölç, zayıfı gör.' },
-  { title: 'Sertifikalar', desc: 'Otomatik üretim, geçerlilik takibi, PDF.' },
-  { title: 'İşlem Geçmişi (Audit)', desc: 'Değiştirilemez kayıt, tam izlenebilirlik.' },
-];
-const MODULES_KURUM: Module[] = [
-  { title: 'Personel Yönetimi', desc: 'Toplu içe aktarma; birim ve role göre düzenleme.' },
-  { title: 'Yetkinlik Matrisi', desc: 'Kim neyi tamamladı, kimde eksik var — tek tabloda.' },
-  { title: 'Toplu Eğitim Atama', desc: 'Yüzlerce personele role göre tek tıkla atama.' },
-];
-const MODULES_ERISIM: Module[] = [
-  { title: 'Mobil Uygulama', desc: 'Eğitimi telefondan tamamla, sertifikayı indir.' },
-  { title: 'Bildirimler', desc: 'Otomatik hatırlatma, duyuru, son tarih uyarısı.' },
-  { title: 'Geri Bildirim Formları', desc: 'Form editörü, yanıt toplama, analitik.' },
-];
-
-// Tam genişlik "platform" showcase bandı (sinematik akıştan sonra, telefonsuz alan).
-const SHOWCASE: { img: string; title: string; desc: string }[] = [
-  {
-    img: '/landing-3d/egitim.svg',
-    title: 'Eğitim & Sınav',
-    desc: 'Video, doküman ve otomatik sınavı tek akışta oluştur, ata, ölç.',
-  },
-  {
-    img: '/landing-3d/showcase-mobil.svg',
-    title: 'Mobil Erişim',
-    desc: 'Personel telefonundan tamamlar; yönetici canlı ilerlemeyi izler.',
-  },
-  {
-    img: '/landing-3d/sertifika.svg',
-    title: 'Sertifika & Başarı',
-    desc: 'Otomatik sertifika üretimi, geçerlilik takibi ve PDF indirme.',
-  },
-];
-
-// §5 sağ alan — KlinoVax'ı sıradan LMS'lerden ayıran farklar (küçük spot illüstrasyon).
-const DIFFERENTIATORS: { img: string; title: string; desc: string }[] = [
-  {
-    img: '/landing-3d/diff-video.svg',
-    title: 'İleri-sarma kilidi',
-    desc: 'Personel videoyu atlayamaz; gerçek izleme süresi ölçülür.',
-  },
-  {
-    img: '/landing-3d/diff-rapor.svg',
-    title: 'Denetime hazır uyum',
-    desc: 'KVKK, SKS ve hizmet içi eğitim raporları tek tıkla.',
-  },
-  {
-    img: '/landing-3d/diff-saglik.svg',
-    title: 'Sağlığa özel',
-    desc: 'Hastane iş akışına göre tasarım; verileriniz tamamen izole.',
-  },
-];
-
-// Sık sorulan sorular (sayfa altı, native <details> akordeon).
-const FAQ: { q: string; a: string }[] = [
-  {
-    q: 'KlinoVax tam olarak nedir?',
-    a: 'Hastane, klinik ve eczaneler için uçtan uca personel eğitim ve sınav platformudur. Eğitim oluşturma, atama, video izleme, sınav, sertifika ve denetim raporlamasını tek panelde toplar.',
-  },
-  {
-    q: 'Kurulum ve personel aktarımı ne kadar sürer?',
-    a: 'Kurulum için sunucu yönetimi gerekmez; bulut tabanlıdır. Personeli Excel ile toplu içe aktarabilir, birim ve rollere göre dakikalar içinde eğitim atamaya başlayabilirsiniz.',
-  },
-  {
-    q: 'Verilerimiz güvende mi? KVKK uyumlu mu?',
-    a: 'Evet. Her kurumun verisi tamamen izole edilir; veriler şifreli saklanır ve tüm kritik işlemler değiştirilemez şekilde kayda alınır. KVKK ve hizmet içi eğitim denetimlerine hazır raporlar üretilir.',
-  },
-  {
-    q: 'Mevcut eğitim içeriklerimizi yükleyebilir miyiz?',
-    a: 'Evet. Video ve dokümanlarınızı medya kütüphanesine yükleyip eğitim akışlarınıza ekleyebilir, soru bankasıyla kendi sınavlarınızı oluşturabilirsiniz.',
-  },
-  {
-    q: 'Personel eğitimleri telefondan tamamlayabilir mi?',
-    a: 'Evet. Personel eğitimi mobil cihazından izleyip sınavını olur, sertifikasını anında indirir. Videolarda ileri sarma kapalıdır; gerçek izleme süresi ölçülür.',
-  },
-  {
-    q: 'Birden fazla hastane/şube yönetebilir miyiz?',
-    a: 'Evet. Çok-kurumlu yapıda her şube kendi personeli, eğitimi ve raporuyla tamamen ayrı çalışır; tümünü tek yönetim panelinden izleyebilirsiniz.',
-  },
-];
+/** Başlık satırlarını `<br />` ile birleştirir (satır kırılmaları sabit kalır). */
+function Lines({ lines }: { lines: readonly string[] }) {
+  return (
+    <>
+      {lines.map((line, i) => (
+        <Fragment key={line}>
+          {i > 0 ? <br /> : null}
+          {line}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 /** Bölüm kopyasının içine gömülen editöryel modül listesi (hairline + check ikon). */
-function ModuleList({ items }: { items: Module[] }) {
+function ModuleList({ items }: { items: readonly Module[] }) {
   return (
-    <ul className="l3d-modules">
+    <ul className="l3d-modules" role="list">
       {items.map((m) => (
         <li key={m.title} className="l3d-module">
           <svg className="l3d-module-ico" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -123,160 +58,121 @@ function ModuleList({ items }: { items: Module[] }) {
   );
 }
 
+type StepKey = 'egitim' | 'kanit' | 'olcek' | 'erisim';
+
 /**
- * Altı scroll section + yatay referans bandı + footer. Footer <main> DIŞINDA
- * (ScrollTrigger end "bottom bottom" hesabı bozulmasın). 4 özellik bölümü (01–04)
- * numaralı adım + dikey çizgi ile bağlanır; her bölüme temasına göre modüller dağıtılır.
+ * Numaralı adım bölümünün kopya bloğu (01–04): numara düğümü, eyebrow, başlık, lead,
+ * mobil illüstrasyon ve modül listesi. Bölüme özgü ek öğeler `children` ile gelir.
+ */
+function StepCopy({
+  section,
+  align,
+  modules,
+  children,
+}: {
+  section: StepKey;
+  align: 'l3d-copy-left' | 'l3d-copy-right';
+  modules: readonly Module[];
+  children?: ReactNode;
+}) {
+  const s = SECTIONS[section];
+  return (
+    <div className={`l3d-copy ${align} l3d-step l3d-reveal`}>
+      <span className="l3d-step-num">{s.step}</span>
+      <span className="l3d-eyebrow">{s.eyebrow}</span>
+      <h2 className="l3d-headline-md">
+        <Lines lines={s.headline} />
+      </h2>
+      <p className="l3d-lead">{s.lead}</p>
+      {/* Mobil-only içerik illüstrasyonu (≤768px); masaüstünde display:none */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={s.art} alt="" aria-hidden="true" className="l3d-section-art" />
+      <ModuleList items={modules} />
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Altı scroll section (<main>) + showcase + showcase SONRASI ayrıntı bantları + footer.
+ * Footer <main> DIŞINDA (ScrollTrigger end "bottom bottom" hesabı bozulmasın).
+ * <main> içine bölüm EKLENMEZ: telefon timeline'ı 6 × ~100vh varsayar. Tüm metin
+ * `content.ts` sabitlerinden gelir.
  */
 export function ScrollSections() {
+  const { egitim, kanit, olcek, erisim, guven } = SECTIONS;
+
   return (
     <>
       <main className="l3d-main">
         {/* §1 — HERO */}
-        <section id="hero" data-section="hero" className="l3d-section">
+        <section id={HERO.id} data-section="hero" className="l3d-section">
           <div className="l3d-copy l3d-copy-hero l3d-reveal">
             <span className="l3d-eyebrow" data-hero-text>
-              HASTANELER İÇİN EĞİTİM PLATFORMU
+              {HERO.eyebrow}
             </span>
             <h1 className="l3d-headline" data-hero-text>
-              Eğitimi yükleyin,
-              <br />
-              gerisi otomatik.
+              <Lines lines={HERO.headline} />
             </h1>
             <p className="l3d-lead" data-hero-text>
-              Tek işiniz eğitimi yüklemek. Atama, sınav, ilerleme takibi, sertifika ve
-              denetim raporu — hepsini sistem otomatik üretir. Personeli toplamak, boşa
-              giden mesai ve yarım kalan eğitim geride kaldı.
+              {HERO.lead}
             </p>
             <div className="l3d-cta-row" data-hero-text>
-              <Link href="/demo" className="l3d-cta">
-                Demo Talep Et
+              <Link href={HERO.primaryCta.href} className="l3d-cta">
+                {HERO.primaryCta.label}
               </Link>
-              <a href="#egitim" className="l3d-link">
-                Modülleri keşfet →
+              <a href={HERO.secondaryCta.href} className="l3d-link">
+                {HERO.secondaryCta.label}
               </a>
             </div>
             <div className="l3d-hero-stores" data-hero-text>
-              <span className="l3d-hero-stores-label">Mobil uygulamayı indirin</span>
+              <span className="l3d-hero-stores-label">{HERO.storesLabel}</span>
               <StoreBadges />
             </div>
           </div>
           <div className="l3d-scroll-cue" aria-hidden="true">
-            <span>Keşfetmek için kaydırın</span>
+            <span>{HERO.scrollCue}</span>
             <span className="l3d-scroll-cue-line" />
           </div>
         </section>
 
         {/* §2 — CLOSEUP */}
-        <section id="egitim" data-section="closeup" className="l3d-section">
-          <div className="l3d-copy l3d-copy-right l3d-step l3d-reveal">
-            <span className="l3d-step-num">01</span>
-            <span className="l3d-eyebrow">EĞİTİM YÖNETİMİ</span>
-            <h2 className="l3d-headline-md">
-              Eğitimi siz tasarlayın,
-              <br />
-              sistem yürütsün.
-            </h2>
-            <p className="l3d-lead">
-              Video, doküman ve sınavı tek akışta hazırlayın. İleri sarma kapalı, izleme süresi
-              gerçek — personel eğitimi gerçekten tamamlar, “izlemiş gibi” yapamaz.
-            </p>
-            {/* Mobil-only içerik illüstrasyonu (≤768px); masaüstünde display:none */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/landing-3d/sec-egitim.svg" alt="" aria-hidden="true" className="l3d-section-art" />
-            <ModuleList items={MODULES_EGITIM} />
-          </div>
+        <section id={egitim.id} data-section={egitim.dataSection} className="l3d-section">
+          <StepCopy section="egitim" align="l3d-copy-right" modules={MODULES.egitim} />
         </section>
 
         {/* §3 — FRONT + STATS */}
-        <section id="kanit" data-section="front" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
-            <span className="l3d-step-num">02</span>
-            <span className="l3d-eyebrow">UYUM & RAPORLAMA</span>
-            <h2 className="l3d-headline-md">
-              Denetime
-              <br />
-              her an hazır.
-            </h2>
-            <p className="l3d-lead">
-              Tamamlanma oranları, sertifika geçerlilikleri ve KVKK uyum raporları tek tıkla.
-              Değiştirilemez işlem kayıtlarıyla tam izlenebilirlik.
-            </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/landing-3d/sec-uyum.svg" alt="" aria-hidden="true" className="l3d-section-art" />
-            <ModuleList items={MODULES_UYUM} />
-          </div>
+        <section id={kanit.id} data-section={kanit.dataSection} className="l3d-section">
+          <StepCopy section="kanit" align="l3d-copy-left" modules={MODULES.kanit} />
           <div className="l3d-stats l3d-reveal">
-            <FeatureStat label="TAMAMLANAN EĞİTİM" value="12.480" unit="+" />
-            <FeatureStat label="BAŞARI ORANI" value="94" unit="%" />
-            <FeatureStat label="AKTİF KURUM" value="40" unit="+" />
+            {STATS.map((s) => (
+              <FeatureStat key={s.label} label={s.label} value={s.value} unit={s.unit} />
+            ))}
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/landing-3d/uyum.svg"
-            alt=""
-            aria-hidden="true"
-            className="l3d-art l3d-art-uyum"
-          />
+          <img src={kanit.sideArt.src} alt="" aria-hidden="true" className={kanit.sideArt.className} />
         </section>
 
         {/* §4 — TOP */}
-        <section id="olcek" data-section="top" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
-            <span className="l3d-step-num">03</span>
-            <span className="l3d-eyebrow">PERSONEL YÖNETİMİ</span>
-            <h2 className="l3d-headline-md">
-              Mesai kaybı
-              <br />
-              olmadan eğitin.
-            </h2>
-            <p className="l3d-lead">
-              Eğitim için personeli salonda toplamaya, işini bırakıp gelmesini beklemeye gerek yok —
-              mesai kaybı olmaz. Herkes kendi vardiyasında tamamlar; siz birim ve role göre toplu
-              atar, kimde eksik kaldığını yetkinlik matrisinde tek tabloda görürsünüz.
-            </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/landing-3d/sec-personel.svg" alt="" aria-hidden="true" className="l3d-section-art" />
-            <ModuleList items={MODULES_KURUM} />
-          </div>
+        <section id={olcek.id} data-section={olcek.dataSection} className="l3d-section">
+          <StepCopy section="olcek" align="l3d-copy-left" modules={MODULES.olcek} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/landing-3d/kurum.svg"
-            alt=""
-            aria-hidden="true"
-            className="l3d-art l3d-art-kurum"
-          />
+          <img src={olcek.sideArt.src} alt="" aria-hidden="true" className={olcek.sideArt.className} />
         </section>
 
         {/* §5 — BACK */}
-        <section id="erisim" data-section="back" className="l3d-section">
-          <div className="l3d-copy l3d-copy-left l3d-step l3d-reveal">
-            <span className="l3d-step-num">04</span>
-            <span className="l3d-eyebrow">MOBİL ERİŞİM</span>
-            <h2 className="l3d-headline-md">
-              Her yerden,
-              <br />
-              her cihazdan.
-            </h2>
-            <p className="l3d-lead">
-              Personel eğitimini telefonundan tamamlar, sertifikasını anında indirir. Yöneticiler
-              ilerlemeyi ve geri bildirimi gerçek zamanlı görür.
-            </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/landing-3d/sec-erisim.svg" alt="" aria-hidden="true" className="l3d-section-art" />
-            <ModuleList items={MODULES_ERISIM} />
+        <section id={erisim.id} data-section={erisim.dataSection} className="l3d-section">
+          <StepCopy section="erisim" align="l3d-copy-left" modules={MODULES.erisim}>
             <StoreBadges className="l3d-store-badges-section" />
-          </div>
+          </StepCopy>
           {/* Sağ alan — projeyi diğerlerinden ayıran 3 fark, küçük illüstrasyonlarla */}
-          <aside className="l3d-diff l3d-reveal" aria-label="KlinoVax farkı">
-            <span className="l3d-eyebrow">NEDEN FARKLI</span>
+          <aside className="l3d-diff l3d-reveal" aria-label={DIFFERENTIATORS.ariaLabel}>
+            <span className="l3d-eyebrow">{DIFFERENTIATORS.eyebrow}</span>
             <h3 className="l3d-diff-title">
-              Sıradan bir
-              <br />
-              LMS değil.
+              <Lines lines={DIFFERENTIATORS.titleLines} />
             </h3>
-            <ul className="l3d-diff-list">
-              {DIFFERENTIATORS.map((d) => (
+            <ul className="l3d-diff-list" role="list">
+              {DIFFERENTIATORS.items.map((d) => (
                 <li key={d.title} className="l3d-diff-item">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={d.img} alt="" aria-hidden="true" className="l3d-diff-ico" />
@@ -291,42 +187,36 @@ export function ScrollSections() {
         </section>
 
         {/* §6 — GÜVEN (Devakent referansı; telefon ekranında logo görünür) */}
-        <section id="guven" data-section="guven" className="l3d-section">
+        <section id={guven.id} data-section={guven.dataSection} className="l3d-section">
           <div className="l3d-copy l3d-copy-left l3d-copy-guven l3d-reveal">
-            <span className="l3d-eyebrow">REFERANS</span>
+            <span className="l3d-eyebrow">{guven.eyebrow}</span>
             <h2 className="l3d-headline-md">
-              Sahada
-              <br />
-              kullanılıyor.
+              <Lines lines={guven.headline} />
             </h2>
-            <p className="l3d-lead">
-              Özel Devakent Hastanesi, personel eğitiminden denetim raporlamasına kadar uçtan uca
-              KlinoVax kullanıyor.
-            </p>
+            <p className="l3d-lead">{guven.lead}</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/landing-3d/sec-referans.svg" alt="" aria-hidden="true" className="l3d-section-art" />
+            <img src={guven.art} alt="" aria-hidden="true" className="l3d-section-art" />
             <div className="l3d-trust-row">
-              <span className="l3d-trust-label">GÜVENİYOR</span>
+              <span className="l3d-trust-label">{guven.trust.label}</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logos/devakent.png"
-                alt="Özel Devakent Hastanesi"
-                className="l3d-trust-logo"
-              />
-              <span className="l3d-trust-name">Özel Devakent Hastanesi</span>
+              <img src={guven.trust.logo} alt={guven.trust.logoAlt} className="l3d-trust-logo" />
+              <span className="l3d-trust-name">{guven.trust.name}</span>
             </div>
           </div>
         </section>
       </main>
 
-      {/* Platform showcase — tam genişlik, 3 büyük illüstrasyon kartı */}
-      <section className="l3d-showcase" aria-label="Platform">
+      {/* ── <main> SONRASI — canvas showcase'te kaydırılıp çıkar; aşağısı telefonsuzdur ── */}
+
+      {/* Platform showcase — tam genişlik, 3 büyük illüstrasyon kartı.
+          `.l3d-showcase` sınıfı DOM'daki İLK eşleşme olmalı (scene-client.tsx). */}
+      <section id={SHOWCASE.id} className="l3d-showcase" aria-label={SHOWCASE.ariaLabel}>
         <div className="l3d-showcase-head l3d-reveal">
-          <span className="l3d-eyebrow">PLATFORM</span>
-          <h2 className="l3d-showcase-title">Tek platform, uçtan uca.</h2>
+          <span className="l3d-eyebrow">{SHOWCASE.eyebrow}</span>
+          <h2 className="l3d-showcase-title">{SHOWCASE.title}</h2>
         </div>
-        <ul className="l3d-showcase-grid l3d-reveal">
-          {SHOWCASE.map((c) => (
+        <ul className="l3d-showcase-grid l3d-reveal" role="list">
+          {SHOWCASE.cards.map((c) => (
             <li key={c.title} className="l3d-showcase-card">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={c.img} alt="" aria-hidden="true" className="l3d-showcase-img" />
@@ -337,14 +227,97 @@ export function ScrollSections() {
         </ul>
       </section>
 
-      {/* Sık sorulan sorular — native <details> akordeon (client JS gerektirmez) */}
-      <section id="sss" className="l3d-faq" aria-label="Sık sorulan sorular">
-        <div className="l3d-faq-head l3d-reveal">
-          <span className="l3d-eyebrow">SIK SORULAN SORULAR</span>
-          <h2 className="l3d-showcase-title">Aklınızdaki sorular</h2>
+      {/* Nasıl çalışır — gerçek bir sıra olduğu için numaralı <ol> */}
+      <section
+        id={FLOW.id}
+        className="l3d-band l3d-band--surface"
+        aria-labelledby="nasil-calisir-baslik"
+      >
+        <div className="l3d-band-head l3d-reveal">
+          <span className="l3d-eyebrow">{FLOW.eyebrow}</span>
+          <h2 id="nasil-calisir-baslik" className="l3d-showcase-title">
+            {FLOW.title}
+          </h2>
+          <p className="l3d-band-lead">{FLOW.lead}</p>
         </div>
-        <ul className="l3d-faq-list l3d-reveal">
-          {FAQ.map((f) => (
+        <ol className="l3d-flow-grid l3d-reveal" role="list">
+          {FLOW.steps.map((step, i) => (
+            <li key={step.title} className="l3d-flow-step">
+              <span className="l3d-flow-num" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3 className="l3d-flow-title">{step.title}</h3>
+              <p className="l3d-flow-desc">{step.desc}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Özellikler — 4 grup, mevcut ModuleList ile */}
+      <section id={FEATURE_GROUPS.id} className="l3d-band" aria-labelledby="ozellikler-baslik">
+        <div className="l3d-band-head l3d-reveal">
+          <span className="l3d-eyebrow">{FEATURE_GROUPS.eyebrow}</span>
+          <h2 id="ozellikler-baslik" className="l3d-showcase-title">
+            {FEATURE_GROUPS.title}
+          </h2>
+          <p className="l3d-band-lead">{FEATURE_GROUPS.lead}</p>
+        </div>
+        <div className="l3d-feature-groups l3d-reveal">
+          {FEATURE_GROUPS.groups.map((g) => (
+            <div key={g.title} className="l3d-feature-group">
+              <h3 className="l3d-feature-group-title">{g.title}</h3>
+              <ModuleList items={g.modules} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Güvenlik — "teknik künye": sayfadaki tek imza öğe. Mono etiketli spesifikasyon satırları. */}
+      <section
+        id={SECURITY.id}
+        className="l3d-band l3d-band--dark"
+        aria-labelledby="guvenlik-baslik"
+      >
+        <div className="l3d-band-inner">
+          <div className="l3d-band-head l3d-band-head--left l3d-reveal">
+            <span className="l3d-eyebrow">{SECURITY.eyebrow}</span>
+            <h2 id="guvenlik-baslik" className="l3d-showcase-title">
+              {SECURITY.title}
+            </h2>
+            <p className="l3d-band-lead">{SECURITY.lead}</p>
+          </div>
+          <div className="l3d-spec l3d-reveal">
+            <div className="l3d-spec-bar">
+              <span className="l3d-spec-bar-title">{SECURITY.panelTitle}</span>
+            </div>
+            <dl className="l3d-spec-list">
+              {SECURITY.rows.map((row) => (
+                <div key={row.label} className="l3d-spec-row">
+                  <dt className="l3d-spec-label">{row.label}</dt>
+                  <dd className="l3d-spec-value">
+                    {row.items.map((item) => (
+                      <span key={item.text} className="l3d-spec-item">
+                        {item.text}
+                        {item.note ? <span className="l3d-spec-note">{item.note}</span> : null}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="l3d-spec-foot">{SECURITY.footnote}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Sık sorulan sorular — native <details> akordeon (client JS gerektirmez) */}
+      <section id={FAQ.id} className="l3d-faq" aria-label={FAQ.ariaLabel}>
+        <div className="l3d-faq-head l3d-reveal">
+          <span className="l3d-eyebrow">{FAQ.eyebrow}</span>
+          <h2 className="l3d-showcase-title">{FAQ.title}</h2>
+        </div>
+        <ul className="l3d-faq-list l3d-reveal" role="list">
+          {FAQ.items.map((f) => (
             <li key={f.q} className="l3d-faq-item">
               <details className="l3d-faq-details">
                 <summary className="l3d-faq-q">
@@ -356,6 +329,24 @@ export function ScrollSections() {
             </li>
           ))}
         </ul>
+      </section>
+
+      {/* Kapanış CTA bandı */}
+      <section className="l3d-band l3d-final-cta" aria-labelledby="son-cta-baslik">
+        <div className="l3d-final-cta-inner l3d-reveal">
+          <h2 id="son-cta-baslik" className="l3d-showcase-title">
+            {FINAL_CTA.title}
+          </h2>
+          <p className="l3d-band-lead">{FINAL_CTA.lead}</p>
+          <div className="l3d-final-cta-actions">
+            <Link href={FINAL_CTA.primary.href} className="l3d-cta">
+              {FINAL_CTA.primary.label}
+            </Link>
+            <Link href={FINAL_CTA.secondary.href} className="l3d-cta-ghost">
+              {FINAL_CTA.secondary.label}
+            </Link>
+          </div>
+        </div>
       </section>
 
       <Footer />

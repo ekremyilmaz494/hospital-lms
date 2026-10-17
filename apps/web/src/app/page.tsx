@@ -5,17 +5,18 @@ import { Header } from '@/components/landing-3d/header';
 import { LoadingScreen } from '@/components/landing-3d/loading-screen';
 import { SceneClient } from '@/components/landing-3d/scene-client';
 import { ScrollSections } from '@/components/landing-3d/scroll-sections';
+import { faqJsonLd } from '@/components/landing-3d/content';
 import { MobileReveal } from '@/components/landing-3d/mobile-reveal';
 import '@/app/landing-3d/landing-3d.css';
 
 export const metadata: Metadata = {
-  title: `${BRAND.name} — Hastaneler için Eğitim & Sınav Platformu`,
+  title: `${BRAND.name} — Sağlık Kurumları için Personel Eğitim Platformu`,
   description:
-    'Hastane, klinik ve eczaneler için uçtan uca personel eğitim platformu. Atama, video eğitim, sınav, sertifika ve KVKK uyum raporlaması — tek akışta.',
+    'Eğitimi bir kez yükleyin; atama, hatırlatma, sınav, sertifika ve denetim raporları tek panelde. Personel eğitimini web veya telefondan tamamlar. 30 gün ücretsiz deneyin.',
   openGraph: {
-    title: `${BRAND.name} — Personeliniz Her Zaman Hazır`,
+    title: `${BRAND.name} — Eğitimi Yükleyin, Gerisi Otomatik`,
     description:
-      'Hastane, klinik ve eczaneler için uçtan uca eğitim platformu. Denetime her an hazır.',
+      'Sağlık kurumları için personel eğitim, sınav ve uyum platformu. İleri sarma kilitli video, sertifika ve denetim raporları. Kurumunuzda 30 gün ücretsiz deneyin.',
     type: 'website',
     locale: 'tr_TR',
   },
@@ -39,6 +40,11 @@ export default function LandingPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: organizationJsonLd('tr') }}
+      />
+      {/* SSS içeriğinden türetilen FAQPage — `<` kaçışlı, kullanıcı girdisi yok */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: faqJsonLd() }}
       />
       <div className="l3d-page">
         <Header />
